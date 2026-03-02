@@ -54,6 +54,34 @@
     color: #333;
 }
 
+/* Connection status */
+.conn-status {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-right: 4px;
+}
+
+.conn-status.online {
+    color: #52c41a;
+    background: #f6ffed;
+}
+
+.conn-status.connecting {
+    color: #faad14;
+    background: #fffbe6;
+}
+
+.conn-status.offline {
+    color: #ff4d4f;
+    background: #fff2f0;
+}
+
+.fm-offline {
+    color: #ff4d4f;
+    font-size: 11px;
+}
+
 /* Split content */
 .ssh-content {
     flex: 1;

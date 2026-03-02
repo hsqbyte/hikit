@@ -44,9 +44,11 @@ const App: React.FC = () => {
         if (activeTab.connectionType === 'ssh') {
             return (
                 <SSHView
+                    key={activeTab.assetId}
                     hostName={activeTab.title}
                     groupName={parentGroup?.name}
                     host={currentAsset?.host}
+                    assetId={activeTab.assetId}
                 />
             );
         }

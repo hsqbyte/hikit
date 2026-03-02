@@ -1,6 +1,11 @@
-import React, { useRef, useState } from 'react';
-import { Breadcrumb, Tooltip } from 'antd';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
+import { Breadcrumb, Tooltip, message } from 'antd';
 import { SplitCellsOutlined } from '@ant-design/icons';
+import { Terminal } from '@xterm/xterm';
+import { FitAddon } from '@xterm/addon-fit';
+import '@xterm/xterm/css/xterm.css';
+import { SSHConnect, SSHSendInput, SSHResize, SSHDisconnect } from '../../wailsjs/go/main/App';
+import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime';
 import FileManager from './FileManager';
 import './SSHView.css';
 
@@ -8,51 +13,160 @@ interface SSHViewProps {
     hostName: string;
     groupName?: string;
     host?: string;
+    assetId: string;
 }
 
-const SSHView: React.FC<SSHViewProps> = ({ hostName, groupName, host }) => {
+const SSHView: React.FC<SSHViewProps> = ({ hostName, groupName, host, assetId }) => {
     const [showFileManager, setShowFileManager] = useState(true);
     const [splitRatio, setSplitRatio] = useState(55);
+    const [sessionId, setSessionId] = useState<string | null>(null);
+    const [connected, setConnected] = useState(false);
+    const [connecting, setConnecting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const terminalRef = useRef<HTMLDivElement>(null);
+    const termRef = useRef<Terminal | null>(null);
+    const fitRef = useRef<FitAddon | null>(null);
     const isDraggingRef = useRef(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
-    // Mock terminal with line numbers (matching HexHub style)
-    const terminalLines = [
-        { num: 1009, content: '2026-03-02 20:05:33 root ls' },
-        { num: 1010, content: '2026-03-02 20:05:35 root git log' },
-        { num: 1011, content: '2026-03-02 20:05:37 root clear' },
-        { num: 1012, content: '2026-03-02 20:05:37 root ls' },
-        { num: 1013, content: '2026-03-02 20:05:40 root cd internal/' },
-        { num: 1014, content: '2026-03-02 20:05:42 root ls' },
-        { num: 1015, content: '2026-03-02 20:05:46 root cd co' },
-        { num: 1016, content: '2026-03-02 20:05:48 root ls' },
-        { num: 1017, content: '2026-03-02 20:05:50 root cd core/' },
-        { num: 1018, content: '2026-03-02 20:05:52 root cd node/' },
-        { num: 1019, content: '2026-03-02 20:05:55 root vim double_check.go' },
-        { num: 1020, content: '2026-03-02 20:06:55 root vim double_check.go' },
-        { num: 1021, content: '2026-03-02 20:06:59 root ls' },
-        { num: 1022, content: '2026-03-02 20:07:00 root cd ..' },
-        { num: 1023, content: '2026-03-02 20:07:00 root . ls' },
-        { num: 1024, content: '2026-03-02 20:07:00 root cd ..' },
-        { num: 1025, content: '2026-03-02 20:07:00 root ls' },
-        { num: 1026, content: '2026-03-02 20:07:04 root history' },
-        { num: 0, content: 'root@opt/hkchat-api$ docker build -f deploy/docker/Dockerfile -t hkchat-api:0.6.3 .' },
-        { num: 0, content: '[+] Building 1.6s [23/23] FINISHED                    docker:default' },
-        { num: 0, content: ' => [internal] load build definition from Dockerfile                     0.0s' },
-        { num: 0, content: ' => => transferring dockerfile: 1.68kB                                   0.0s' },
-        { num: 0, content: ' => [internal] load metadata for docker.io/library/golang:1.25-alpine    1.2s' },
-        { num: 0, content: ' => [internal] load metadata for docker.io/library/ubuntu:22.04          0.0s' },
-        { num: 0, content: ' => [internal] load .dockerignore                                        0.0s' },
-        { num: 0, content: ' => => transferring context: 28                                          0.0s' },
-        { num: 0, content: '' },
-        { num: 0, content: ' => exporting to image                                                   0.0s' },
-        { num: 0, content: ' => => naming to docker.io/library/hkchat-api:0.6.3' },
-        { num: 0, content: '' },
-        { num: 0, content: 'root@opt/hkchat-api$ git pull' },
-        { num: 0, content: 'remote: Enumerating objects: 9, done.' },
-        { num: 0, content: 'remote: Counting objects: 100% (9/9), done.' },
-    ];
+    // Initialize terminal
+    useEffect(() => {
+        if (!terminalRef.current) return;
 
+        const term = new Terminal({
+            cursorBlink: true,
+            cursorStyle: 'bar',
+            fontSize: 13,
+            fontFamily: "'Menlo', 'Monaco', 'Courier New', monospace",
+            theme: {
+                background: '#1e1e2e',
+                foreground: '#cdd6f4',
+                cursor: '#89b4fa',
+                selectionBackground: '#45475a',
+                black: '#45475a',
+                red: '#f38ba8',
+                green: '#a6e3a1',
+                yellow: '#f9e2af',
+                blue: '#89b4fa',
+                magenta: '#f5c2e7',
+                cyan: '#94e2d5',
+                white: '#bac2de',
+                brightBlack: '#585b70',
+                brightRed: '#f38ba8',
+                brightGreen: '#a6e3a1',
+                brightYellow: '#f9e2af',
+                brightBlue: '#89b4fa',
+                brightMagenta: '#f5c2e7',
+                brightCyan: '#94e2d5',
+                brightWhite: '#a6adc8',
+            },
+            allowProposedApi: true,
+        });
+
+        const fit = new FitAddon();
+        term.loadAddon(fit);
+        term.open(terminalRef.current);
+
+        // Fit to container
+        setTimeout(() => fit.fit(), 100);
+
+        termRef.current = term;
+        fitRef.current = fit;
+
+        // Handle resize
+        const resizeObserver = new ResizeObserver(() => {
+            try { fit.fit(); } catch { }
+        });
+        resizeObserver.observe(terminalRef.current);
+
+        return () => {
+            resizeObserver.disconnect();
+            term.dispose();
+            termRef.current = null;
+            fitRef.current = null;
+        };
+    }, []);
+
+    // Connect to SSH when terminal is ready
+    useEffect(() => {
+        if (!termRef.current || !assetId) return;
+
+        const connect = async () => {
+            setConnecting(true);
+            setError(null);
+            termRef.current?.writeln('\x1b[90m正在连接...\x1b[0m');
+
+            try {
+                const sid = await SSHConnect(assetId);
+                setSessionId(sid);
+                setConnected(true);
+                setConnecting(false);
+            } catch (err: any) {
+                const errMsg = err?.message || String(err);
+                setError(errMsg);
+                setConnecting(false);
+                termRef.current?.writeln(`\x1b[31m连接失败: ${errMsg}\x1b[0m`);
+                termRef.current?.writeln('\x1b[90m请检查主机地址、端口和认证信息\x1b[0m');
+            }
+        };
+
+        connect();
+
+        return () => {
+            // Disconnect on unmount
+            if (sessionId) {
+                SSHDisconnect(sessionId);
+            }
+        };
+    }, [assetId]);
+
+    // Wire up terminal I/O when connected
+    useEffect(() => {
+        if (!sessionId || !termRef.current) return;
+        const term = termRef.current;
+
+        // Send keyboard input to SSH
+        const dataDisposable = term.onData((data) => {
+            SSHSendInput(sessionId, data).catch(console.error);
+        });
+
+        // Resize handler
+        const resizeDisposable = term.onResize(({ cols, rows }) => {
+            SSHResize(sessionId, cols, rows).catch(console.error);
+        });
+
+        // Receive SSH output via Wails events
+        const outputEvent = `ssh:output:${sessionId}`;
+        const closedEvent = `ssh:closed:${sessionId}`;
+
+        EventsOn(outputEvent, (data: string) => {
+            term.write(data);
+        });
+
+        EventsOn(closedEvent, () => {
+            term.writeln('\r\n\x1b[31m连接已断开\x1b[0m');
+            setConnected(false);
+        });
+
+        // Send initial resize
+        if (fitRef.current) {
+            try {
+                fitRef.current.fit();
+                const { cols, rows } = term;
+                SSHResize(sessionId, cols, rows).catch(console.error);
+            } catch { }
+        }
+
+        return () => {
+            dataDisposable.dispose();
+            resizeDisposable.dispose();
+            EventsOff(outputEvent);
+            EventsOff(closedEvent);
+        };
+    }, [sessionId]);
+
+    // Splitter drag
     const handleMouseDown = (e: React.MouseEvent) => {
         isDraggingRef.current = true;
         e.preventDefault();
@@ -68,6 +182,10 @@ const SSHView: React.FC<SSHViewProps> = ({ hostName, groupName, host }) => {
             isDraggingRef.current = false;
             document.removeEventListener('mousemove', handleMouseMove);
             document.removeEventListener('mouseup', handleMouseUp);
+            // Refit terminal after resize
+            if (fitRef.current) {
+                try { fitRef.current.fit(); } catch { }
+            }
         };
 
         document.addEventListener('mousemove', handleMouseMove);
@@ -76,7 +194,6 @@ const SSHView: React.FC<SSHViewProps> = ({ hostName, groupName, host }) => {
 
     return (
         <div className="ssh-view">
-            {/* Breadcrumb + toolbar header */}
             <div className="ssh-header">
                 <Breadcrumb
                     items={[
@@ -86,10 +203,16 @@ const SSHView: React.FC<SSHViewProps> = ({ hostName, groupName, host }) => {
                     ]}
                 />
                 <div className="ssh-header-actions">
+                    <span className={`conn-status ${connected ? 'online' : connecting ? 'connecting' : 'offline'}`}>
+                        {connected ? '● 已连接' : connecting ? '○ 连接中...' : '● 未连接'}
+                    </span>
                     <Tooltip title={showFileManager ? '隐藏文件管理器' : '显示文件管理器'}>
                         <button
                             className="ssh-action-btn"
-                            onClick={() => setShowFileManager(!showFileManager)}
+                            onClick={() => {
+                                setShowFileManager(!showFileManager);
+                                setTimeout(() => { try { fitRef.current?.fit(); } catch { } }, 200);
+                            }}
                         >
                             <SplitCellsOutlined />
                         </button>
@@ -97,50 +220,26 @@ const SSHView: React.FC<SSHViewProps> = ({ hostName, groupName, host }) => {
                 </div>
             </div>
 
-            {/* Split content */}
             <div className="ssh-content" ref={containerRef}>
-                {/* Terminal Panel */}
                 <div
                     className="ssh-terminal-panel"
                     style={{ width: showFileManager ? `${splitRatio}%` : '100%' }}
                 >
-                    <div className="terminal-container">
-                        <div className="terminal-output">
-                            {terminalLines.map((line, i) => (
-                                <div key={i} className="terminal-line">
-                                    {line.num > 0 && (
-                                        <span className="terminal-linenum">{line.num}</span>
-                                    )}
-                                    <span className="terminal-text">{line.content}</span>
-                                </div>
-                            ))}
-                            <div className="terminal-prompt">
-                                <span className="prompt-user">root</span>
-                                <span className="prompt-at">@</span>
-                                <span className="prompt-host">{host || 'server'}</span>
-                                <span className="prompt-sep">:</span>
-                                <span className="prompt-path">~</span>
-                                <span className="prompt-dollar">$ </span>
-                                <span className="terminal-cursor">▌</span>
-                            </div>
-                        </div>
-                    </div>
+                    <div className="terminal-container" ref={terminalRef} />
                 </div>
 
-                {/* Resize Handle */}
                 {showFileManager && (
                     <div className="ssh-splitter" onMouseDown={handleMouseDown}>
                         <div className="splitter-line" />
                     </div>
                 )}
 
-                {/* File Manager Panel */}
                 {showFileManager && (
                     <div
                         className="ssh-file-panel"
                         style={{ width: `${100 - splitRatio}%` }}
                     >
-                        <FileManager />
+                        <FileManager sessionId={sessionId} connected={connected} />
                     </div>
                 )}
             </div>

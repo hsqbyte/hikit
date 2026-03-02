@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"embed"
 	"log"
 
@@ -37,9 +36,7 @@ func main() {
 		},
 		BackgroundColour: &options.RGBA{R: 255, G: 255, B: 255, A: 1},
 		OnStartup:        app.startup,
-		OnShutdown: func(ctx context.Context) {
-			store.Close()
-		},
+		OnShutdown:       app.shutdown,
 		Bind: []interface{}{
 			app,
 		},
