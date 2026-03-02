@@ -3,36 +3,46 @@ import { Tree, Dropdown, Tooltip, Modal, Input, message } from 'antd';
 import type { MenuProps } from 'antd';
 import {
     FolderOutlined,
-    CloudServerOutlined,
-    DatabaseOutlined,
     PlusOutlined,
     DeleteOutlined,
     EditOutlined,
-    ApiOutlined,
-    ConsoleSqlOutlined,
-    DesktopOutlined,
-    ContainerOutlined,
     ReloadOutlined,
     SettingOutlined,
 } from '@ant-design/icons';
+import {
+    SiMysql, SiPostgresql, SiRedis, SiDocker,
+    SiMariadb, SiClickhouse, SiSqlite, SiOracle,
+} from 'react-icons/si';
+import { VscTerminal, VscRemote, VscPulse } from 'react-icons/vsc';
+import { BsDisplay, BsHddNetwork } from 'react-icons/bs';
+import { AiOutlineMergeCells } from 'react-icons/ai';
+import { TbDatabase } from 'react-icons/tb';
 import type { DataNode } from 'antd/es/tree';
 import { useConnectionStore, Asset, ConnectionType } from '../stores/connectionStore';
 import ConnectionEditor from './ConnectionEditor';
 import './AssetTree.css';
 
+const iconStyle = { fontSize: 15, verticalAlign: 'middle' };
+
 const connectionIcons: Record<string, React.ReactNode> = {
-    ssh: <CloudServerOutlined />,
-    mysql: <ConsoleSqlOutlined style={{ color: '#e48e00' }} />,
-    postgresql: <DatabaseOutlined style={{ color: '#336791' }} />,
-    redis: <DatabaseOutlined style={{ color: '#d32f2f' }} />,
-    docker: <ContainerOutlined style={{ color: '#2196f3' }} />,
-    rdp: <DesktopOutlined />,
-    telnet: <ApiOutlined />,
+    ssh: <VscTerminal style={{ ...iconStyle, color: '#333' }} />,
+    ssh_tunnel: <AiOutlineMergeCells style={{ ...iconStyle, color: '#666' }} />,
+    telnet: <BsHddNetwork style={{ ...iconStyle, color: '#666' }} />,
+    rdp: <BsDisplay style={{ ...iconStyle, color: '#0078d4' }} />,
+    docker: <SiDocker style={{ ...iconStyle, color: '#2496ed' }} />,
+    redis: <SiRedis style={{ ...iconStyle, color: '#dc382d' }} />,
+    mysql: <SiMysql style={{ ...iconStyle, color: '#4479a1' }} />,
+    mariadb: <SiMariadb style={{ ...iconStyle, color: '#003545' }} />,
+    postgresql: <SiPostgresql style={{ ...iconStyle, color: '#4169e1' }} />,
+    sqlserver: <TbDatabase style={{ ...iconStyle, color: '#cc2927' }} />,
+    clickhouse: <SiClickhouse style={{ ...iconStyle, color: '#ffcc00' }} />,
+    sqlite: <SiSqlite style={{ ...iconStyle, color: '#003b57' }} />,
+    oracle: <SiOracle style={{ ...iconStyle, color: '#f80000' }} />,
 };
 
 const getIcon = (a: Asset): React.ReactNode => {
     if (a.type === 'group') return <FolderOutlined style={{ color: '#e8a838' }} />;
-    return connectionIcons[a.connectionType || 'ssh'] || <CloudServerOutlined />;
+    return connectionIcons[a.connectionType || 'ssh'] || <VscTerminal style={iconStyle} />;
 };
 
 const convertToTreeData = (assets: Asset[]): DataNode[] => {
@@ -57,19 +67,19 @@ const findAsset = (assets: Asset[], id: string): Asset | undefined => {
 };
 
 const newConnectionTypes: { key: ConnectionType; label: string; icon: React.ReactNode }[] = [
-    { key: 'ssh', label: 'SSH', icon: <CloudServerOutlined /> },
-    { key: 'ssh_tunnel', label: 'SSH 隧道', icon: <ApiOutlined /> },
-    { key: 'telnet', label: 'Telnet', icon: <ApiOutlined /> },
-    { key: 'rdp', label: 'RDP', icon: <DesktopOutlined /> },
-    { key: 'docker', label: 'Docker', icon: <ContainerOutlined /> },
-    { key: 'redis', label: 'Redis', icon: <DatabaseOutlined /> },
-    { key: 'mysql', label: 'MySQL', icon: <ConsoleSqlOutlined /> },
-    { key: 'mariadb', label: 'MariaDB', icon: <ConsoleSqlOutlined /> },
-    { key: 'postgresql', label: 'PostgreSQL', icon: <DatabaseOutlined /> },
-    { key: 'sqlserver', label: 'SQL Server', icon: <DatabaseOutlined /> },
-    { key: 'clickhouse', label: 'ClickHouse', icon: <DatabaseOutlined /> },
-    { key: 'sqlite', label: 'SQLite', icon: <DatabaseOutlined /> },
-    { key: 'oracle', label: 'Oracle', icon: <DatabaseOutlined /> },
+    { key: 'ssh', label: 'SSH', icon: <VscTerminal style={iconStyle} /> },
+    { key: 'ssh_tunnel', label: 'SSH 隧道', icon: <AiOutlineMergeCells style={iconStyle} /> },
+    { key: 'telnet', label: 'Telnet', icon: <BsHddNetwork style={iconStyle} /> },
+    { key: 'rdp', label: 'RDP', icon: <BsDisplay style={{ ...iconStyle, color: '#0078d4' }} /> },
+    { key: 'docker', label: 'Docker', icon: <SiDocker style={{ ...iconStyle, color: '#2496ed' }} /> },
+    { key: 'redis', label: 'Redis', icon: <SiRedis style={{ ...iconStyle, color: '#dc382d' }} /> },
+    { key: 'mysql', label: 'MySQL', icon: <SiMysql style={{ ...iconStyle, color: '#4479a1' }} /> },
+    { key: 'mariadb', label: 'MariaDB', icon: <SiMariadb style={{ ...iconStyle, color: '#003545' }} /> },
+    { key: 'postgresql', label: 'PostgreSQL', icon: <SiPostgresql style={{ ...iconStyle, color: '#4169e1' }} /> },
+    { key: 'sqlserver', label: 'SQL Server', icon: <TbDatabase style={{ ...iconStyle, color: '#cc2927' }} /> },
+    { key: 'clickhouse', label: 'ClickHouse', icon: <SiClickhouse style={{ ...iconStyle, color: '#ffcc00' }} /> },
+    { key: 'sqlite', label: 'SQLite', icon: <SiSqlite style={{ ...iconStyle, color: '#003b57' }} /> },
+    { key: 'oracle', label: 'Oracle', icon: <SiOracle style={{ ...iconStyle, color: '#f80000' }} /> },
 ];
 
 const AssetTree: React.FC = () => {

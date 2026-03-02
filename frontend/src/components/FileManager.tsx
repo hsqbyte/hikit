@@ -5,18 +5,18 @@ import {
     ArrowLeftOutlined,
     ReloadOutlined,
     ArrowUpOutlined,
-    FolderOutlined,
-    FileOutlined,
-    FileZipOutlined,
-    FileTextOutlined,
-    CodeOutlined,
     SearchOutlined,
-    UploadOutlined,
-    DownloadOutlined,
     FolderAddOutlined,
     DeleteOutlined,
     MoreOutlined,
 } from '@ant-design/icons';
+import {
+    VscFolder, VscFile, VscFileCode, VscFileZip,
+    VscFileBinary, VscFileMedia, VscJson, VscTerminalBash,
+    VscMarkdown, VscGear,
+} from 'react-icons/vsc';
+import { SiPython, SiGo, SiDocker } from 'react-icons/si';
+import { FaFileArchive } from 'react-icons/fa';
 import {
     SFTPListFiles,
     SFTPMakeDir,
@@ -56,51 +56,42 @@ function getDotColor(name: string, isDir: boolean): string {
     return colors[ext] || '#8c8c8c';
 }
 
+const fis = { fontSize: 15, verticalAlign: 'middle' as const };
+
 function getFileIcon(name: string, isDir: boolean) {
-    if (isDir) return <FolderOutlined style={{ color: '#e8a838', fontSize: 15 }} />;
+    if (isDir) return <VscFolder style={{ ...fis, color: '#e8a838' }} />;
     const ext = name.split('.').pop()?.toLowerCase() || '';
     const base = name.toLowerCase();
-    // Archive
     if (['zip', 'rar', '7z'].includes(ext))
-        return <FileZipOutlined style={{ color: '#52c41a', fontSize: 14 }} />;
+        return <VscFileZip style={{ ...fis, color: '#52c41a' }} />;
     if (['gz', 'tar', 'bz2', 'xz', 'tgz'].includes(ext))
-        return <FileZipOutlined style={{ color: '#fa8c16', fontSize: 14 }} />;
-    // Scripts
-    if (['sh', 'bash', 'zsh'].includes(ext))
-        return <CodeOutlined style={{ color: '#fa8c16', fontSize: 14 }} />;
-    // Python
+        return <FaFileArchive style={{ ...fis, color: '#fa8c16' }} />;
     if (ext === 'py')
-        return <CodeOutlined style={{ color: '#52c41a', fontSize: 14 }} />;
-    // Go / Rust / Java / C
-    if (['go', 'rs', 'java', 'c', 'cpp', 'h'].includes(ext))
-        return <CodeOutlined style={{ color: '#1890ff', fontSize: 14 }} />;
-    // JS / TS
-    if (['js', 'ts', 'jsx', 'tsx'].includes(ext))
-        return <CodeOutlined style={{ color: '#faad14', fontSize: 14 }} />;
-    // Config / Data
-    if (['yml', 'yaml', 'json', 'toml', 'xml', 'conf', 'cfg', 'ini'].includes(ext))
-        return <FileTextOutlined style={{ color: '#722ed1', fontSize: 14 }} />;
-    // Docker / Compose
+        return <SiPython style={{ ...fis, color: '#3776ab' }} />;
+    if (ext === 'go')
+        return <SiGo style={{ ...fis, fontSize: 17, color: '#00add8' }} />;
+    if (['sh', 'bash', 'zsh'].includes(ext))
+        return <VscTerminalBash style={{ ...fis, color: '#fa8c16' }} />;
     if (base.startsWith('docker') || base === 'dockerfile')
-        return <FileTextOutlined style={{ color: '#1890ff', fontSize: 14 }} />;
-    // SQL / DB
-    if (['sql', 'db', 'sqlite', 'sqlite3'].includes(ext))
-        return <FileTextOutlined style={{ color: '#722ed1', fontSize: 14 }} />;
-    // Text / Docs
-    if (['md', 'txt', 'log', 'csv'].includes(ext))
-        return <FileTextOutlined style={{ color: '#1890ff', fontSize: 14 }} />;
-    // RC / profile / config files (no extension or special names)
-    if (['profile', 'bashrc', 'gitconfig', 'viminfo', 'lesshst', 'history'].includes(ext) ||
+        return <SiDocker style={{ ...fis, color: '#2496ed' }} />;
+    if (['js', 'ts', 'jsx', 'tsx', 'rs', 'java', 'c', 'cpp', 'h', 'rb'].includes(ext))
+        return <VscFileCode style={{ ...fis, color: '#1890ff' }} />;
+    if (ext === 'json')
+        return <VscJson style={{ ...fis, color: '#faad14' }} />;
+    if (ext === 'md')
+        return <VscMarkdown style={{ ...fis, color: '#1890ff' }} />;
+    if (['yml', 'yaml', 'toml', 'xml', 'conf', 'cfg', 'ini'].includes(ext))
+        return <VscGear style={{ ...fis, color: '#722ed1' }} />;
+    if (['sql', 'db', 'sqlite', 'sqlite3', 'sqlite_history'].includes(ext))
+        return <VscFileCode style={{ ...fis, color: '#722ed1' }} />;
+    if (['txt', 'log', 'csv', 'profile', 'bashrc', 'gitconfig', 'viminfo', 'lesshst', 'history'].includes(ext) ||
         ['.profile', '.bashrc', '.gitconfig', '.vimrc', '.zshrc'].includes(base))
-        return <FileTextOutlined style={{ color: '#1890ff', fontSize: 14 }} />;
-    // APK / EXE
-    if (['apk', 'exe', 'dmg', 'deb', 'rpm'].includes(ext))
-        return <FileOutlined style={{ color: '#f5222d', fontSize: 14 }} />;
-    // Images
-    if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'ico', 'webp'].includes(ext))
-        return <FileOutlined style={{ color: '#eb2f96', fontSize: 14 }} />;
-    // Default
-    return <FileOutlined style={{ color: '#722ed1', fontSize: 14 }} />;
+        return <VscFile style={{ ...fis, color: '#1890ff' }} />;
+    if (['apk', 'exe', 'dmg', 'deb', 'rpm', 'swp'].includes(ext))
+        return <VscFileBinary style={{ ...fis, color: '#f5222d' }} />;
+    if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'ico', 'webp', 'mp4', 'mp3'].includes(ext))
+        return <VscFileMedia style={{ ...fis, color: '#eb2f96' }} />;
+    return <VscFile style={{ ...fis, color: '#722ed1' }} />;
 }
 
 interface FileManagerProps {

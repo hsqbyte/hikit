@@ -1,27 +1,34 @@
 import React from 'react';
 import { Tabs, Dropdown } from 'antd';
 import type { MenuProps } from 'antd';
+import { MenuOutlined } from '@ant-design/icons';
 import {
-    CloudServerOutlined,
-    ConsoleSqlOutlined,
-    DatabaseOutlined,
-    ContainerOutlined,
-    DesktopOutlined,
-    ApiOutlined,
-    UnorderedListOutlined,
-    MenuOutlined,
-} from '@ant-design/icons';
+    SiMysql, SiPostgresql, SiRedis, SiDocker,
+    SiMariadb, SiClickhouse, SiSqlite, SiOracle,
+} from 'react-icons/si';
+import { VscTerminal } from 'react-icons/vsc';
+import { BsDisplay, BsHddNetwork } from 'react-icons/bs';
+import { AiOutlineMergeCells } from 'react-icons/ai';
+import { TbDatabase } from 'react-icons/tb';
 import { useConnectionStore } from '../stores/connectionStore';
 import './TabBar.css';
 
+const tis = { fontSize: 13, verticalAlign: 'middle' };
+
 const typeIcons: Record<string, React.ReactNode> = {
-    ssh: <CloudServerOutlined />,
-    mysql: <ConsoleSqlOutlined />,
-    postgresql: <DatabaseOutlined />,
-    redis: <DatabaseOutlined />,
-    docker: <ContainerOutlined />,
-    rdp: <DesktopOutlined />,
-    telnet: <ApiOutlined />,
+    ssh: <VscTerminal style={{ ...tis, color: '#333' }} />,
+    ssh_tunnel: <AiOutlineMergeCells style={tis} />,
+    telnet: <BsHddNetwork style={tis} />,
+    rdp: <BsDisplay style={{ ...tis, color: '#0078d4' }} />,
+    docker: <SiDocker style={{ ...tis, color: '#2496ed' }} />,
+    redis: <SiRedis style={{ ...tis, color: '#dc382d' }} />,
+    mysql: <SiMysql style={{ ...tis, color: '#4479a1' }} />,
+    mariadb: <SiMariadb style={{ ...tis, color: '#003545' }} />,
+    postgresql: <SiPostgresql style={{ ...tis, color: '#4169e1' }} />,
+    sqlserver: <TbDatabase style={{ ...tis, color: '#cc2927' }} />,
+    clickhouse: <SiClickhouse style={{ ...tis, color: '#ffcc00' }} />,
+    sqlite: <SiSqlite style={{ ...tis, color: '#003b57' }} />,
+    oracle: <SiOracle style={{ ...tis, color: '#f80000' }} />,
 };
 
 interface TabBarProps {
@@ -46,7 +53,7 @@ const TabBar: React.FC<TabBarProps> = ({ onShowList }) => {
             key: tab.id,
             label: (
                 <span className="tab-label">
-                    {typeIcons[tab.connectionType] || <CloudServerOutlined />}
+                    {typeIcons[tab.connectionType] || <VscTerminal style={tis} />}
                     <span className="tab-title">{tab.title}</span>
                 </span>
             ),
