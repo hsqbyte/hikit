@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Input, Table, Button, Tooltip, Modal, message } from 'antd';
+import { Input, Table, Button, Tooltip, Modal, Dropdown, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import type { MenuProps } from 'antd';
 import {
     ArrowLeftOutlined,
     ReloadOutlined,
@@ -9,6 +10,10 @@ import {
     FolderAddOutlined,
     DeleteOutlined,
     MoreOutlined,
+    UploadOutlined,
+    DownloadOutlined,
+    EditOutlined,
+    CopyOutlined,
 } from '@ant-design/icons';
 import {
     VscFolder, VscFile, VscFileCode, VscFileZip,
@@ -22,6 +27,9 @@ import {
     SFTPMakeDir,
     SFTPDelete,
     SFTPGetHomePath,
+    SFTPUploadFile,
+    SFTPDownloadFile,
+    SFTPRename,
 } from '../../wailsjs/go/main/App';
 import './FileManager.css';
 
@@ -224,6 +232,99 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
         });
     };
 
+    const handleUpload = async () => {
+        if (!sessionId) return;
+        try {
+            await SFTPUploadFile(sessionId, currentPath);
+            message.success('上传成功');
+            loadFiles();
+        } catch (err: any) {
+            if (err?.message?.includes('canceled') || err?.message === '') return;
+            message.error('上传失败: ' + (err?.message || String(err)));
+        }
+    };
+
+    const handleDownload = async (record: FileItem) => {
+        if (!sessionId || record.isDir) return;
+        try {
+            const fullPath = currentPath === '/' ? `/${record.name}` : `${currentPath}/${record.name}`;
+            await SFTPDownloadFile(sessionId, fullPath);
+            message.success('下载成功');
+        } catch (err: any) {
+            if (err?.message?.includes('canceled') || err?.message === '') return;
+            message.error('下载失败: ' + (err?.message || String(err)));
+        }
+    };
+
+    const handleRename = (record: FileItem) => {
+        if (!sessionId) return;
+        Modal.confirm({
+            title: '重命名',
+            content: (
+                <Input
+                    id="rename-input"
+                    defaultValue={record.name}
+                    autoFocus
+                />
+            ),
+            okText: '确定',
+            cancelText: '取消',
+            onOk: async () => {
+                const input = document.getElementById('rename-input') as HTMLInputElement;
+                const newName = input?.value?.trim();
+                if (!newName || newName === record.name) return;
+                try {
+                    const oldPath = currentPath === '/' ? `/${record.name}` : `${currentPath}/${record.name}`;
+                    const newPath = currentPath === '/' ? `/${newName}` : `${currentPath}/${newName}`;
+                    await SFTPRename(sessionId!, oldPath, newPath);
+                    message.success('重命名成功');
+                    loadFiles();
+                } catch (err: any) {
+                    message.error('重命名失败: ' + (err?.message || String(err)));
+                }
+            },
+        });
+    };
+
+    const handleCopyPath = (record: FileItem) => {
+        const fullPath = currentPath === '/' ? `/${record.name}` : `${currentPath}/${record.name}`;
+        navigator.clipboard.writeText(fullPath).then(() => {
+            message.success('路径已复制');
+        }).catch(() => {
+            message.error('复制失败');
+        });
+    };
+
+    const getContextMenu = (record: FileItem): MenuProps['items'] => [
+        {
+            key: 'download',
+            label: '下载',
+            icon: <DownloadOutlined />,
+            disabled: record.isDir,
+            onClick: () => handleDownload(record),
+        },
+        {
+            key: 'rename',
+            label: '重命名',
+            icon: <EditOutlined />,
+            onClick: () => handleRename(record),
+        },
+        {
+            key: 'copyPath',
+            label: '复制路径',
+            icon: <CopyOutlined />,
+            onClick: () => handleCopyPath(record),
+        },
+        { type: 'divider' },
+        {
+            key: 'delete',
+            label: '删除',
+            icon: <DeleteOutlined />,
+            danger: true,
+            onClick: () => handleDelete(record),
+        },
+    ];
+
     const columns: ColumnsType<FileItem> = [
         {
             title: '',
@@ -266,16 +367,15 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
             title: '',
             width: '5%',
             render: (_, record) => (
-                <Tooltip title="删除">
+                <Dropdown menu={{ items: getContextMenu(record) }} trigger={['click']}>
                     <Button
                         type="text"
                         size="small"
-                        danger
-                        icon={<DeleteOutlined />}
-                        onClick={(e) => { e.stopPropagation(); handleDelete(record); }}
+                        icon={<MoreOutlined />}
+                        onClick={(e) => e.stopPropagation()}
                         className="fm-btn"
                     />
-                </Tooltip>
+                </Dropdown>
             ),
         },
     ];
@@ -317,8 +417,8 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
                     />
                 </div>
                 <div className="fm-toolbar-right">
+                    <Tooltip title="上传文件"><Button type="text" size="small" icon={<UploadOutlined />} className="fm-btn" onClick={handleUpload} /></Tooltip>
                     <Tooltip title="新建文件夹"><Button type="text" size="small" icon={<FolderAddOutlined />} className="fm-btn" onClick={handleMakeDir} /></Tooltip>
-                    <Tooltip title="更多"><Button type="text" size="small" icon={<MoreOutlined />} className="fm-btn" /></Tooltip>
                 </div>
             </div>
 
@@ -340,6 +440,9 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
                     rowClassName={(record) => record.isDir ? 'folder-row' : 'file-row'}
                     onRow={(record) => ({
                         onDoubleClick: () => handleDoubleClick(record),
+                        onContextMenu: (e) => {
+                            e.preventDefault();
+                        },
                     })}
                 />
             </div>

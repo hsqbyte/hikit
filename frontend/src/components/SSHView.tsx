@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Breadcrumb, Tooltip, message } from 'antd';
-import { SplitCellsOutlined } from '@ant-design/icons';
+import { SplitCellsOutlined, ReloadOutlined } from '@ant-design/icons';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
@@ -94,30 +94,30 @@ const SSHView: React.FC<SSHViewProps> = ({ hostName, groupName, host, assetId })
         };
     }, []);
 
-    // Connect to SSH when terminal is ready
+    // Connect / reconnect to SSH
+    const doConnect = useCallback(async () => {
+        if (!termRef.current || !assetId) return;
+        setConnecting(true);
+        setError(null);
+        termRef.current.writeln('\x1b[90m正在连接...\x1b[0m');
+
+        try {
+            const sid = await SSHConnect(assetId);
+            setSessionId(sid);
+            setConnected(true);
+            setConnecting(false);
+        } catch (err: any) {
+            const errMsg = err?.message || String(err);
+            setError(errMsg);
+            setConnecting(false);
+            termRef.current?.writeln(`\x1b[31m连接失败: ${errMsg}\x1b[0m`);
+            termRef.current?.writeln('\x1b[90m请检查主机地址、端口和认证信息\x1b[0m');
+        }
+    }, [assetId]);
+
     useEffect(() => {
         if (!termRef.current || !assetId) return;
-
-        const connect = async () => {
-            setConnecting(true);
-            setError(null);
-            termRef.current?.writeln('\x1b[90m正在连接...\x1b[0m');
-
-            try {
-                const sid = await SSHConnect(assetId);
-                setSessionId(sid);
-                setConnected(true);
-                setConnecting(false);
-            } catch (err: any) {
-                const errMsg = err?.message || String(err);
-                setError(errMsg);
-                setConnecting(false);
-                termRef.current?.writeln(`\x1b[31m连接失败: ${errMsg}\x1b[0m`);
-                termRef.current?.writeln('\x1b[90m请检查主机地址、端口和认证信息\x1b[0m');
-            }
-        };
-
-        connect();
+        doConnect();
 
         return () => {
             if (sessionId) {
@@ -214,6 +214,13 @@ const SSHView: React.FC<SSHViewProps> = ({ hostName, groupName, host, assetId })
                     <span className={`conn-status ${connected ? 'online' : connecting ? 'connecting' : 'offline'}`}>
                         {connected ? '● 已连接' : connecting ? '○ 连接中...' : '● 未连接'}
                     </span>
+                    {!connected && !connecting && (
+                        <Tooltip title="重新连接">
+                            <button className="ssh-action-btn" onClick={doConnect}>
+                                <ReloadOutlined />
+                            </button>
+                        </Tooltip>
+                    )}
                     <Tooltip title={showFileManager ? '隐藏文件管理器' : '显示文件管理器'}>
                         <button
                             className="ssh-action-btn"

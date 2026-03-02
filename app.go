@@ -3,9 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"nexushub/internal/asset"
 	sshpkg "nexushub/internal/ssh"
+
+	wr "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // App struct
@@ -155,4 +159,59 @@ func (a *App) SFTPGetHomePath(sessionID string) (string, error) {
 		return "", fmt.Errorf("SSH manager not initialized")
 	}
 	return mgr.GetHomePath(sessionID)
+}
+
+// SFTPUploadFile opens a native file picker and uploads selected file to remote path
+func (a *App) SFTPUploadFile(sessionID string, remotePath string) error {
+	mgr := sshpkg.GetManager()
+	if mgr == nil {
+		return fmt.Errorf("SSH manager not initialized")
+	}
+
+	// Open native file picker
+	localPath, err := wr.OpenFileDialog(a.ctx, wr.OpenDialogOptions{
+		Title: "选择要上传的文件",
+	})
+	if err != nil {
+		return fmt.Errorf("failed to open file dialog: %w", err)
+	}
+	if localPath == "" {
+		return nil // User canceled
+	}
+
+	// Upload
+	fileName := filepath.Base(localPath)
+	fullRemotePath := remotePath + "/" + fileName
+	return mgr.UploadFile(sessionID, localPath, fullRemotePath)
+}
+
+// SFTPDownloadFile downloads a remote file and opens a native save dialog
+func (a *App) SFTPDownloadFile(sessionID string, remotePath string) error {
+	mgr := sshpkg.GetManager()
+	if mgr == nil {
+		return fmt.Errorf("SSH manager not initialized")
+	}
+
+	fileName := filepath.Base(remotePath)
+
+	// Open native save dialog
+	savePath, err := wr.SaveFileDialog(a.ctx, wr.SaveDialogOptions{
+		Title:           "保存文件",
+		DefaultFilename: fileName,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to open save dialog: %w", err)
+	}
+	if savePath == "" {
+		return nil // User canceled
+	}
+
+	// Read remote file
+	data, err := mgr.ReadFile(sessionID, remotePath)
+	if err != nil {
+		return fmt.Errorf("failed to read remote file: %w", err)
+	}
+
+	// Write to local
+	return os.WriteFile(savePath, data, 0644)
 }
