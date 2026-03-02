@@ -1,0 +1,214 @@
+.ssh-view {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: #fff;
+}
+
+/* Breadcrumb header - matches HexHub */
+.ssh-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 16px;
+    background: #fafafa;
+    border-bottom: 1px solid #e8e8e8;
+    min-height: 36px;
+}
+
+.ssh-header .ant-breadcrumb {
+    font-size: 12px;
+}
+
+.ssh-header .ant-breadcrumb-link {
+    color: #666 !important;
+}
+
+.ssh-header .ant-breadcrumb-separator {
+    color: #ccc !important;
+}
+
+.breadcrumb-brand {
+    color: #1677ff !important;
+    font-weight: 600;
+}
+
+.ssh-header-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.ssh-action-btn {
+    background: transparent;
+    border: none;
+    color: #999;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: all 0.15s;
+}
+
+.ssh-action-btn:hover {
+    background: #f0f0f0;
+    color: #333;
+}
+
+/* Split content */
+.ssh-content {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+/* Terminal panel - dark theme */
+.ssh-terminal-panel {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.terminal-container {
+    flex: 1;
+    background: #1e1e2e;
+    overflow: auto;
+    padding: 4px 0;
+    font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.terminal-output {
+    color: #cdd6f4;
+}
+
+/* Terminal lines with line numbers (matching HexHub) */
+.terminal-line {
+    display: flex;
+    white-space: pre;
+    padding: 0 8px;
+    min-height: 18px;
+}
+
+.terminal-line:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.terminal-linenum {
+    display: inline-block;
+    width: 40px;
+    text-align: right;
+    color: #585b70;
+    margin-right: 12px;
+    flex-shrink: 0;
+    font-size: 11px;
+    user-select: none;
+}
+
+.terminal-text {
+    color: #cdd6f4;
+    flex: 1;
+}
+
+/* Terminal prompt */
+.terminal-prompt {
+    padding: 0 8px;
+    padding-left: 60px;
+    margin-top: 2px;
+}
+
+.prompt-user {
+    color: #a6e3a1;
+    font-weight: 600;
+}
+
+.prompt-at {
+    color: #6c7086;
+}
+
+.prompt-host {
+    color: #89b4fa;
+}
+
+.prompt-sep {
+    color: #6c7086;
+}
+
+.prompt-path {
+    color: #f9e2af;
+}
+
+.prompt-dollar {
+    color: #6c7086;
+}
+
+.terminal-cursor {
+    color: #89b4fa;
+    animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+
+    0%,
+    50% {
+        opacity: 1;
+    }
+
+    51%,
+    100% {
+        opacity: 0;
+    }
+}
+
+/* Splitter */
+.ssh-splitter {
+    width: 4px;
+    cursor: col-resize;
+    background: #e8e8e8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.15s;
+}
+
+.ssh-splitter:hover {
+    background: #1677ff;
+}
+
+.ssh-splitter:hover .splitter-line {
+    background: #fff;
+}
+
+.splitter-line {
+    width: 1px;
+    height: 40px;
+    background: #ccc;
+    border-radius: 1px;
+    transition: background 0.15s;
+}
+
+/* File panel */
+.ssh-file-panel {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Terminal scrollbar */
+.terminal-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.terminal-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.terminal-container::-webkit-scrollbar-thumb {
+    background: #313244;
+    border-radius: 3px;
+}
+
+.terminal-container::-webkit-scrollbar-thumb:hover {
+    background: #45475a;
+}

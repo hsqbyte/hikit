@@ -1,0 +1,191 @@
+.file-manager {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: #fff;
+}
+
+/* Toolbar - matches HexHub */
+.fm-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    background: #fafafa;
+    border-bottom: 1px solid #e8e8e8;
+}
+
+.fm-toolbar-left {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.fm-toolbar-right {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.fm-btn.ant-btn {
+    color: #999;
+    border-radius: 4px;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+}
+
+.fm-btn.ant-btn:hover {
+    color: #333;
+    background: #f0f0f0;
+}
+
+.fm-path {
+    flex: 1;
+}
+
+.fm-path .ant-input-affix-wrapper {
+    background: #fff;
+    border: 1px solid #e8e8e8;
+    border-radius: 6px;
+    font-size: 12px;
+    height: 26px;
+}
+
+.fm-path .ant-input-affix-wrapper:hover,
+.fm-path .ant-input-affix-wrapper:focus-within {
+    border-color: #1677ff;
+}
+
+.fm-path .ant-input {
+    background: transparent;
+    color: #333;
+    font-family: 'Menlo', monospace;
+    font-size: 12px;
+}
+
+.fm-path .ant-input-prefix {
+    color: #999;
+}
+
+/* System info bar (HexHub right side) */
+.fm-sysinfo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 3px 12px;
+    font-size: 11px;
+    color: #999;
+    border-bottom: 1px solid #f0f0f0;
+    background: #fafafa;
+}
+
+.fm-filecount {
+    color: #888;
+}
+
+.fm-sysinfo-right {
+    display: flex;
+    gap: 12px;
+}
+
+.sys-stat {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    color: #bbb;
+}
+
+.sys-label {
+    color: #bbb;
+}
+
+/* File type colored dots (matching HexHub) */
+.file-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+/* Table */
+.fm-table {
+    flex: 1;
+    overflow: hidden;
+}
+
+.fm-table .ant-table {
+    background: transparent;
+    font-size: 12px;
+}
+
+.fm-table .ant-table-thead>tr>th {
+    background: #fafafa !important;
+    color: #888 !important;
+    font-size: 11px;
+    font-weight: 500;
+    border-bottom: 1px solid #f0f0f0 !important;
+    padding: 4px 8px !important;
+}
+
+.fm-table .ant-table-tbody>tr>td {
+    border-bottom: 1px solid #f8f8f8 !important;
+    padding: 3px 8px !important;
+    color: #333;
+    font-size: 12px;
+}
+
+.fm-table .ant-table-tbody>tr:hover>td {
+    background: #f5f5f5 !important;
+}
+
+.fm-table .ant-table-tbody>tr.folder-row>td {
+    cursor: pointer;
+}
+
+.fm-table .ant-table-tbody>tr.folder-row:hover>td {
+    background: #e6f4ff !important;
+}
+
+/* File name styling */
+.file-name {
+    color: #333;
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 12px;
+}
+
+.file-name.is-folder {
+    color: #1677ff;
+    font-weight: 500;
+}
+
+.file-permissions {
+    font-family: 'Menlo', monospace;
+    font-size: 11px;
+    color: #999;
+}
+
+.sort-icon {
+    font-size: 9px;
+    color: #ccc;
+}
+
+/* Table sort icons */
+.fm-table .ant-table-column-sorter {
+    color: #ddd;
+}
+
+/* Table scroll */
+.fm-table .ant-table-body::-webkit-scrollbar {
+    width: 5px;
+}
+
+.fm-table .ant-table-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.fm-table .ant-table-body::-webkit-scrollbar-thumb {
+    background: #ddd;
+    border-radius: 3px;
+}

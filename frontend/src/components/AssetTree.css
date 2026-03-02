@@ -1,0 +1,123 @@
+.asset-tree {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: #fff;
+    user-select: none;
+}
+
+/* Header with title + toolbar icons */
+.asset-tree-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid #f0f0f0;
+    min-height: 38px;
+}
+
+.asset-tree-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+}
+
+.asset-tree-toolbar {
+    display: flex;
+    gap: 1px;
+}
+
+.toolbar-btn {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    color: #999;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.toolbar-btn:hover {
+    background: #f0f0f0;
+    color: #333;
+}
+
+/* Tree content */
+.asset-tree-content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 4px 0;
+}
+
+/* Ant Design Tree styles for light theme */
+.asset-tree .ant-tree {
+    background: transparent;
+    color: #333;
+    font-size: 13px;
+}
+
+.asset-tree .ant-tree .ant-tree-node-content-wrapper {
+    color: #333;
+    border-radius: 4px;
+    padding: 2px 8px;
+    transition: all 0.15s;
+}
+
+.asset-tree .ant-tree .ant-tree-node-content-wrapper:hover {
+    background: #f5f5f5;
+}
+
+.asset-tree .ant-tree .ant-tree-node-content-wrapper.ant-tree-node-selected {
+    background: #e6f4ff;
+    color: #1677ff;
+}
+
+.asset-tree .ant-tree .ant-tree-switcher {
+    color: #999;
+}
+
+.asset-tree .ant-tree .ant-tree-icon__customize {
+    margin-right: 6px;
+    font-size: 14px;
+}
+
+.asset-tree .ant-tree .ant-tree-treenode {
+    padding: 1px 8px;
+}
+
+/* Scrollbar */
+.asset-tree-content::-webkit-scrollbar {
+    width: 5px;
+}
+
+.asset-tree-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.asset-tree-content::-webkit-scrollbar-thumb {
+    background: #ddd;
+    border-radius: 3px;
+}
+
+.asset-tree-content::-webkit-scrollbar-thumb:hover {
+    background: #ccc;
+}
+
+/* Empty state */
+.asset-tree-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    color: #bbb;
+    font-size: 12px;
+    text-align: center;
+    line-height: 1.8;
+}

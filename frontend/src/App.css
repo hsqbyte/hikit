@@ -1,0 +1,79 @@
+.app-layout {
+    display: flex;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background: #fff;
+    color: #333;
+}
+
+/* Sidebar container = activity bar + asset panel */
+.app-sidebar-wrapper {
+    display: flex;
+    height: 100%;
+    flex-shrink: 0;
+}
+
+/* Asset panel (tree area) */
+.app-sidebar {
+    width: 220px;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid #e8e8e8;
+    background: #fff;
+}
+
+/* Main content area */
+.app-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    background: #fff;
+}
+
+/* Content area below tabs */
+.app-content {
+    flex: 1;
+    overflow: auto;
+    background: #fff;
+}
+
+/* Right toolbar in header */
+.app-header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-right: 12px;
+}
+
+.app-header-btn {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    color: #999;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.app-header-btn:hover {
+    background: #f0f0f0;
+    color: #333;
+}
+
+/* Terminal placeholder */
+.terminal-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #999;
+    font-size: 14px;
+}

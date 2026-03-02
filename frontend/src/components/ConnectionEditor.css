@@ -1,0 +1,184 @@
+.connection-editor-modal .ant-modal-content {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.connection-editor-modal .ant-modal-header {
+    padding: 16px 20px 8px;
+    border-bottom: none;
+}
+
+.connection-editor-modal .ant-modal-title {
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.connection-editor-modal .ant-modal-body {
+    padding: 0 20px 12px;
+}
+
+.connection-editor-modal .ant-modal-footer {
+    padding: 8px 20px 16px;
+    border-top: none;
+}
+
+/* Tabs */
+.editor-tabs .ant-tabs-nav {
+    margin-bottom: 12px;
+}
+
+.editor-tabs .ant-tabs-tab {
+    font-size: 12px;
+    padding: 4px 0;
+}
+
+/* Form */
+.editor-form .ant-form-item {
+    margin-bottom: 12px;
+}
+
+.editor-form .ant-form-item-label>label {
+    font-size: 12px;
+    color: #666;
+}
+
+/* Two-column row */
+.editor-row {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+}
+
+/* Field label */
+.field-label {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 6px;
+}
+
+/* Color picker */
+.color-picker {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.color-dot {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.color-dot:hover {
+    transform: scale(1.2);
+}
+
+.color-dot.active {
+    border-color: #333;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+}
+
+.color-dot.clear {
+    background: #f0f0f0;
+    color: #999;
+    font-size: 10px;
+    border: 1px dashed #d0d0d0;
+}
+
+/* Auth section (SSH password/key/MFA tabs) */
+.auth-section {
+    margin-bottom: 12px;
+}
+
+.auth-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 8px;
+}
+
+.auth-tab {
+    padding: 4px 14px;
+    font-size: 12px;
+    border: 1px solid #e8e8e8;
+    background: #fafafa;
+    cursor: pointer;
+    color: #666;
+    transition: all 0.15s;
+}
+
+.auth-tab:first-child {
+    border-radius: 4px 0 0 4px;
+}
+
+.auth-tab:last-child {
+    border-radius: 0 4px 4px 0;
+}
+
+.auth-tab:not(:first-child) {
+    border-left: none;
+}
+
+.auth-tab.active {
+    background: #1677ff;
+    border-color: #1677ff;
+    color: #fff;
+}
+
+.auth-tab:hover:not(.active) {
+    background: #f0f0f0;
+}
+
+.auth-content {
+    padding: 8px 0;
+}
+
+.auth-option-btn {
+    font-size: 11px;
+    color: #888;
+}
+
+.auth-hint {
+    color: #bbb;
+    font-size: 12px;
+    text-align: center;
+    padding: 16px 0;
+}
+
+/* SSH Agent row */
+.ssh-agent-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 0;
+    font-size: 12px;
+    color: #666;
+}
+
+.agent-status {
+    font-size: 12px;
+    color: #999;
+}
+
+/* Footer */
+.editor-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+/* Tab placeholder */
+.tab-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 0;
+    color: #bbb;
+    font-size: 13px;
+}

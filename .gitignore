@@ -1,0 +1,39 @@
+# Build output
+build/
+dist/
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Frontend - dependencies
+frontend/node_modules/
+frontend/dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database (user data, not committed)
+*.db
+*.db-wal
+*.db-shm
+
+# Wails generated (auto-regenerated on build)
+frontend/wailsjs/
+
+# Environment
+.env
+.env.local
