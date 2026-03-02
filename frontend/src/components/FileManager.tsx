@@ -57,15 +57,50 @@ function getDotColor(name: string, isDir: boolean): string {
 }
 
 function getFileIcon(name: string, isDir: boolean) {
-    if (isDir) return <FolderOutlined style={{ color: '#4a9eff' }} />;
+    if (isDir) return <FolderOutlined style={{ color: '#e8a838', fontSize: 15 }} />;
     const ext = name.split('.').pop()?.toLowerCase() || '';
-    if (['zip', 'gz', 'tar', 'rar', '7z'].includes(ext))
-        return <FileZipOutlined style={{ color: '#9254de' }} />;
-    if (['go', 'py', 'js', 'ts', 'rs', 'java', 'c', 'cpp', 'sh', 'bash'].includes(ext))
-        return <CodeOutlined style={{ color: '#1890ff' }} />;
-    if (['md', 'txt', 'log', 'yml', 'yaml', 'json', 'toml', 'cfg', 'conf', 'ini'].includes(ext))
-        return <FileTextOutlined style={{ color: '#52c41a' }} />;
-    return <FileOutlined style={{ color: '#8c8c8c' }} />;
+    const base = name.toLowerCase();
+    // Archive
+    if (['zip', 'rar', '7z'].includes(ext))
+        return <FileZipOutlined style={{ color: '#52c41a', fontSize: 14 }} />;
+    if (['gz', 'tar', 'bz2', 'xz', 'tgz'].includes(ext))
+        return <FileZipOutlined style={{ color: '#fa8c16', fontSize: 14 }} />;
+    // Scripts
+    if (['sh', 'bash', 'zsh'].includes(ext))
+        return <CodeOutlined style={{ color: '#fa8c16', fontSize: 14 }} />;
+    // Python
+    if (ext === 'py')
+        return <CodeOutlined style={{ color: '#52c41a', fontSize: 14 }} />;
+    // Go / Rust / Java / C
+    if (['go', 'rs', 'java', 'c', 'cpp', 'h'].includes(ext))
+        return <CodeOutlined style={{ color: '#1890ff', fontSize: 14 }} />;
+    // JS / TS
+    if (['js', 'ts', 'jsx', 'tsx'].includes(ext))
+        return <CodeOutlined style={{ color: '#faad14', fontSize: 14 }} />;
+    // Config / Data
+    if (['yml', 'yaml', 'json', 'toml', 'xml', 'conf', 'cfg', 'ini'].includes(ext))
+        return <FileTextOutlined style={{ color: '#722ed1', fontSize: 14 }} />;
+    // Docker / Compose
+    if (base.startsWith('docker') || base === 'dockerfile')
+        return <FileTextOutlined style={{ color: '#1890ff', fontSize: 14 }} />;
+    // SQL / DB
+    if (['sql', 'db', 'sqlite', 'sqlite3'].includes(ext))
+        return <FileTextOutlined style={{ color: '#722ed1', fontSize: 14 }} />;
+    // Text / Docs
+    if (['md', 'txt', 'log', 'csv'].includes(ext))
+        return <FileTextOutlined style={{ color: '#1890ff', fontSize: 14 }} />;
+    // RC / profile / config files (no extension or special names)
+    if (['profile', 'bashrc', 'gitconfig', 'viminfo', 'lesshst', 'history'].includes(ext) ||
+        ['.profile', '.bashrc', '.gitconfig', '.vimrc', '.zshrc'].includes(base))
+        return <FileTextOutlined style={{ color: '#1890ff', fontSize: 14 }} />;
+    // APK / EXE
+    if (['apk', 'exe', 'dmg', 'deb', 'rpm'].includes(ext))
+        return <FileOutlined style={{ color: '#f5222d', fontSize: 14 }} />;
+    // Images
+    if (['png', 'jpg', 'jpeg', 'gif', 'svg', 'ico', 'webp'].includes(ext))
+        return <FileOutlined style={{ color: '#eb2f96', fontSize: 14 }} />;
+    // Default
+    return <FileOutlined style={{ color: '#722ed1', fontSize: 14 }} />;
 }
 
 interface FileManagerProps {
@@ -201,15 +236,15 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
     const columns: ColumnsType<FileItem> = [
         {
             title: '',
-            dataIndex: 'dot',
-            width: 24,
-            render: (_, record) => (
-                <span className="file-dot" style={{ background: record.dotColor }} />
-            ),
+            dataIndex: 'icon',
+            width: '4%',
+            render: (_, record) => getFileIcon(record.name, record.isDir),
         },
         {
             title: '名称',
             dataIndex: 'name',
+            width: '25%',
+            ellipsis: true,
             sorter: (a, b) => a.name.localeCompare(b.name),
             render: (name: string, record) => (
                 <span className={`file-name ${record.isDir ? 'is-folder' : ''}`}>
@@ -220,23 +255,25 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
         {
             title: '修改时间',
             dataIndex: 'modifiedTime',
-            width: 145,
+            width: '22%',
+            ellipsis: true,
             sorter: (a, b) => a.modifiedTime.localeCompare(b.modifiedTime),
         },
-        { title: '类型', dataIndex: 'type', width: 80 },
-        { title: '大小', dataIndex: 'size', width: 75, align: 'right' },
+        { title: '类型', dataIndex: 'type', width: '10%', ellipsis: true },
+        { title: '大小', dataIndex: 'size', width: '10%', align: 'right', ellipsis: true },
         {
             title: '权限',
             dataIndex: 'permissions',
-            width: 105,
+            width: '15%',
+            ellipsis: true,
             render: (perm: string) => (
                 <span className="file-permissions">{perm}</span>
             ),
         },
-        { title: '用户/组', dataIndex: 'owner', width: 80 },
+        { title: '用户/组', dataIndex: 'owner', width: '10%', ellipsis: true },
         {
             title: '',
-            width: 40,
+            width: '5%',
             render: (_, record) => (
                 <Tooltip title="删除">
                     <Button
@@ -308,7 +345,7 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
                     size="small"
                     pagination={false}
                     loading={loading}
-                    scroll={{ y: 'calc(100vh - 200px)' }}
+                    scroll={{ x: 560, y: 'calc(100vh - 200px)' }}
                     rowClassName={(record) => record.isDir ? 'folder-row' : 'file-row'}
                     onRow={(record) => ({
                         onDoubleClick: () => handleDoubleClick(record),

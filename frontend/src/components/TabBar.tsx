@@ -76,29 +76,6 @@ const TabBar: React.FC<TabBarProps> = ({ onShowList }) => {
                     size="small"
                 />
             </div>
-            <div className="tab-bar-right">
-                <HeaderToolbar />
-            </div>
-        </div>
-    );
-};
-
-/* Right-side header toolbar icons (matching HexHub top-right) */
-const HeaderToolbar: React.FC = () => {
-    return (
-        <div className="header-toolbar">
-            <button className="header-btn" title="帮助">
-                <span style={{ fontSize: 13 }}>😊</span>
-            </button>
-            <button className="header-btn" title="设置">
-                <span style={{ fontSize: 13 }}>⚙️</span>
-            </button>
-            <button className="header-btn" title="通知">
-                <span style={{ fontSize: 13 }}>🔔</span>
-            </button>
-            <button className="header-btn avatar-btn" title="用户">
-                <span>👤</span>
-            </button>
         </div>
     );
 };

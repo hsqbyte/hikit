@@ -89,6 +89,17 @@
     overflow: hidden;
 }
 
+/* Prevent terminal from capturing mouse during splitter drag */
+.ssh-content.is-dragging {
+    cursor: col-resize;
+}
+
+.ssh-content.is-dragging .ssh-terminal-panel,
+.ssh-content.is-dragging .ssh-file-panel {
+    pointer-events: none;
+    user-select: none;
+}
+
 /* Terminal panel - dark theme */
 .ssh-terminal-panel {
     display: flex;

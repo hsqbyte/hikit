@@ -24,11 +24,16 @@ const SSHView: React.FC<SSHViewProps> = ({ hostName, groupName, host, assetId })
     const [connecting, setConnecting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    const [dragging, setDragging] = useState(false);
+
     const terminalRef = useRef<HTMLDivElement>(null);
     const termRef = useRef<Terminal | null>(null);
     const fitRef = useRef<FitAddon | null>(null);
     const isDraggingRef = useRef(false);
     const containerRef = useRef<HTMLDivElement>(null);
+    const termPanelRef = useRef<HTMLDivElement>(null);
+    const filePanelRef = useRef<HTMLDivElement>(null);
+    const ratioRef = useRef(splitRatio);
 
     // Initialize terminal
     useEffect(() => {
@@ -68,15 +73,16 @@ const SSHView: React.FC<SSHViewProps> = ({ hostName, groupName, host, assetId })
         term.loadAddon(fit);
         term.open(terminalRef.current);
 
-        // Fit to container
         setTimeout(() => fit.fit(), 100);
 
         termRef.current = term;
         fitRef.current = fit;
 
-        // Handle resize
+        // Only fit when NOT dragging
         const resizeObserver = new ResizeObserver(() => {
-            try { fit.fit(); } catch { }
+            if (!isDraggingRef.current) {
+                try { fit.fit(); } catch { }
+            }
         });
         resizeObserver.observe(terminalRef.current);
 
@@ -114,7 +120,6 @@ const SSHView: React.FC<SSHViewProps> = ({ hostName, groupName, host, assetId })
         connect();
 
         return () => {
-            // Disconnect on unmount
             if (sessionId) {
                 SSHDisconnect(sessionId);
             }
@@ -126,17 +131,14 @@ const SSHView: React.FC<SSHViewProps> = ({ hostName, groupName, host, assetId })
         if (!sessionId || !termRef.current) return;
         const term = termRef.current;
 
-        // Send keyboard input to SSH
         const dataDisposable = term.onData((data) => {
             SSHSendInput(sessionId, data).catch(console.error);
         });
 
-        // Resize handler
         const resizeDisposable = term.onResize(({ cols, rows }) => {
             SSHResize(sessionId, cols, rows).catch(console.error);
         });
 
-        // Receive SSH output via Wails events
         const outputEvent = `ssh:output:${sessionId}`;
         const closedEvent = `ssh:closed:${sessionId}`;
 
@@ -149,7 +151,6 @@ const SSHView: React.FC<SSHViewProps> = ({ hostName, groupName, host, assetId })
             setConnected(false);
         });
 
-        // Send initial resize
         if (fitRef.current) {
             try {
                 fitRef.current.fit();
@@ -166,23 +167,30 @@ const SSHView: React.FC<SSHViewProps> = ({ hostName, groupName, host, assetId })
         };
     }, [sessionId]);
 
-    // Splitter drag
+    // Splitter drag — zero React re-renders: direct DOM style manipulation
     const handleMouseDown = (e: React.MouseEvent) => {
         isDraggingRef.current = true;
+        setDragging(true);
         e.preventDefault();
 
         const handleMouseMove = (e: MouseEvent) => {
             if (!isDraggingRef.current || !containerRef.current) return;
             const rect = containerRef.current.getBoundingClientRect();
-            const ratio = ((e.clientX - rect.left) / rect.width) * 100;
-            setSplitRatio(Math.max(20, Math.min(80, ratio)));
+            const ratio = Math.max(20, Math.min(80, ((e.clientX - rect.left) / rect.width) * 100));
+            ratioRef.current = ratio;
+            // Direct DOM manipulation — no React re-render
+            if (termPanelRef.current) termPanelRef.current.style.width = `${ratio}%`;
+            if (filePanelRef.current) filePanelRef.current.style.width = `${100 - ratio}%`;
         };
 
         const handleMouseUp = () => {
             isDraggingRef.current = false;
+            setDragging(false);
             document.removeEventListener('mousemove', handleMouseMove);
             document.removeEventListener('mouseup', handleMouseUp);
-            // Refit terminal after resize
+            // Sync React state once
+            setSplitRatio(ratioRef.current);
+            // Fit terminal once
             if (fitRef.current) {
                 try { fitRef.current.fit(); } catch { }
             }
@@ -220,8 +228,9 @@ const SSHView: React.FC<SSHViewProps> = ({ hostName, groupName, host, assetId })
                 </div>
             </div>
 
-            <div className="ssh-content" ref={containerRef}>
+            <div className={`ssh-content ${dragging ? 'is-dragging' : ''}`} ref={containerRef}>
                 <div
+                    ref={termPanelRef}
                     className="ssh-terminal-panel"
                     style={{ width: showFileManager ? `${splitRatio}%` : '100%' }}
                 >
@@ -236,6 +245,7 @@ const SSHView: React.FC<SSHViewProps> = ({ hostName, groupName, host, assetId })
 
                 {showFileManager && (
                     <div
+                        ref={filePanelRef}
                         className="ssh-file-panel"
                         style={{ width: `${100 - splitRatio}%` }}
                     >
