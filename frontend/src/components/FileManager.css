@@ -126,14 +126,18 @@
     font-size: 11px;
     font-weight: 500;
     border-bottom: 1px solid #f0f0f0 !important;
-    padding: 4px 8px !important;
+    padding: 4px 6px !important;
+    white-space: nowrap;
 }
 
 .fm-table .ant-table-tbody>tr>td {
     border-bottom: 1px solid #f8f8f8 !important;
-    padding: 3px 8px !important;
+    padding: 3px 6px !important;
     color: #333;
     font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .fm-table .ant-table-tbody>tr:hover>td {

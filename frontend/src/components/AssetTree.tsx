@@ -289,6 +289,10 @@ const AssetTree: React.FC = () => {
                                 onSelect={(keys) => {
                                     selectAsset(keys.length > 0 ? keys[0] as string : null);
                                 }}
+                                onRightClick={({ node }) => {
+                                    // Select the node on right click so context menu items are enabled
+                                    selectAsset(node.key as string);
+                                }}
                                 onDoubleClick={(_e, node) => {
                                     handleDoubleClick(node.key as string);
                                 }}
