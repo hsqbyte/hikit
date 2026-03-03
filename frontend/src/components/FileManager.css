@@ -3,6 +3,7 @@
     flex-direction: column;
     height: 100%;
     background: #fff;
+    position: relative;
 }
 
 /* Toolbar - matches HexHub */
@@ -192,4 +193,65 @@
 .fm-table .ant-table-body::-webkit-scrollbar-thumb {
     background: #ddd;
     border-radius: 3px;
+}
+
+/* Drag-drop overlay */
+.file-manager.fm-drag-over {
+    border: 2px dashed #52c41a;
+}
+
+.fm-drop-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(82, 196, 26, 0.08);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+
+.fm-drop-message {
+    text-align: center;
+    color: #52c41a;
+    font-size: 14px;
+}
+
+.fm-drop-message p {
+    margin: 8px 0 0;
+}
+
+/* File Viewer / Editor */
+.fm-viewer-pre {
+    margin: 0;
+    padding: 16px;
+    background: #1e1e2e;
+    color: #cdd6f4;
+    font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    overflow: auto;
+    max-height: 65vh;
+    min-height: 300px;
+    white-space: pre;
+    tab-size: 4;
+}
+
+.fm-viewer-textarea {
+    width: 100%;
+    min-height: 300px;
+    max-height: 65vh;
+    padding: 16px;
+    background: #1e1e2e;
+    color: #cdd6f4;
+    font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    border: none;
+    outline: none;
+    resize: none;
+    tab-size: 4;
 }

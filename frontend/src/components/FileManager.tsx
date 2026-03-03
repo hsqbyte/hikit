@@ -30,6 +30,9 @@ import {
     SFTPUploadFile,
     SFTPDownloadFile,
     SFTPRename,
+    SFTPReadFile,
+    SFTPWriteFile,
+    SFTPUploadFromPath,
 } from '../../wailsjs/go/main/App';
 import './FileManager.css';
 
@@ -39,6 +42,7 @@ interface FileItem {
     modifiedTime: string;
     type: string;
     size: string;
+    sizeBytes: number;
     permissions: string;
     owner: string;
     dotColor: string;
@@ -115,6 +119,17 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
     const [pathHistory, setPathHistory] = useState<string[]>(['/root']);
     const [historyIndex, setHistoryIndex] = useState(0);
 
+    // File viewer/editor state
+    const [viewerOpen, setViewerOpen] = useState(false);
+    const [viewerContent, setViewerContent] = useState('');
+    const [viewerPath, setViewerPath] = useState('');
+    const [viewerEditing, setViewerEditing] = useState(false);
+    const [viewerModified, setViewerModified] = useState(false);
+    const [viewerLoading, setViewerLoading] = useState(false);
+
+    // Drag-drop state
+    const [isDragging, setIsDragging] = useState(false);
+
     // Load files when connected or path changes
     const loadFiles = useCallback(async () => {
         if (!sessionId || !connected) return;
@@ -128,6 +143,7 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
                 modifiedTime: f.modifiedTime,
                 type: f.type,
                 size: f.size,
+                sizeBytes: f.sizeBytes || 0,
                 permissions: f.permissions,
                 owner: f.owner,
                 dotColor: getDotColor(f.name, f.isDir),
@@ -175,11 +191,73 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
         navigateTo(parent);
     };
 
-    const handleDoubleClick = (record: FileItem) => {
+    const handleDoubleClick = async (record: FileItem) => {
         if (record.isDir) {
             const newPath = currentPath === '/' ? `/${record.name}` : `${currentPath}/${record.name}`;
             navigateTo(newPath);
+            return;
         }
+        // Open file viewer for files < 5MB
+        if (record.sizeBytes && record.sizeBytes > 5 * 1024 * 1024) {
+            message.warning('文件太大，无法在线查看（> 5MB）');
+            return;
+        }
+        if (!sessionId) return;
+        const fullPath = currentPath === '/' ? `/${record.name}` : `${currentPath}/${record.name}`;
+        setViewerPath(fullPath);
+        setViewerLoading(true);
+        setViewerOpen(true);
+        setViewerEditing(false);
+        setViewerModified(false);
+        try {
+            const content = await SFTPReadFile(sessionId, fullPath);
+            setViewerContent(content);
+        } catch (err: any) {
+            message.error('读取文件失败: ' + (err?.message || String(err)));
+            setViewerContent('');
+        } finally {
+            setViewerLoading(false);
+        }
+    };
+
+    const handleViewerSave = async () => {
+        if (!sessionId || !viewerPath) return;
+        try {
+            await SFTPWriteFile(sessionId, viewerPath, viewerContent);
+            message.success('保存成功');
+            setViewerModified(false);
+            setViewerEditing(false);
+            loadFiles();
+        } catch (err: any) {
+            message.error('保存失败: ' + (err?.message || String(err)));
+        }
+    };
+
+    // Drag-and-drop upload
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+    };
+
+    const handleDrop = async (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+        if (!sessionId) return;
+
+        const droppedFiles = e.dataTransfer.files;
+        if (droppedFiles.length === 0) return;
+
+        // In Wails, we can't access file paths from DataTransfer directly
+        // Use the native upload dialog as fallback
+        message.info(`拖拽了 ${droppedFiles.length} 个文件，请使用上传按钮`);
     };
 
     const handleMakeDir = () => {
@@ -388,7 +466,21 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
     const fileCount = files.length - folderCount;
 
     return (
-        <div className="file-manager">
+        <div
+            className={`file-manager ${isDragging ? 'fm-drag-over' : ''}`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+        >
+            {isDragging && (
+                <div className="fm-drop-overlay">
+                    <div className="fm-drop-message">
+                        <UploadOutlined style={{ fontSize: 32 }} />
+                        <p>释放上传文件</p>
+                    </div>
+                </div>
+            )}
+
             <div className="fm-toolbar">
                 <div className="fm-toolbar-left">
                     <Tooltip title="返回">
@@ -446,6 +538,64 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
                     })}
                 />
             </div>
+
+            {/* File Viewer / Editor Modal */}
+            <Modal
+                title={
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span>{viewerPath.split('/').pop()}</span>
+                        <span style={{ fontSize: 11, color: '#888', fontWeight: 'normal' }}>{viewerPath}</span>
+                    </div>
+                }
+                open={viewerOpen}
+                onCancel={() => {
+                    if (viewerModified) {
+                        Modal.confirm({
+                            title: '未保存的更改',
+                            content: '有未保存的更改，确定要关闭吗？',
+                            okText: '关闭',
+                            cancelText: '取消',
+                            onOk: () => { setViewerOpen(false); setViewerEditing(false); setViewerModified(false); },
+                        });
+                    } else {
+                        setViewerOpen(false);
+                        setViewerEditing(false);
+                    }
+                }}
+                width="70vw"
+                bodyStyle={{ padding: 0 }}
+                footer={
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: 12, color: '#888', lineHeight: '32px' }}>
+                            {viewerContent.split('\n').length} 行
+                            {viewerModified && ' (已修改)'}
+                        </span>
+                        <div>
+                            {!viewerEditing ? (
+                                <Button onClick={() => setViewerEditing(true)} icon={<EditOutlined />}>编辑</Button>
+                            ) : (
+                                <>
+                                    <Button onClick={() => { setViewerEditing(false); setViewerModified(false); }} style={{ marginRight: 8 }}>取消</Button>
+                                    <Button type="primary" onClick={handleViewerSave} disabled={!viewerModified}>保存</Button>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                }
+            >
+                {viewerLoading ? (
+                    <div style={{ padding: 40, textAlign: 'center', color: '#888' }}>加载中...</div>
+                ) : viewerEditing ? (
+                    <textarea
+                        className="fm-viewer-textarea"
+                        value={viewerContent}
+                        onChange={(e) => { setViewerContent(e.target.value); setViewerModified(true); }}
+                        spellCheck={false}
+                    />
+                ) : (
+                    <pre className="fm-viewer-pre">{viewerContent}</pre>
+                )}
+            </Modal>
         </div>
     );
 };

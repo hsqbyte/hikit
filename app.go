@@ -215,3 +215,36 @@ func (a *App) SFTPDownloadFile(sessionID string, remotePath string) error {
 	// Write to local
 	return os.WriteFile(savePath, data, 0644)
 }
+
+// SFTPReadFile reads a remote file and returns its content as string (for viewer/editor)
+func (a *App) SFTPReadFile(sessionID string, remotePath string) (string, error) {
+	mgr := sshpkg.GetManager()
+	if mgr == nil {
+		return "", fmt.Errorf("SSH manager not initialized")
+	}
+	data, err := mgr.ReadFile(sessionID, remotePath)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+// SFTPWriteFile writes content to a remote file (for editor save)
+func (a *App) SFTPWriteFile(sessionID string, remotePath string, content string) error {
+	mgr := sshpkg.GetManager()
+	if mgr == nil {
+		return fmt.Errorf("SSH manager not initialized")
+	}
+	return mgr.WriteFile(sessionID, remotePath, []byte(content))
+}
+
+// SFTPUploadFromPath uploads a local file to the remote server (for drag-and-drop)
+func (a *App) SFTPUploadFromPath(sessionID string, localPath string, remotePath string) error {
+	mgr := sshpkg.GetManager()
+	if mgr == nil {
+		return fmt.Errorf("SSH manager not initialized")
+	}
+	fileName := filepath.Base(localPath)
+	fullRemotePath := remotePath + "/" + fileName
+	return mgr.UploadFile(sessionID, localPath, fullRemotePath)
+}
