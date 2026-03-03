@@ -255,3 +255,9 @@
     resize: none;
     tab-size: 4;
 }
+
+/* Active toggle button */
+.fm-btn.fm-btn-active {
+    color: #1677ff;
+    background: #e6f4ff;
+}

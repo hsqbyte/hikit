@@ -14,6 +14,10 @@ import {
     DownloadOutlined,
     EditOutlined,
     CopyOutlined,
+    EyeOutlined,
+    EyeInvisibleOutlined,
+    LockOutlined,
+    FileSearchOutlined,
 } from '@ant-design/icons';
 import {
     VscFolder, VscFile, VscFileCode, VscFileZip,
@@ -33,6 +37,7 @@ import {
     SFTPReadFile,
     SFTPWriteFile,
     SFTPUploadFromPath,
+    SFTPChmod,
 } from '../../wailsjs/go/main/App';
 import './FileManager.css';
 
@@ -129,6 +134,9 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
 
     // Drag-drop state
     const [isDragging, setIsDragging] = useState(false);
+
+    // Hidden files toggle
+    const [showHidden, setShowHidden] = useState(false);
 
     // Load files when connected or path changes
     const loadFiles = useCallback(async () => {
@@ -373,7 +381,49 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
         });
     };
 
+    const handleChmod = (record: FileItem) => {
+        if (!sessionId) return;
+        Modal.confirm({
+            title: '修改权限',
+            content: (
+                <div>
+                    <p style={{ marginBottom: 8, color: '#888' }}>当前: {record.permissions}</p>
+                    <Input
+                        id="chmod-input"
+                        placeholder="如 755, 644"
+                        defaultValue="755"
+                        autoFocus
+                    />
+                </div>
+            ),
+            okText: '确定',
+            cancelText: '取消',
+            onOk: async () => {
+                const input = document.getElementById('chmod-input') as HTMLInputElement;
+                const mode = input?.value?.trim();
+                if (!mode || !/^[0-7]{3,4}$/.test(mode)) {
+                    message.error('无效的权限值（如 755, 644）');
+                    return;
+                }
+                try {
+                    const fullPath = currentPath === '/' ? `/${record.name}` : `${currentPath}/${record.name}`;
+                    await SFTPChmod(sessionId!, fullPath, mode);
+                    message.success('权限已修改');
+                    loadFiles();
+                } catch (err: any) {
+                    message.error('修改失败: ' + (err?.message || String(err)));
+                }
+            },
+        });
+    };
+
     const getContextMenu = (record: FileItem): MenuProps['items'] => [
+        {
+            key: 'open',
+            label: record.isDir ? '打开' : '查看',
+            icon: <FileSearchOutlined />,
+            onClick: () => handleDoubleClick(record),
+        },
         {
             key: 'download',
             label: '下载',
@@ -381,11 +431,18 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
             disabled: record.isDir,
             onClick: () => handleDownload(record),
         },
+        { type: 'divider' },
         {
             key: 'rename',
             label: '重命名',
             icon: <EditOutlined />,
             onClick: () => handleRename(record),
+        },
+        {
+            key: 'chmod',
+            label: '修改权限',
+            icon: <LockOutlined />,
+            onClick: () => handleChmod(record),
         },
         {
             key: 'copyPath',
@@ -458,12 +515,13 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
         },
     ];
 
+    const visibleFiles = showHidden ? files : files.filter(f => !f.name.startsWith('.'));
     const filteredFiles = searchText
-        ? files.filter((f) => f.name.toLowerCase().includes(searchText.toLowerCase()))
-        : files;
+        ? visibleFiles.filter((f) => f.name.toLowerCase().includes(searchText.toLowerCase()))
+        : visibleFiles;
 
-    const folderCount = files.filter(f => f.isDir).length;
-    const fileCount = files.length - folderCount;
+    const folderCount = filteredFiles.filter(f => f.isDir).length;
+    const fileCount = filteredFiles.length - folderCount;
 
     return (
         <div
@@ -509,6 +567,12 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
                     />
                 </div>
                 <div className="fm-toolbar-right">
+                    <Tooltip title={showHidden ? '隐藏点文件' : '显示点文件'}>
+                        <Button type="text" size="small"
+                            icon={showHidden ? <EyeOutlined /> : <EyeInvisibleOutlined />}
+                            className={`fm-btn ${showHidden ? 'fm-btn-active' : ''}`}
+                            onClick={() => setShowHidden(!showHidden)} />
+                    </Tooltip>
                     <Tooltip title="上传文件"><Button type="text" size="small" icon={<UploadOutlined />} className="fm-btn" onClick={handleUpload} /></Tooltip>
                     <Tooltip title="新建文件夹"><Button type="text" size="small" icon={<FolderAddOutlined />} className="fm-btn" onClick={handleMakeDir} /></Tooltip>
                 </div>

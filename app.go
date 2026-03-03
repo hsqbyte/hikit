@@ -248,3 +248,12 @@ func (a *App) SFTPUploadFromPath(sessionID string, localPath string, remotePath 
 	fullRemotePath := remotePath + "/" + fileName
 	return mgr.UploadFile(sessionID, localPath, fullRemotePath)
 }
+
+// SFTPChmod changes file permissions
+func (a *App) SFTPChmod(sessionID string, remotePath string, mode string) error {
+	mgr := sshpkg.GetManager()
+	if mgr == nil {
+		return fmt.Errorf("SSH manager not initialized")
+	}
+	return mgr.Chmod(sessionID, remotePath, mode)
+}

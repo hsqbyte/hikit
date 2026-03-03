@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 
 	"github.com/pkg/sftp"
 )
@@ -244,4 +245,20 @@ func (m *Manager) UploadFile(sessionID, localPath, remotePath string) error {
 
 	_, err = io.Copy(remoteFile, localFile)
 	return err
+}
+
+// Chmod changes file permissions
+func (m *Manager) Chmod(sessionID, path string, mode string) error {
+	client, err := m.getSFTPClient(sessionID)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	// Parse octal mode string (e.g. "755")
+	modeVal, err := strconv.ParseUint(mode, 8, 32)
+	if err != nil {
+		return fmt.Errorf("invalid mode %s: %w", mode, err)
+	}
+	return client.Chmod(path, os.FileMode(modeVal))
 }
