@@ -112,6 +112,15 @@ func (a *App) SSHDisconnect(sessionID string) {
 	}
 }
 
+// SSHOpenShell opens a new shell tab on an existing SSH connection
+func (a *App) SSHOpenShell(existingSessionID string) (string, error) {
+	mgr := sshpkg.GetManager()
+	if mgr == nil {
+		return "", fmt.Errorf("SSH manager not initialized")
+	}
+	return mgr.OpenNewShell(existingSessionID)
+}
+
 // ============================================================
 // SFTP Methods
 // ============================================================

@@ -1,10 +1,10 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Breadcrumb, Tooltip, message } from 'antd';
-import { SplitCellsOutlined, ReloadOutlined } from '@ant-design/icons';
+import { SplitCellsOutlined, ReloadOutlined, PlusOutlined, CloseOutlined } from '@ant-design/icons';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
-import { SSHConnect, SSHSendInput, SSHResize, SSHDisconnect } from '../../wailsjs/go/main/App';
+import { SSHConnect, SSHSendInput, SSHResize, SSHDisconnect, SSHOpenShell } from '../../wailsjs/go/main/App';
 import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime';
 import FileManager from './FileManager';
 import './SSHView.css';
@@ -16,29 +16,40 @@ interface SSHViewProps {
     assetId: string;
 }
 
+interface TermTab {
+    id: string;          // unique tab id
+    sessionId: string;   // SSH session ID
+    label: string;
+    term: Terminal;
+    fit: FitAddon;
+    containerRef: HTMLDivElement | null;
+}
+
+let tabCounter = 0;
+
 const SSHView: React.FC<SSHViewProps> = ({ hostName, groupName, host, assetId }) => {
     const [showFileManager, setShowFileManager] = useState(true);
     const [splitRatio, setSplitRatio] = useState(55);
-    const [sessionId, setSessionId] = useState<string | null>(null);
     const [connected, setConnected] = useState(false);
     const [connecting, setConnecting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const [dragging, setDragging] = useState(false);
+    // Multi-tab terminal state
+    const [tabs, setTabs] = useState<TermTab[]>([]);
+    const [activeTabId, setActiveTabId] = useState<string>('');
 
-    const terminalRef = useRef<HTMLDivElement>(null);
-    const termRef = useRef<Terminal | null>(null);
-    const fitRef = useRef<FitAddon | null>(null);
+    // First session reference (for creating new shells)
+    const firstSessionRef = useRef<string | null>(null);
+
+    const [dragging, setDragging] = useState(false);
     const isDraggingRef = useRef(false);
     const containerRef = useRef<HTMLDivElement>(null);
     const termPanelRef = useRef<HTMLDivElement>(null);
     const filePanelRef = useRef<HTMLDivElement>(null);
     const ratioRef = useRef(splitRatio);
 
-    // Initialize terminal
-    useEffect(() => {
-        if (!terminalRef.current) return;
-
+    // Create a terminal instance
+    const createTerminal = useCallback(() => {
         const term = new Terminal({
             cursorBlink: true,
             cursorStyle: 'bar',
@@ -68,68 +79,14 @@ const SSHView: React.FC<SSHViewProps> = ({ hostName, groupName, host, assetId })
             },
             allowProposedApi: true,
         });
-
         const fit = new FitAddon();
         term.loadAddon(fit);
-        term.open(terminalRef.current);
-
-        setTimeout(() => fit.fit(), 100);
-
-        termRef.current = term;
-        fitRef.current = fit;
-
-        // Only fit when NOT dragging
-        const resizeObserver = new ResizeObserver(() => {
-            if (!isDraggingRef.current) {
-                try { fit.fit(); } catch { }
-            }
-        });
-        resizeObserver.observe(terminalRef.current);
-
-        return () => {
-            resizeObserver.disconnect();
-            term.dispose();
-            termRef.current = null;
-            fitRef.current = null;
-        };
+        return { term, fit };
     }, []);
 
-    // Connect / reconnect to SSH
-    const doConnect = useCallback(async () => {
-        if (!termRef.current || !assetId) return;
-        setConnecting(true);
-        setError(null);
-        termRef.current.writeln('\x1b[90m正在连接...\x1b[0m');
-
-        try {
-            const sid = await SSHConnect(assetId);
-            setSessionId(sid);
-            setConnected(true);
-            setConnecting(false);
-        } catch (err: any) {
-            const errMsg = err?.message || String(err);
-            setError(errMsg);
-            setConnecting(false);
-            termRef.current?.writeln(`\x1b[31m连接失败: ${errMsg}\x1b[0m`);
-            termRef.current?.writeln('\x1b[90m请检查主机地址、端口和认证信息\x1b[0m');
-        }
-    }, [assetId]);
-
-    useEffect(() => {
-        if (!termRef.current || !assetId) return;
-        doConnect();
-
-        return () => {
-            if (sessionId) {
-                SSHDisconnect(sessionId);
-            }
-        };
-    }, [assetId]);
-
-    // Wire up terminal I/O when connected
-    useEffect(() => {
-        if (!sessionId || !termRef.current) return;
-        const term = termRef.current;
+    // Wire up I/O for a specific tab
+    const wireTabIO = useCallback((tab: TermTab) => {
+        const { term, sessionId } = tab;
 
         const dataDisposable = term.onData((data) => {
             SSHSendInput(sessionId, data).catch(console.error);
@@ -148,16 +105,13 @@ const SSHView: React.FC<SSHViewProps> = ({ hostName, groupName, host, assetId })
 
         EventsOn(closedEvent, () => {
             term.writeln('\r\n\x1b[31m连接已断开\x1b[0m');
-            setConnected(false);
+            // Check if all tabs are disconnected
+            setTabs(prev => {
+                const allDisconnected = prev.every(t => t.sessionId === sessionId || !t.sessionId);
+                if (allDisconnected) setConnected(false);
+                return prev;
+            });
         });
-
-        if (fitRef.current) {
-            try {
-                fitRef.current.fit();
-                const { cols, rows } = term;
-                SSHResize(sessionId, cols, rows).catch(console.error);
-            } catch { }
-        }
 
         return () => {
             dataDisposable.dispose();
@@ -165,40 +119,195 @@ const SSHView: React.FC<SSHViewProps> = ({ hostName, groupName, host, assetId })
             EventsOff(outputEvent);
             EventsOff(closedEvent);
         };
-    }, [sessionId]);
+    }, []);
+
+    // Initial connect
+    const doConnect = useCallback(async () => {
+        if (!assetId) return;
+        setConnecting(true);
+        setError(null);
+
+        const { term, fit } = createTerminal();
+        term.writeln('\x1b[90m正在连接...\x1b[0m');
+
+        try {
+            const sid = await SSHConnect(assetId);
+            firstSessionRef.current = sid;
+
+            const tabId = `tab-${++tabCounter}`;
+            const newTab: TermTab = {
+                id: tabId,
+                sessionId: sid,
+                label: 'Terminal 1',
+                term,
+                fit,
+                containerRef: null,
+            };
+
+            setTabs([newTab]);
+            setActiveTabId(tabId);
+            setConnected(true);
+            setConnecting(false);
+        } catch (err: any) {
+            const errMsg = err?.message || String(err);
+            setError(errMsg);
+            setConnecting(false);
+            term.writeln(`\x1b[31m连接失败: ${errMsg}\x1b[0m`);
+            term.writeln('\x1b[90m请检查主机地址、端口和认证信息\x1b[0m');
+            // Still add the tab to show error
+            const tabId = `tab-${++tabCounter}`;
+            setTabs([{ id: tabId, sessionId: '', label: 'Terminal 1', term, fit, containerRef: null }]);
+            setActiveTabId(tabId);
+        }
+    }, [assetId, createTerminal]);
+
+    // Add new tab
+    const addTab = useCallback(async () => {
+        if (!firstSessionRef.current) return;
+
+        const { term, fit } = createTerminal();
+        term.writeln('\x1b[90m打开新终端...\x1b[0m');
+
+        try {
+            const sid = await SSHOpenShell(firstSessionRef.current);
+            const tabId = `tab-${++tabCounter}`;
+            const newTab: TermTab = {
+                id: tabId,
+                sessionId: sid,
+                label: `Terminal ${tabs.length + 1}`,
+                term,
+                fit,
+                containerRef: null,
+            };
+
+            setTabs(prev => [...prev, newTab]);
+            setActiveTabId(tabId);
+        } catch (err: any) {
+            message.error('新建终端失败: ' + (err?.message || String(err)));
+            term.dispose();
+        }
+    }, [createTerminal, tabs.length]);
+
+    // Close tab
+    const closeTab = useCallback((tabId: string) => {
+        setTabs(prev => {
+            const tab = prev.find(t => t.id === tabId);
+            if (tab) {
+                if (tab.sessionId) SSHDisconnect(tab.sessionId);
+                tab.term.dispose();
+            }
+            const remaining = prev.filter(t => t.id !== tabId);
+            if (remaining.length === 0) {
+                setConnected(false);
+                firstSessionRef.current = null;
+                return [];
+            }
+            return remaining;
+        });
+        setActiveTabId(prev => {
+            const remaining = tabs.filter(t => t.id !== tabId);
+            if (prev === tabId && remaining.length > 0) {
+                return remaining[remaining.length - 1].id;
+            }
+            return prev;
+        });
+    }, [tabs]);
+
+    // Initial mount
+    useEffect(() => {
+        doConnect();
+        return () => {
+            tabs.forEach(tab => {
+                if (tab.sessionId) SSHDisconnect(tab.sessionId);
+                tab.term.dispose();
+            });
+        };
+    }, [assetId]);
+
+    // Mount terminal to DOM and wire I/O when tabs change
+    useEffect(() => {
+        const cleanups: (() => void)[] = [];
+
+        tabs.forEach(tab => {
+            if (tab.containerRef && !tab.containerRef.querySelector('.xterm')) {
+                tab.term.open(tab.containerRef);
+                setTimeout(() => {
+                    try { tab.fit.fit(); } catch {}
+                }, 50);
+
+                // ResizeObserver for this terminal
+                const resizeObserver = new ResizeObserver(() => {
+                    if (!isDraggingRef.current) {
+                        try { tab.fit.fit(); } catch {}
+                    }
+                });
+                resizeObserver.observe(tab.containerRef);
+                cleanups.push(() => resizeObserver.disconnect());
+            }
+
+            if (tab.sessionId) {
+                const cleanup = wireTabIO(tab);
+                cleanups.push(cleanup);
+
+                // Send initial resize
+                setTimeout(() => {
+                    try {
+                        tab.fit.fit();
+                        SSHResize(tab.sessionId, tab.term.cols, tab.term.rows).catch(() => {});
+                    } catch {}
+                }, 100);
+            }
+        });
+
+        return () => {
+            cleanups.forEach(fn => fn());
+        };
+    }, [tabs.map(t => t.id + t.sessionId).join(',')]);
+
+    // Fit active terminal when switching tabs
+    useEffect(() => {
+        const activeTab = tabs.find(t => t.id === activeTabId);
+        if (activeTab) {
+            setTimeout(() => {
+                try { activeTab.fit.fit(); } catch {}
+            }, 50);
+        }
+    }, [activeTabId]);
 
     // Splitter drag — zero React re-renders: direct DOM style manipulation
     const handleMouseDown = (e: React.MouseEvent) => {
+        e.preventDefault();
         isDraggingRef.current = true;
         setDragging(true);
-        e.preventDefault();
 
         const handleMouseMove = (e: MouseEvent) => {
-            if (!isDraggingRef.current || !containerRef.current) return;
+            if (!containerRef.current) return;
             const rect = containerRef.current.getBoundingClientRect();
-            const ratio = Math.max(20, Math.min(80, ((e.clientX - rect.left) / rect.width) * 100));
-            ratioRef.current = ratio;
-            // Direct DOM manipulation — no React re-render
-            if (termPanelRef.current) termPanelRef.current.style.width = `${ratio}%`;
-            if (filePanelRef.current) filePanelRef.current.style.width = `${100 - ratio}%`;
+            let newRatio = ((e.clientX - rect.left) / rect.width) * 100;
+            newRatio = Math.max(25, Math.min(75, newRatio));
+            ratioRef.current = newRatio;
+            if (termPanelRef.current) termPanelRef.current.style.width = `${newRatio}%`;
+            if (filePanelRef.current) filePanelRef.current.style.width = `${100 - newRatio}%`;
         };
 
         const handleMouseUp = () => {
             isDraggingRef.current = false;
             setDragging(false);
+            setSplitRatio(ratioRef.current);
+            // Fit all terminals after splitter release
+            tabs.forEach(tab => {
+                try { tab.fit.fit(); } catch {}
+            });
             document.removeEventListener('mousemove', handleMouseMove);
             document.removeEventListener('mouseup', handleMouseUp);
-            // Sync React state once
-            setSplitRatio(ratioRef.current);
-            // Fit terminal once
-            if (fitRef.current) {
-                try { fitRef.current.fit(); } catch { }
-            }
         };
 
         document.addEventListener('mousemove', handleMouseMove);
         document.addEventListener('mouseup', handleMouseUp);
     };
+
+    // Get the main session ID (first connected tab)
+    const mainSessionId = tabs.find(t => t.sessionId)?.sessionId || null;
 
     return (
         <div className="ssh-view">
@@ -226,7 +335,9 @@ const SSHView: React.FC<SSHViewProps> = ({ hostName, groupName, host, assetId })
                             className="ssh-action-btn"
                             onClick={() => {
                                 setShowFileManager(!showFileManager);
-                                setTimeout(() => { try { fitRef.current?.fit(); } catch { } }, 200);
+                                setTimeout(() => {
+                                    tabs.forEach(tab => { try { tab.fit.fit(); } catch {} });
+                                }, 200);
                             }}
                         >
                             <SplitCellsOutlined />
@@ -241,7 +352,45 @@ const SSHView: React.FC<SSHViewProps> = ({ hostName, groupName, host, assetId })
                     className="ssh-terminal-panel"
                     style={{ width: showFileManager ? `${splitRatio}%` : '100%' }}
                 >
-                    <div className="terminal-container" ref={terminalRef} />
+                    {/* Terminal Tab Bar */}
+                    {tabs.length > 0 && (
+                        <div className="term-tab-bar">
+                            {tabs.map(tab => (
+                                <div
+                                    key={tab.id}
+                                    className={`term-tab ${tab.id === activeTabId ? 'term-tab-active' : ''}`}
+                                    onClick={() => setActiveTabId(tab.id)}
+                                >
+                                    <span className="term-tab-label">{tab.label}</span>
+                                    {tabs.length > 1 && (
+                                        <span
+                                            className="term-tab-close"
+                                            onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }}
+                                        >
+                                            <CloseOutlined style={{ fontSize: 10 }} />
+                                        </span>
+                                    )}
+                                </div>
+                            ))}
+                            {connected && (
+                                <Tooltip title="新建终端">
+                                    <div className="term-tab term-tab-add" onClick={addTab}>
+                                        <PlusOutlined style={{ fontSize: 11 }} />
+                                    </div>
+                                </Tooltip>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Terminal Containers */}
+                    {tabs.map(tab => (
+                        <div
+                            key={tab.id}
+                            className="terminal-container"
+                            ref={el => { if (el) tab.containerRef = el; }}
+                            style={{ display: tab.id === activeTabId ? 'block' : 'none' }}
+                        />
+                    ))}
                 </div>
 
                 {showFileManager && (
@@ -256,7 +405,7 @@ const SSHView: React.FC<SSHViewProps> = ({ hostName, groupName, host, assetId })
                         className="ssh-file-panel"
                         style={{ width: `${100 - splitRatio}%` }}
                     >
-                        <FileManager sessionId={sessionId} connected={connected} />
+                        <FileManager sessionId={mainSessionId} connected={connected} />
                     </div>
                 )}
             </div>

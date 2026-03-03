@@ -107,6 +107,73 @@
     overflow: hidden;
 }
 
+/* Terminal Tab Bar */
+.term-tab-bar {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: #181825;
+    border-bottom: 1px solid #313244;
+    padding: 0 4px;
+    min-height: 30px;
+    overflow-x: auto;
+    flex-shrink: 0;
+}
+
+.term-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    font-size: 11px;
+    color: #6c7086;
+    cursor: pointer;
+    border-right: 1px solid #313244;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+    user-select: none;
+}
+
+.term-tab:hover {
+    color: #cdd6f4;
+    background: #1e1e2e;
+}
+
+.term-tab-active {
+    color: #cdd6f4;
+    background: #1e1e2e;
+    border-bottom: 2px solid #89b4fa;
+}
+
+.term-tab-label {
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.term-tab-close {
+    display: flex;
+    align-items: center;
+    padding: 1px;
+    border-radius: 3px;
+    opacity: 0.5;
+    transition: all 0.15s ease;
+}
+
+.term-tab-close:hover {
+    opacity: 1;
+    background: #45475a;
+}
+
+.term-tab-add {
+    padding: 4px 8px;
+    border-right: none;
+    color: #6c7086;
+}
+
+.term-tab-add:hover {
+    color: #89b4fa;
+    background: #1e1e2e;
+}
+
 .terminal-container {
     flex: 1;
     background: #1e1e2e;
