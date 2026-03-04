@@ -1,12 +1,16 @@
 module nexushub
 
-go 1.24.0
+go 1.25.0
 
 require (
+	github.com/creack/pty v1.1.24
+	github.com/elazarl/goproxy v1.8.2
 	github.com/google/uuid v1.6.0
+	github.com/lib/pq v1.11.2
 	github.com/pkg/sftp v1.13.10
 	github.com/wailsapp/wails/v2 v2.11.0
 	golang.org/x/crypto v0.48.0
+	golang.org/x/net v0.51.0
 	modernc.org/sqlite v1.46.1
 )
 
@@ -38,7 +42,6 @@ require (
 	github.com/wailsapp/go-webview2 v1.0.22 // indirect
 	github.com/wailsapp/mimetype v1.4.1 // indirect
 	golang.org/x/exp v0.0.0-20251023183803-a4bb9ffd2546 // indirect
-	golang.org/x/net v0.49.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
 	modernc.org/libc v1.67.6 // indirect

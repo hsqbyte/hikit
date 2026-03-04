@@ -14,13 +14,30 @@
     flex-shrink: 0;
 }
 
-/* Asset panel (tree area) */
+/* Asset panel (tree area) — width set by inline style */
 .app-sidebar {
-    width: 220px;
     display: flex;
     flex-direction: column;
-    border-right: 1px solid #e8e8e8;
+    border-right: none;
     background: #fff;
+    min-width: 0;
+    overflow: hidden;
+}
+
+/* Drag resize handle */
+.app-sidebar-resize {
+    width: 4px;
+    cursor: col-resize;
+    background: transparent;
+    transition: background 0.15s;
+    flex-shrink: 0;
+    border-right: 1px solid #e8e8e8;
+}
+
+.app-sidebar-resize:hover,
+.app-sidebar-resize:active {
+    background: #1677ff;
+    border-right-color: #1677ff;
 }
 
 /* Main content area */

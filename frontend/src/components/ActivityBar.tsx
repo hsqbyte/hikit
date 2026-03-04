@@ -7,6 +7,8 @@ import {
     MessageOutlined,
     LinkOutlined,
     SettingOutlined,
+    SwapOutlined,
+    ApiOutlined,
 } from '@ant-design/icons';
 import './ActivityBar.css';
 
@@ -18,6 +20,8 @@ interface ActivityBarItem {
 
 const topItems: ActivityBarItem[] = [
     { key: 'assets', icon: <AppstoreOutlined />, label: '资产列表' },
+    { key: 'forwards', icon: <SwapOutlined />, label: '端口转发' },
+    { key: 'proxy', icon: <ApiOutlined />, label: 'Web 代理' },
     { key: 'search', icon: <SearchOutlined />, label: '搜索' },
 ];
 

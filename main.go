@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"log"
 
@@ -8,6 +9,10 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 
+	localpkg "nexushub/internal/local"
+	pgpkg "nexushub/internal/pg"
+	proxypkg "nexushub/internal/proxy"
+	sshpkg "nexushub/internal/ssh"
 	"nexushub/internal/store"
 )
 
@@ -21,8 +26,12 @@ func main() {
 	}
 	defer store.Close()
 
-	// Create an instance of the app structure
+	// Create services — each module manages its own Wails bindings
 	app := NewApp()
+	sshService := sshpkg.NewSSHService()
+	localService := localpkg.NewLocalService()
+	pgService := pgpkg.NewPGService()
+	proxyService := proxypkg.NewProxyService()
 
 	// Create application with options
 	err := wails.Run(&options.App{
@@ -35,10 +44,23 @@ func main() {
 			Assets: assets,
 		},
 		BackgroundColour: &options.RGBA{R: 255, G: 255, B: 255, A: 1},
-		OnStartup:        app.startup,
-		OnShutdown:       app.shutdown,
+		OnStartup: func(ctx context.Context) {
+			app.startup(ctx)
+			sshService.Startup(ctx)
+			localService.Startup(ctx)
+			proxyService.Startup(ctx)
+		},
+		OnShutdown: func(ctx context.Context) {
+			proxyService.Shutdown(ctx)
+			sshService.Shutdown(ctx)
+			app.shutdown(ctx)
+		},
 		Bind: []interface{}{
 			app,
+			sshService,
+			localService,
+			pgService,
+			proxyService,
 		},
 	})
 

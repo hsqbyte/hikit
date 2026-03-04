@@ -1,0 +1,753 @@
+/* PostgreSQLView — content only (sidebar is now in AssetTree) */
+
+.pg-view-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* ========== MexHub-style Toolbar ========== */
+.pg-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 12px;
+    background: #fafafa;
+    border-bottom: 1px solid #e8e8e8;
+    gap: 4px;
+    min-height: 36px;
+}
+
+.pg-toolbar-left,
+.pg-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.pg-tb-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    font-size: 12px;
+    color: #555;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+
+.pg-tb-btn:hover {
+    background: #e8e8e8;
+    color: #333;
+}
+
+.pg-tb-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.pg-tb-btn.active {
+    background: #e6f4ff;
+    color: #1677ff;
+}
+
+.pg-tb-btn.green {
+    color: #52c41a;
+}
+
+.pg-tb-btn.green:hover {
+    background: #f6ffed;
+}
+
+.pg-tb-btn.red {
+    color: #ff4d4f;
+}
+
+.pg-tb-btn.red:hover:not(:disabled) {
+    background: #fff2f0;
+}
+
+.pg-tb-divider {
+    width: 1px;
+    height: 16px;
+    background: #ddd;
+    margin: 0 4px;
+    flex-shrink: 0;
+}
+
+.pg-toolbar-info {
+    font-size: 11px;
+    color: #999;
+    white-space: nowrap;
+}
+
+/* ========== Data Grid ========== */
+.pg-datagrid {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.pg-datagrid .ant-table-wrapper {
+    flex: 1;
+    overflow: auto;
+}
+
+.pg-datagrid .ant-table {
+    font-size: 12px;
+}
+
+.pg-datagrid .ant-table-thead>tr>th {
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #fafafa;
+}
+
+.pg-datagrid .ant-table-tbody>tr>td {
+    padding: 4px 12px;
+    font-size: 12px;
+    font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ========== Column Filter ========== */
+.pg-col-header-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    position: relative;
+}
+
+.pg-col-filter-icon {
+    font-size: 10px;
+    color: #ccc;
+    cursor: pointer;
+    margin-left: 4px;
+    display: inline;
+}
+
+.pg-col-filter-icon:hover {
+    color: #1677ff;
+}
+
+.pg-col-filter {
+    width: 100%;
+    padding: 2px 6px;
+    font-size: 11px;
+    border: 1px solid #e8e8e8;
+    border-radius: 3px;
+    outline: none;
+    background: #fff;
+    transition: border-color 0.2s;
+    margin-top: 2px;
+}
+
+.pg-col-filter:focus {
+    border-color: #1677ff;
+}
+
+.pg-col-filter::placeholder {
+    color: #ccc;
+}
+
+/* ========== Bottom Status Bar ========== */
+.pg-statusbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 12px;
+    background: #fafafa;
+    border-top: 1px solid #e8e8e8;
+    font-size: 11px;
+    color: #666;
+    min-height: 28px;
+    flex-shrink: 0;
+}
+
+.pg-statusbar-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.pg-statusbar-sql {
+    font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+    font-size: 11px;
+    color: #999;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.pg-statusbar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.pg-statusbar-divider {
+    width: 1px;
+    height: 12px;
+    background: #ddd;
+}
+
+.pg-statusbar .ant-pagination {
+    margin: 0;
+}
+
+.pg-statusbar .ant-pagination-simple .ant-pagination-simple-pager input {
+    width: 28px;
+    height: 20px;
+    font-size: 11px;
+}
+
+/* ========== Inline Cell Editing ========== */
+.pg-cell-input {
+    width: 100%;
+    padding: 2px 4px;
+    font-size: 12px;
+    font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+    border: 1px solid #1677ff;
+    border-radius: 2px;
+    outline: none;
+    background: #e6f4ff;
+}
+
+.pg-modified {
+    color: #fa8c16 !important;
+    font-weight: 600;
+    font-style: normal !important;
+}
+
+.pg-null {
+    color: #ccc;
+    font-style: italic;
+}
+
+.pg-row-modified {
+    background: #fffbe6 !important;
+}
+
+.pg-row-modified:hover>td {
+    background: #fff7cc !important;
+}
+
+/* ========== Structure ========== */
+.pg-structure {
+    padding: 16px;
+    overflow: auto;
+    flex: 1;
+}
+
+/* ========== DDL View ========== */
+.pg-ddl-view {
+    padding: 16px;
+    overflow: auto;
+    flex: 1;
+}
+
+.pg-ddl-code {
+    font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #333;
+    background: #fafbfc;
+    padding: 16px;
+    border-radius: 6px;
+    border: 1px solid #e8e8e8;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0;
+}
+
+/* ========== SQL Editor ========== */
+.pg-sql-editor {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.pg-sql-input-area {
+    display: flex;
+    flex-direction: column;
+    border-bottom: 1px solid #e8e8e8;
+    background: #fff;
+}
+
+.pg-sql-textarea {
+    width: 100%;
+    min-height: 120px;
+    max-height: 300px;
+    padding: 12px 16px;
+    font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+    font-size: 13px;
+    border: none;
+    outline: none;
+    resize: vertical;
+    background: #fafbfc;
+    line-height: 1.6;
+    color: #333;
+}
+
+.pg-sql-textarea::placeholder {
+    color: #bbb;
+}
+
+.pg-sql-actions {
+    display: flex;
+    align-items: center;
+    padding: 6px 16px;
+    gap: 8px;
+    background: #fff;
+}
+
+.pg-sql-result {
+    flex: 1;
+    overflow: auto;
+}
+
+.pg-sql-result-info {
+    padding: 6px 16px;
+    font-size: 12px;
+    color: #52c41a;
+    background: #f6ffed;
+    border-bottom: 1px solid #b7eb8f;
+}
+
+.pg-sql-result-info.error {
+    color: #ff4d4f;
+    background: #fff2f0;
+    border-bottom-color: #ffccc7;
+}
+
+/* ========== Connect overlay ========== */
+.pg-connecting {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #666;
+    gap: 16px;
+}
+
+.pg-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #ff4d4f;
+    gap: 12px;
+}
+
+/* ========== Insert Form Modal ========== */
+.pg-insert-form {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.pg-insert-field {
+    margin-bottom: 8px;
+}
+
+.pg-insert-field label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: #333;
+    margin-bottom: 4px;
+}
+
+.pg-insert-type {
+    margin-left: 6px;
+    font-size: 11px;
+    color: #999;
+    font-weight: normal;
+}
+
+/* ========== Table List Toolbar (MexHub style) ========== */
+.pg-tl-toolbar {
+    display: flex;
+    align-items: center;
+    padding: 6px 12px;
+    background: #fff;
+    border-bottom: 1px solid #f0f0f0;
+    gap: 6px;
+    min-height: 34px;
+    flex-shrink: 0;
+}
+
+.pg-tl-sort {
+    font-size: 12px;
+    color: #333;
+    font-weight: 500;
+    margin-right: 8px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.pg-tl-sort-arrow {
+    font-size: 10px;
+    color: #bbb;
+    margin-left: 2px;
+}
+
+.pg-tl-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 12px;
+    color: #1677ff;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 3px;
+    transition: background 0.12s;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.pg-tl-action:hover {
+    background: #e6f4ff;
+}
+
+.pg-tl-action.disabled {
+    color: #ccc;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.pg-tl-info {
+    font-size: 11px;
+    color: #999;
+    white-space: nowrap;
+    margin-right: 4px;
+}
+
+.pg-tl-ddl {
+    font-size: 12px;
+    color: #666;
+    cursor: pointer;
+    padding: 2px 8px;
+    white-space: nowrap;
+    user-select: none;
+    transition: color 0.12s;
+}
+
+.pg-tl-ddl:hover {
+    color: #1677ff;
+}
+
+.pg-tl-ddl.disabled {
+    color: #ccc;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* ========== Table List View ========== */
+.pg-tablelist-viewtoggle {
+    display: flex;
+    border: 1px solid #d9d9d9;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.pg-viewtoggle-btn {
+    padding: 3px 8px;
+    background: #fff;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    color: #999;
+    transition: all 0.15s;
+}
+
+.pg-viewtoggle-btn+.pg-viewtoggle-btn {
+    border-left: 1px solid #d9d9d9;
+}
+
+.pg-viewtoggle-btn.active {
+    background: #1677ff;
+    color: #fff;
+}
+
+.pg-viewtoggle-btn:hover:not(.active) {
+    color: #1677ff;
+}
+
+.pg-tablelist-content {
+    flex: 1;
+    overflow: auto;
+    padding: 0;
+}
+
+.pg-tablelist-content .ant-table {
+    font-size: 12px;
+}
+
+.pg-tablelist-content .ant-table-thead>tr>th {
+    padding: 6px 12px;
+    font-size: 12px;
+    background: #fafafa;
+}
+
+.pg-tablelist-content .ant-table-tbody>tr>td {
+    padding: 5px 12px;
+    font-size: 12px;
+}
+
+.pg-tablelist-row {
+    cursor: pointer;
+}
+
+.pg-tablelist-row:hover>td {
+    background: #e6f4ff !important;
+}
+
+/* List / icon view — multi-column grid */
+.pg-tablelist-icons {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    padding: 8px 12px;
+    gap: 2px;
+}
+
+.pg-tablelist-icon-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background 0.12s;
+    min-width: 0;
+}
+
+.pg-tablelist-icon-item:hover {
+    background: #e6f4ff;
+}
+
+.pg-tablelist-icon-item.selected {
+    background: #e6f4ff;
+    color: #1677ff;
+}
+
+.pg-tablelist-icon-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Selected rows in grid */
+.pg-tablelist-row-selected>td {
+    background: #d9f7be !important;
+}
+
+/* ========== Context menu ========== */
+.pg-context-menu {
+    position: fixed;
+    background: #fff;
+    border: 1px solid #e8e8e8;
+    border-radius: 6px;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+    z-index: 1000;
+    min-width: 140px;
+    padding: 4px 0;
+}
+
+.pg-context-item {
+    padding: 6px 16px;
+    font-size: 12px;
+    cursor: pointer;
+    color: #333;
+    transition: background 0.12s;
+}
+
+.pg-context-item:hover {
+    background: #e6f4ff;
+}
+
+.pg-context-item.danger {
+    color: #ff4d4f;
+}
+
+.pg-context-item.danger:hover {
+    background: #fff2f0;
+}
+
+.pg-context-divider {
+    height: 1px;
+    background: #e8e8e8;
+    margin: 4px 0;
+}
+
+/* ========== Cell Viewer Modal ========== */
+.pg-cell-viewer-toolbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.pg-cell-viewer-content {
+    font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 500px;
+    overflow: auto;
+    margin: 0;
+    padding: 12px;
+    background: #f6f8fa;
+    border: 1px solid #e8e8e8;
+    border-radius: 6px;
+    color: #333;
+}
+
+.pg-cell-truncated {
+    cursor: pointer;
+    border-bottom: 1px dashed #d9d9d9;
+    transition: border-color 0.15s;
+}
+
+.pg-cell-truncated:hover {
+    border-color: #1677ff;
+    color: #1677ff;
+}
+
+.pg-cell-popover-content {
+    font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 400px;
+    max-width: 460px;
+    overflow: auto;
+    margin: 0;
+    padding: 4px;
+    background: #f6f8fa;
+    border-radius: 4px;
+}
+
+/* Fixed column shadow */
+.pg-datagrid .ant-table-cell-fix-left-last::after {
+    box-shadow: inset 8px 0 6px -6px rgba(0, 0, 0, 0.08);
+}
+
+/* ========== Column Visibility Toggle ========== */
+.pg-col-toggle-dropdown {
+    background: #fff;
+    border: 1px solid #e8e8e8;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    max-height: 320px;
+    overflow-y: auto;
+    min-width: 160px;
+}
+
+.pg-col-toggle-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.12s;
+}
+
+.pg-col-toggle-item:hover {
+    background: #f5f5f5;
+}
+
+/* ========== JSON Tree ========== */
+.pg-json-tree {
+    font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    background: #f6f8fa;
+    border: 1px solid #e8e8e8;
+    border-radius: 6px;
+    padding: 8px 4px;
+    overflow: auto;
+    max-height: 500px;
+}
+
+.jt-row {
+    white-space: nowrap;
+    padding: 1px 4px;
+    border-radius: 3px;
+}
+
+.jt-toggle {
+    cursor: pointer;
+    user-select: none;
+}
+
+.jt-toggle:hover {
+    background: rgba(0, 0, 0, 0.04);
+}
+
+.jt-arrow {
+    display: inline-block;
+    width: 14px;
+    font-size: 9px;
+    color: #999;
+    margin-right: 2px;
+}
+
+.jt-key {
+    color: #881391;
+    font-weight: 500;
+}
+
+.jt-bracket {
+    color: #333;
+    font-weight: 600;
+}
+
+.jt-ellipsis {
+    color: #999;
+    font-style: italic;
+    font-size: 11px;
+}
+
+.jt-val {
+    color: #333;
+}
+
+.jt-string {
+    color: #22863a;
+}
+
+.jt-number {
+    color: #005cc5;
+}
+
+.jt-bool {
+    color: #e36209;
+}
+
+.jt-null {
+    color: #999;
+    font-style: italic;
+}

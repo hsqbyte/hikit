@@ -31,6 +31,7 @@ const colorOptions = [
 // Connection type titles
 const typeLabels: Record<string, string> = {
     ssh: 'SSH 配置编辑',
+    local_terminal: '本地终端配置',
     mysql: 'MySQL 配置编辑',
     mariadb: 'MariaDB 配置编辑',
     postgresql: 'PostgreSQL 配置编辑',
@@ -44,6 +45,8 @@ const typeLabels: Record<string, string> = {
     sqlite: 'SQLite 配置编辑',
     oracle: 'Oracle 配置编辑',
     serial: '串口配置编辑',
+    web_bookmark: '网页书签',
+    rest_client: 'REST Client',
 };
 
 // Default ports by type
@@ -71,6 +74,9 @@ const typeFields: Record<string, string[]> = {
     oracle: ['host', 'port', 'username', 'password', 'database', 'notes'],
     sqlite: ['database', 'notes'],
     serial: ['notes'],
+    local_terminal: ['shell', 'notes'],
+    web_bookmark: ['url', 'notes'],
+    rest_client: ['notes'],
 };
 
 const ConnectionEditor: React.FC<ConnectionEditorProps> = ({
@@ -104,6 +110,7 @@ const ConnectionEditor: React.FC<ConnectionEditorProps> = ({
                 form.setFieldsValue({
                     port: defaultPorts[connectionType] || 0,
                     username: connectionType === 'ssh' ? 'root' : '',
+                    shell: connectionType === 'local_terminal' ? '' : undefined,
                 });
                 setColor('#40a9ff');
             }
@@ -114,7 +121,7 @@ const ConnectionEditor: React.FC<ConnectionEditorProps> = ({
 
     const handleSave = () => {
         form.validateFields().then((values) => {
-            onSave({
+            const saveData: any = {
                 ...values,
                 color,
                 connectionType,
@@ -123,7 +130,13 @@ const ConnectionEditor: React.FC<ConnectionEditorProps> = ({
                 id: editingAsset?.id,
                 password: authTab === 'password' ? values.password : '',
                 privateKey: authTab === 'key' ? values.privateKey : '',
-            });
+            };
+            // For local_terminal, store shell in 'host' field
+            if (connectionType === 'local_terminal') {
+                saveData.host = values.shell || '';
+                delete saveData.shell;
+            }
+            onSave(saveData);
         });
     };
 
@@ -225,6 +238,16 @@ const ConnectionEditor: React.FC<ConnectionEditorProps> = ({
                                     <Input placeholder="IP 或域名" />
                                 </Form.Item>
                             )}
+                            {fields.includes('url') && (
+                                <Form.Item
+                                    name="host"
+                                    label={<span style={{ color: '#f5222d' }}>URL</span>}
+                                    rules={[{ required: true, message: '请输入网页链接' }]}
+                                    style={{ flex: 1 }}
+                                >
+                                    <Input placeholder="https://example.com" />
+                                </Form.Item>
+                            )}
                         </div>
 
                         {/* User + Port */}
@@ -245,6 +268,19 @@ const ConnectionEditor: React.FC<ConnectionEditorProps> = ({
                                     </Form.Item>
                                 )}
                             </div>
+                        )}
+
+
+                        {/* Shell selector (for local terminal) */}
+                        {fields.includes('shell') && (
+                            <Form.Item name="shell" label="Shell">
+                                <Select placeholder="自动检测（默认 Shell）" allowClear>
+                                    <Option value="bash">bash</Option>
+                                    <Option value="zsh">zsh</Option>
+                                    <Option value="fish">fish</Option>
+                                    <Option value="sh">sh</Option>
+                                </Select>
+                            </Form.Item>
                         )}
 
                         {/* Database (for DB types) */}

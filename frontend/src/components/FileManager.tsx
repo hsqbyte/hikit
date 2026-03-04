@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Input, Table, Button, Tooltip, Modal, Dropdown, message } from 'antd';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime';
+import { Input, Table, Button, Tooltip, Modal, Dropdown, message, List, Spin } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { MenuProps } from 'antd';
 import {
@@ -18,6 +19,8 @@ import {
     EyeInvisibleOutlined,
     LockOutlined,
     FileSearchOutlined,
+    ScissorOutlined,
+    SnippetsOutlined,
 } from '@ant-design/icons';
 import {
     VscFolder, VscFile, VscFileCode, VscFileZip,
@@ -38,7 +41,10 @@ import {
     SFTPWriteFile,
     SFTPUploadFromPath,
     SFTPChmod,
-} from '../../wailsjs/go/main/App';
+    SFTPSearch,
+    SFTPCopy,
+    SFTPMove,
+} from '../../wailsjs/go/ssh/SSHService';
 import './FileManager.css';
 
 interface FileItem {
@@ -137,6 +143,18 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
 
     // Hidden files toggle
     const [showHidden, setShowHidden] = useState(false);
+
+    // Clipboard for copy/cut
+    const [clipboard, setClipboard] = useState<{ path: string; op: 'copy' | 'cut' } | null>(null);
+
+    // Search state
+    const [searchModalOpen, setSearchModalOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState<any[]>([]);
+    const [searchLoading, setSearchLoading] = useState(false);
+
+    // Right-click context menu state
+    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; record: FileItem } | null>(null);
 
     // Load files when connected or path changes
     const loadFiles = useCallback(async () => {
@@ -241,7 +259,40 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
         }
     };
 
-    // Drag-and-drop upload
+    // Drag-and-drop upload via Wails native file drop
+    const currentPathRef = useRef(currentPath);
+    useEffect(() => { currentPathRef.current = currentPath; }, [currentPath]);
+
+    useEffect(() => {
+        if (!sessionId || !connected) return;
+
+        const handleFileDrop = async (paths: string[]) => {
+            if (!paths || paths.length === 0) return;
+            setIsDragging(false);
+            const hide = message.loading(`正在上传 ${paths.length} 个文件...`, 0);
+            let success = 0;
+            let failed = 0;
+            for (const localPath of paths) {
+                const fileName = localPath.split('/').pop() || localPath.split('\\').pop() || 'file';
+                const remotePath = currentPathRef.current === '/' ? `/${fileName}` : `${currentPathRef.current}/${fileName}`;
+                try {
+                    await SFTPUploadFromPath(sessionId, localPath, remotePath);
+                    success++;
+                } catch (err: any) {
+                    console.error('Upload error:', err);
+                    failed++;
+                }
+            }
+            hide();
+            if (success > 0) message.success(`成功上传 ${success} 个文件`);
+            if (failed > 0) message.error(`${failed} 个文件上传失败`);
+            loadFiles();
+        };
+
+        EventsOn('wails:file-drop', handleFileDrop);
+        return () => { EventsOff('wails:file-drop'); };
+    }, [sessionId, connected, loadFiles]);
+
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault();
         e.stopPropagation();
@@ -254,18 +305,62 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
         setIsDragging(false);
     };
 
-    const handleDrop = async (e: React.DragEvent) => {
+    const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        setIsDragging(false);
-        if (!sessionId) return;
+        // Actual file handling is done via Wails EventsOn('wails:file-drop')
+    };
 
-        const droppedFiles = e.dataTransfer.files;
-        if (droppedFiles.length === 0) return;
+    // Search handler
+    const handleSearch = async () => {
+        if (!sessionId || !searchQuery.trim()) return;
+        setSearchLoading(true);
+        try {
+            const results = await SFTPSearch(sessionId, currentPath, searchQuery.trim());
+            setSearchResults(results || []);
+        } catch (err: any) {
+            message.error('搜索失败: ' + (err?.message || String(err)));
+        } finally {
+            setSearchLoading(false);
+        }
+    };
 
-        // In Wails, we can't access file paths from DataTransfer directly
-        // Use the native upload dialog as fallback
-        message.info(`拖拽了 ${droppedFiles.length} 个文件，请使用上传按钮`);
+    // Copy/Cut/Paste
+    const handleCopy = (record: FileItem) => {
+        const fullPath = currentPath === '/' ? `/${record.name}` : `${currentPath}/${record.name}`;
+        setClipboard({ path: fullPath, op: 'copy' });
+        message.success('已复制: ' + record.name);
+    };
+
+    const handleCut = (record: FileItem) => {
+        const fullPath = currentPath === '/' ? `/${record.name}` : `${currentPath}/${record.name}`;
+        setClipboard({ path: fullPath, op: 'cut' });
+        message.success('已剪切: ' + record.name);
+    };
+
+    const handlePaste = async () => {
+        if (!sessionId || !clipboard) return;
+        const fileName = clipboard.path.split('/').pop() || '';
+        const dstPath = currentPath === '/' ? `/${fileName}` : `${currentPath}/${fileName}`;
+
+        if (clipboard.path === dstPath) {
+            message.warning('源路径和目标路径相同');
+            return;
+        }
+
+        try {
+            if (clipboard.op === 'copy') {
+                await SFTPCopy(sessionId, clipboard.path, dstPath);
+                message.success('已粘贴（复制）: ' + fileName);
+            } else {
+                await SFTPMove(sessionId, clipboard.path, dstPath);
+                message.success('已粘贴（移动）: ' + fileName);
+                setClipboard(null);
+            }
+            loadFiles();
+        } catch (err: any) {
+            message.error('粘贴失败: ' + (err?.message || String(err)));
+        }
     };
 
     const handleMakeDir = () => {
@@ -433,6 +528,18 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
         },
         { type: 'divider' },
         {
+            key: 'copy',
+            label: '复制',
+            icon: <CopyOutlined />,
+            onClick: () => handleCopy(record),
+        },
+        {
+            key: 'cut',
+            label: '剪切',
+            icon: <DeleteOutlined style={{ transform: 'rotate(45deg)' }} />,
+            onClick: () => handleCut(record),
+        },
+        {
             key: 'rename',
             label: '重命名',
             icon: <EditOutlined />,
@@ -464,7 +571,8 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
         {
             title: '',
             dataIndex: 'icon',
-            width: '4%',
+            width: 36,
+            ellipsis: false,
             render: (_, record) => getFileIcon(record.name, record.isDir),
         },
         {
@@ -567,6 +675,21 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
                     />
                 </div>
                 <div className="fm-toolbar-right">
+                    <Tooltip title="搜索文件">
+                        <Button type="text" size="small" icon={<FileSearchOutlined />}
+                            className="fm-btn"
+                            onClick={() => { setSearchModalOpen(true); setSearchResults([]); setSearchQuery(''); }} />
+                    </Tooltip>
+                    {clipboard && (
+                        <Tooltip title={`粘贴: ${clipboard.path.split('/').pop()} (${clipboard.op === 'copy' ? '复制' : '剪切'})`}>
+                            <Button type="text" size="small"
+                                className="fm-btn fm-btn-active"
+                                onClick={handlePaste}
+                                style={{ fontSize: 11 }}>
+                                📋
+                            </Button>
+                        </Tooltip>
+                    )}
                     <Tooltip title={showHidden ? '隐藏点文件' : '显示点文件'}>
                         <Button type="text" size="small"
                             icon={showHidden ? <EyeOutlined /> : <EyeInvisibleOutlined />}
@@ -598,10 +721,32 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
                         onDoubleClick: () => handleDoubleClick(record),
                         onContextMenu: (e) => {
                             e.preventDefault();
+                            setContextMenu({ x: e.clientX, y: e.clientY, record });
                         },
                     })}
                 />
             </div>
+
+            {/* Right-click Context Menu */}
+            {contextMenu && (
+                <Dropdown
+                    menu={{ items: getContextMenu(contextMenu.record), onClick: () => setContextMenu(null) }}
+                    open={true}
+                    onOpenChange={(open) => { if (!open) setContextMenu(null); }}
+                    trigger={['contextMenu']}
+                >
+                    <div
+                        style={{
+                            position: 'fixed',
+                            left: contextMenu.x,
+                            top: contextMenu.y,
+                            width: 1,
+                            height: 1,
+                            zIndex: -1,
+                        }}
+                    />
+                </Dropdown>
+            )}
 
             {/* File Viewer / Editor Modal */}
             <Modal
@@ -658,6 +803,61 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
                     />
                 ) : (
                     <pre className="fm-viewer-pre">{viewerContent}</pre>
+                )}
+            </Modal>
+
+            {/* Search Modal */}
+            <Modal
+                title="搜索文件"
+                open={searchModalOpen}
+                onCancel={() => { setSearchModalOpen(false); setSearchResults([]); setSearchQuery(''); }}
+                width="50vw"
+                footer={null}
+                destroyOnClose
+            >
+                <Input.Search
+                    placeholder="输入文件名关键词"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onSearch={handleSearch}
+                    loading={searchLoading}
+                    enterButton="搜索"
+                    style={{ marginBottom: 12 }}
+                />
+                <div style={{ color: '#888', fontSize: 12, marginBottom: 8 }}>
+                    搜索范围: {currentPath} {searchResults.length > 0 && `(${searchResults.length} 个结果)`}
+                </div>
+                {searchLoading ? (
+                    <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
+                ) : (
+                    <List
+                        size="small"
+                        dataSource={searchResults}
+                        locale={{ emptyText: searchQuery ? '无结果' : '输入关键词开始搜索' }}
+                        style={{ maxHeight: '50vh', overflowY: 'auto' }}
+                        renderItem={(item: any) => (
+                            <List.Item
+                                style={{ cursor: 'pointer', padding: '6px 12px' }}
+                                onClick={() => {
+                                    const dir = item.path.substring(0, item.path.lastIndexOf('/')) || '/';
+                                    if (item.isDir) {
+                                        navigateTo(item.path);
+                                    } else {
+                                        navigateTo(dir);
+                                    }
+                                    setSearchModalOpen(false);
+                                    setSearchResults([]);
+                                    setSearchQuery('');
+                                }}
+                            >
+                                <List.Item.Meta
+                                    avatar={getFileIcon(item.name, item.isDir)}
+                                    title={<span style={{ fontSize: 13 }}>{item.name}</span>}
+                                    description={<span style={{ fontSize: 11, color: '#888' }}>{item.path} · {item.size}</span>}
+                                />
+                            </List.Item>
+                        )}
+                    />
                 )}
             </Modal>
         </div>

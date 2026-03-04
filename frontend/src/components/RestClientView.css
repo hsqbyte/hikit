@@ -1,0 +1,212 @@
+/* ========== REST Client View ========== */
+.rc-view {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.rc-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    background: #fafafa;
+    border-bottom: 1px solid #e8e8e8;
+}
+
+.rc-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+}
+
+.rc-name {
+    font-size: 12px;
+    color: #999;
+}
+
+/* URL Bar */
+.rc-urlbar {
+    display: flex;
+    gap: 8px;
+    padding: 10px 16px;
+    border-bottom: 1px solid #f0f0f0;
+    align-items: center;
+}
+
+.rc-url-input {
+    flex: 1;
+    font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+    font-size: 13px;
+}
+
+/* Split layout */
+.rc-split {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+.rc-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+}
+
+.rc-request {
+    border-right: 1px solid #e8e8e8;
+}
+
+.rc-panel-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #999;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 6px 16px 2px;
+}
+
+.rc-panel .ant-tabs {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0 12px;
+}
+
+.rc-panel .ant-tabs-content {
+    flex: 1;
+    overflow: auto;
+}
+
+/* Textarea */
+.rc-textarea {
+    width: 100%;
+    min-height: 120px;
+    flex: 1;
+    padding: 8px 12px;
+    font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    border: 1px solid #e8e8e8;
+    border-radius: 6px;
+    outline: none;
+    resize: none;
+    background: #fafbfc;
+    color: #333;
+}
+
+.rc-textarea:focus {
+    border-color: #1677ff;
+}
+
+.rc-textarea::placeholder {
+    color: #bbb;
+}
+
+.rc-body-area {
+    min-height: 200px;
+}
+
+/* Response */
+.rc-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    flex: 1;
+    color: #ccc;
+    font-size: 13px;
+}
+
+.rc-status-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 12px;
+    border-bottom: 1px solid #f0f0f0;
+    flex-shrink: 0;
+}
+
+.rc-status-text {
+    font-size: 12px;
+    color: #333;
+    font-weight: 500;
+}
+
+.rc-status-meta {
+    font-size: 11px;
+    color: #999;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.rc-active-btn {
+    color: #1677ff !important;
+}
+
+/* Response body */
+.rc-resp-body {
+    font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-all;
+    padding: 12px;
+    margin: 0;
+    background: #f6f8fa;
+    border: 1px solid #e8e8e8;
+    border-radius: 6px;
+    overflow: auto;
+    max-height: calc(100vh - 280px);
+    color: #333;
+}
+
+/* Response headers */
+.rc-resp-headers {
+    padding: 4px 0;
+}
+
+.rc-resp-header-row {
+    display: flex;
+    padding: 3px 12px;
+    border-bottom: 1px solid #f5f5f5;
+    font-size: 12px;
+}
+
+.rc-resp-header-key {
+    font-weight: 600;
+    color: #1677ff;
+    min-width: 160px;
+    flex-shrink: 0;
+    font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+}
+
+.rc-resp-header-val {
+    color: #333;
+    word-break: break-all;
+    font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+}
+
+.rc-loading-dots {
+    color: #1677ff;
+    animation: rc-pulse 1.5s infinite;
+}
+
+@keyframes rc-pulse {
+
+    0%,
+    100% {
+        opacity: 0.4;
+    }
+
+    50% {
+        opacity: 1;
+    }
+}

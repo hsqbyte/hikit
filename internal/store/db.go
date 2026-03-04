@@ -60,6 +60,17 @@ func createTables() error {
 
 		CREATE INDEX IF NOT EXISTS idx_assets_parent ON assets(parent_id);
 		CREATE INDEX IF NOT EXISTS idx_assets_sort ON assets(sort_order);
+
+		CREATE TABLE IF NOT EXISTS forward_rules (
+			id TEXT PRIMARY KEY,
+			asset_id TEXT NOT NULL,
+			type TEXT NOT NULL CHECK(type IN ('local', 'remote', 'dynamic')),
+			local_port INTEGER NOT NULL,
+			remote_addr TEXT DEFAULT '',
+			enabled INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (asset_id) REFERENCES assets(id) ON DELETE CASCADE
+		);
 	`)
 	return err
 }

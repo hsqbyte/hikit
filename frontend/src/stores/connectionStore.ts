@@ -10,9 +10,10 @@ import { asset } from '../../wailsjs/go/models';
 
 export type ConnectionType =
     | 'ssh' | 'ssh_tunnel' | 'telnet' | 'serial'
-    | 'rdp' | 'docker'
+    | 'rdp' | 'docker' | 'local_terminal'
     | 'redis' | 'mysql' | 'mariadb' | 'postgresql'
-    | 'sqlserver' | 'clickhouse' | 'sqlite' | 'oracle';
+    | 'sqlserver' | 'clickhouse' | 'sqlite' | 'oracle'
+    | 'web_bookmark' | 'rest_client';
 
 // Re-export the auto-generated Asset type with a simpler alias
 export type Asset = asset.Asset;
@@ -24,6 +25,14 @@ export interface Tab {
     connectionType: ConnectionType;
     icon?: string;
     active: boolean;
+    pgMeta?: {
+        sessionID?: string;
+        database?: string;
+        schema?: string;
+        table?: string;
+        type?: 'tableData' | 'tableList' | 'sql';
+        url?: string;
+    };
 }
 
 interface ConnectionState {

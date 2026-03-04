@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/pkg/sftp"
 )
@@ -261,4 +262,89 @@ func (m *Manager) Chmod(sessionID, path string, mode string) error {
 		return fmt.Errorf("invalid mode %s: %w", mode, err)
 	}
 	return client.Chmod(path, os.FileMode(modeVal))
+}
+
+// SearchResult represents a search result entry
+type SearchResult struct {
+	Path  string `json:"path"`
+	Name  string `json:"name"`
+	IsDir bool   `json:"isDir"`
+	Size  string `json:"size"`
+}
+
+// SearchFiles recursively searches for files matching the pattern
+func (m *Manager) SearchFiles(sessionID, basePath, pattern string, maxResults int) ([]SearchResult, error) {
+	client, err := m.getSFTPClient(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	defer client.Close()
+
+	if maxResults <= 0 {
+		maxResults = 200
+	}
+
+	var results []SearchResult
+	lowerPattern := strings.ToLower(pattern)
+
+	var walk func(dir string) error
+	walk = func(dir string) error {
+		if len(results) >= maxResults {
+			return nil
+		}
+		entries, err := client.ReadDir(dir)
+		if err != nil {
+			return nil // Skip unreadable dirs
+		}
+		for _, entry := range entries {
+			if len(results) >= maxResults {
+				return nil
+			}
+			fullPath := dir + "/" + entry.Name()
+			if strings.Contains(strings.ToLower(entry.Name()), lowerPattern) {
+				sr := SearchResult{
+					Path:  fullPath,
+					Name:  entry.Name(),
+					IsDir: entry.IsDir(),
+				}
+				if entry.IsDir() {
+					sr.Size = "4KB"
+				} else {
+					sr.Size = humanizeSize(entry.Size())
+				}
+				results = append(results, sr)
+			}
+			if entry.IsDir() {
+				walk(fullPath)
+			}
+		}
+		return nil
+	}
+
+	walk(basePath)
+	return results, nil
+}
+
+// CopyFile copies a file on the remote server
+func (m *Manager) CopyFile(sessionID, srcPath, dstPath string) error {
+	client, err := m.getSFTPClient(sessionID)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	src, err := client.Open(srcPath)
+	if err != nil {
+		return fmt.Errorf("failed to open source: %w", err)
+	}
+	defer src.Close()
+
+	dst, err := client.Create(dstPath)
+	if err != nil {
+		return fmt.Errorf("failed to create destination: %w", err)
+	}
+	defer dst.Close()
+
+	_, err = io.Copy(dst, src)
+	return err
 }

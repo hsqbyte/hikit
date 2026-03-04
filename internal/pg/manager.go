@@ -1,0 +1,334 @@
+package pg
+
+import (
+	"database/sql"
+	"fmt"
+	"sync"
+
+	_ "github.com/lib/pq"
+)
+
+// ConnConfig holds PostgreSQL connection parameters
+type ConnConfig struct {
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	User     string `json:"user"`
+	Password string `json:"password"`
+	DBName   string `json:"dbName"`
+	SSLMode  string `json:"sslMode"`
+}
+
+// Session represents an active PostgreSQL connection
+type Session struct {
+	ID     string
+	DB     *sql.DB
+	Config ConnConfig
+}
+
+// PGService is the Wails-bindable service for PostgreSQL operations.
+// It is registered in main.go via Bind and all exported methods become
+// available to the frontend automatically.
+type PGService struct {
+	sessions map[string]*Session
+	mu       sync.RWMutex
+	counter  int
+}
+
+// NewPGService creates a new PGService instance
+func NewPGService() *PGService {
+	return &PGService{
+		sessions: make(map[string]*Session),
+	}
+}
+
+func (c *ConnConfig) dsn() string {
+	sslMode := c.SSLMode
+	if sslMode == "" {
+		sslMode = "disable"
+	}
+	return fmt.Sprintf(
+		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+		c.Host, c.Port, c.User, c.Password, c.DBName, sslMode,
+	)
+}
+
+// Connect establishes a new PostgreSQL connection
+func (s *PGService) Connect(cfg ConnConfig) (string, error) {
+	if cfg.Port == 0 {
+		cfg.Port = 5432
+	}
+	if cfg.DBName == "" {
+		cfg.DBName = "postgres"
+	}
+
+	db, err := sql.Open("postgres", cfg.dsn())
+	if err != nil {
+		return "", fmt.Errorf("failed to open connection: %w", err)
+	}
+
+	if err := db.Ping(); err != nil {
+		db.Close()
+		return "", fmt.Errorf("failed to ping %s:%d: %w", cfg.Host, cfg.Port, err)
+	}
+
+	s.mu.Lock()
+	s.counter++
+	sessionID := fmt.Sprintf("pg-%d", s.counter)
+	s.sessions[sessionID] = &Session{
+		ID:     sessionID,
+		DB:     db,
+		Config: cfg,
+	}
+	s.mu.Unlock()
+
+	return sessionID, nil
+}
+
+// ConnectByAsset connects to PostgreSQL using an asset's stored config
+func (s *PGService) ConnectByAsset(assetID string) (string, error) {
+	host, port, user, pass, err := loadAssetCredentials(assetID)
+	if err != nil {
+		return "", err
+	}
+	return s.Connect(ConnConfig{
+		Host: host, Port: port, User: user, Password: pass, DBName: "postgres",
+	})
+}
+
+// TestConnection tests if a PostgreSQL connection can be established
+func (s *PGService) TestConnection(cfg ConnConfig) error {
+	if cfg.Port == 0 {
+		cfg.Port = 5432
+	}
+	if cfg.DBName == "" {
+		cfg.DBName = "postgres"
+	}
+
+	db, err := sql.Open("postgres", cfg.dsn())
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	return db.Ping()
+}
+
+// GetSession returns a session by ID
+func (s *PGService) GetSession(sessionID string) (*Session, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	sess, ok := s.sessions[sessionID]
+	if !ok {
+		return nil, fmt.Errorf("session not found: %s", sessionID)
+	}
+	return sess, nil
+}
+
+// Disconnect closes a PostgreSQL session
+func (s *PGService) Disconnect(sessionID string) {
+	s.mu.Lock()
+	sess, ok := s.sessions[sessionID]
+	if ok {
+		delete(s.sessions, sessionID)
+	}
+	s.mu.Unlock()
+
+	if ok && sess.DB != nil {
+		sess.DB.Close()
+	}
+}
+
+// DisconnectAll closes all sessions
+func (s *PGService) DisconnectAll() {
+	s.mu.Lock()
+	sessions := make([]*Session, 0, len(s.sessions))
+	for _, sess := range s.sessions {
+		sessions = append(sessions, sess)
+	}
+	s.sessions = make(map[string]*Session)
+	s.mu.Unlock()
+
+	for _, sess := range sessions {
+		if sess.DB != nil {
+			sess.DB.Close()
+		}
+	}
+}
+
+// SwitchDatabase closes current DB and opens a new one on the same server
+func (s *PGService) SwitchDatabase(sessionID, dbName string) error {
+	s.mu.Lock()
+	sess, ok := s.sessions[sessionID]
+	s.mu.Unlock()
+	if !ok {
+		return fmt.Errorf("session not found: %s", sessionID)
+	}
+
+	newCfg := sess.Config
+	newCfg.DBName = dbName
+
+	newDB, err := sql.Open("postgres", newCfg.dsn())
+	if err != nil {
+		return err
+	}
+	if err := newDB.Ping(); err != nil {
+		newDB.Close()
+		return err
+	}
+
+	oldDB := sess.DB
+	s.mu.Lock()
+	sess.DB = newDB
+	sess.Config = newCfg
+	s.mu.Unlock()
+
+	oldDB.Close()
+	return nil
+}
+
+// ============================================================
+// Query & Metadata — exposed directly as Wails bindings
+// ============================================================
+
+// ListDatabases returns all databases on the server
+func (s *PGService) ListDatabases(sessionID string) ([]string, error) {
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return sess.ListDatabases()
+}
+
+// ListSchemas returns all schemas in the current database
+func (s *PGService) ListSchemas(sessionID string) ([]string, error) {
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return sess.ListSchemas()
+}
+
+// ListTables returns all tables in a schema
+func (s *PGService) ListTables(sessionID string, schema string) ([]TableInfo, error) {
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return sess.ListTables(schema)
+}
+
+// GetColumns returns column metadata for a table
+func (s *PGService) GetColumns(sessionID string, schema string, table string) ([]ColumnInfo, error) {
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return sess.GetColumns(schema, table)
+}
+
+// GetTableData returns paginated table data
+func (s *PGService) GetTableData(sessionID string, schema string, table string, page int, pageSize int, orderBy string, orderDir string) (*QueryResult, error) {
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return sess.GetTableData(schema, table, page, pageSize, orderBy, orderDir)
+}
+
+// ExecuteQuery executes arbitrary SQL
+func (s *PGService) ExecuteQuery(sessionID string, sqlText string) (*QueryResult, error) {
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return sess.ExecuteQuery(sqlText)
+}
+
+// GetTableDDL returns the CREATE TABLE statement
+func (s *PGService) GetTableDDL(sessionID string, schema string, table string) (string, error) {
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return "", err
+	}
+	return sess.GetTableDDL(schema, table)
+}
+
+// ListViews returns all views in a schema
+func (s *PGService) ListViews(sessionID string, schema string) ([]ViewInfo, error) {
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return sess.ListViews(schema)
+}
+
+// ListFunctions returns all functions/procedures in a schema
+func (s *PGService) ListFunctions(sessionID string, schema string) ([]FunctionInfo, error) {
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return sess.ListFunctions(schema)
+}
+
+// ListMaterializedViews returns all materialized views in a schema
+func (s *PGService) ListMaterializedViews(sessionID string, schema string) ([]MaterializedViewInfo, error) {
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return sess.ListMaterializedViews(schema)
+}
+
+// DropTable drops a table
+func (s *PGService) DropTable(sessionID string, schema string, table string) error {
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return err
+	}
+	return sess.DropTable(schema, table)
+}
+
+// GetPrimaryKeys returns primary key column names for a table
+func (s *PGService) GetPrimaryKeys(sessionID string, schema string, table string) ([]string, error) {
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return sess.GetPrimaryKeys(schema, table)
+}
+
+// InsertRow inserts a new row into a table
+func (s *PGService) InsertRow(sessionID string, schema string, table string, data map[string]interface{}) error {
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return err
+	}
+	return sess.InsertRow(schema, table, data)
+}
+
+// UpdateRow updates a single row identified by primary key values
+func (s *PGService) UpdateRow(sessionID string, schema string, table string, pkValues map[string]interface{}, data map[string]interface{}) error {
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return err
+	}
+	return sess.UpdateRow(schema, table, pkValues, data)
+}
+
+// DeleteRows deletes rows identified by primary key values
+func (s *PGService) DeleteRows(sessionID string, schema string, table string, pkValuesList []map[string]interface{}) error {
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return err
+	}
+	return sess.DeleteRows(schema, table, pkValuesList)
+}
+
+// GetTableDataWithFilter returns paginated table data with column filters
+func (s *PGService) GetTableDataWithFilter(sessionID string, schema string, table string, page int, pageSize int, orderBy string, orderDir string, filters map[string]string) (*QueryResult, error) {
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return sess.GetTableDataWithFilter(schema, table, page, pageSize, orderBy, orderDir, filters)
+}

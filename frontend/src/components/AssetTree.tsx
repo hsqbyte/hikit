@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { Tree, Dropdown, Tooltip, Modal, Input, message } from 'antd';
 import type { MenuProps } from 'antd';
 import {
@@ -8,6 +8,11 @@ import {
     EditOutlined,
     ReloadOutlined,
     SettingOutlined,
+    TableOutlined,
+    EyeOutlined,
+    FunctionOutlined,
+    AppstoreOutlined,
+    GlobalOutlined,
 } from '@ant-design/icons';
 import {
     SiMysql, SiPostgresql, SiRedis, SiDocker,
@@ -19,6 +24,13 @@ import { AiOutlineMergeCells } from 'react-icons/ai';
 import { TbDatabase } from 'react-icons/tb';
 import type { DataNode } from 'antd/es/tree';
 import { useConnectionStore, Asset, ConnectionType } from '../stores/connectionStore';
+import {
+    ConnectByAsset, ListDatabases, ListSchemas,
+    ListTables, ListViews, ListFunctions,
+    ListMaterializedViews, SwitchDatabase,
+} from '../../wailsjs/go/pg/PGService';
+import { MoveAsset } from '../../wailsjs/go/main/App';
+import { BrowserOpenURL } from '../../wailsjs/runtime/runtime';
 import ConnectionEditor from './ConnectionEditor';
 import './AssetTree.css';
 
@@ -26,6 +38,7 @@ const iconStyle = { fontSize: 15, verticalAlign: 'middle' };
 
 const connectionIcons: Record<string, React.ReactNode> = {
     ssh: <VscTerminal style={{ ...iconStyle, color: '#333' }} />,
+    local_terminal: <VscTerminal style={{ ...iconStyle, color: '#52c41a' }} />,
     ssh_tunnel: <AiOutlineMergeCells style={{ ...iconStyle, color: '#666' }} />,
     telnet: <BsHddNetwork style={{ ...iconStyle, color: '#666' }} />,
     rdp: <BsDisplay style={{ ...iconStyle, color: '#0078d4' }} />,
@@ -38,21 +51,13 @@ const connectionIcons: Record<string, React.ReactNode> = {
     clickhouse: <SiClickhouse style={{ ...iconStyle, color: '#ffcc00' }} />,
     sqlite: <SiSqlite style={{ ...iconStyle, color: '#003b57' }} />,
     oracle: <SiOracle style={{ ...iconStyle, color: '#f80000' }} />,
+    web_bookmark: <GlobalOutlined style={{ ...iconStyle, color: '#1677ff' }} />,
+    rest_client: <VscPulse style={{ ...iconStyle, color: '#722ed1' }} />,
 };
 
 const getIcon = (a: Asset): React.ReactNode => {
     if (a.type === 'group') return <FolderOutlined style={{ color: '#e8a838' }} />;
     return connectionIcons[a.connectionType || 'ssh'] || <VscTerminal style={iconStyle} />;
-};
-
-const convertToTreeData = (assets: Asset[]): DataNode[] => {
-    return (assets || []).map((a) => ({
-        key: a.id,
-        title: a.name,
-        icon: getIcon(a),
-        children: a.children && a.children.length > 0 ? convertToTreeData(a.children) : undefined,
-        isLeaf: a.type === 'host',
-    }));
 };
 
 const findAsset = (assets: Asset[], id: string): Asset | undefined => {
@@ -68,6 +73,7 @@ const findAsset = (assets: Asset[], id: string): Asset | undefined => {
 
 const newConnectionTypes: { key: ConnectionType; label: string; icon: React.ReactNode }[] = [
     { key: 'ssh', label: 'SSH', icon: <VscTerminal style={iconStyle} /> },
+    { key: 'local_terminal', label: '本地终端', icon: <VscTerminal style={{ ...iconStyle, color: '#52c41a' }} /> },
     { key: 'ssh_tunnel', label: 'SSH 隧道', icon: <AiOutlineMergeCells style={iconStyle} /> },
     { key: 'telnet', label: 'Telnet', icon: <BsHddNetwork style={iconStyle} /> },
     { key: 'rdp', label: 'RDP', icon: <BsDisplay style={{ ...iconStyle, color: '#0078d4' }} /> },
@@ -80,7 +86,22 @@ const newConnectionTypes: { key: ConnectionType; label: string; icon: React.Reac
     { key: 'clickhouse', label: 'ClickHouse', icon: <SiClickhouse style={{ ...iconStyle, color: '#ffcc00' }} /> },
     { key: 'sqlite', label: 'SQLite', icon: <SiSqlite style={{ ...iconStyle, color: '#003b57' }} /> },
     { key: 'oracle', label: 'Oracle', icon: <SiOracle style={{ ...iconStyle, color: '#f80000' }} /> },
+    { key: 'web_bookmark', label: '网页书签', icon: <GlobalOutlined style={{ ...iconStyle, color: '#1677ff' }} /> },
+    { key: 'rest_client', label: 'REST Client', icon: <VscPulse style={{ ...iconStyle, color: '#722ed1' }} /> },
 ];
+
+// ===== PG Tree Node Key format =====
+// pg:{assetId}                    — PG connection root (= asset node)
+// pg:{assetId}:db:{dbName}        — database
+// pg:{assetId}:db:{dbName}:s:{schema}           — schema
+// pg:{assetId}:db:{dbName}:s:{schema}:cat:tables   — "表" category
+// pg:{assetId}:db:{dbName}:s:{schema}:cat:views    — "视图" category
+// pg:{assetId}:db:{dbName}:s:{schema}:cat:mvs      — "物化视图" category
+// pg:{assetId}:db:{dbName}:s:{schema}:cat:funcs     — "函数" category
+// pg:{assetId}:db:{dbName}:s:{schema}:tbl:{tableName} — table leaf
+// pg:{assetId}:db:{dbName}:s:{schema}:view:{viewName} — view leaf
+// pg:{assetId}:db:{dbName}:s:{schema}:mv:{mvName}  — materialized view leaf
+// pg:{assetId}:db:{dbName}:s:{schema}:fn:{funcName} — function leaf
 
 const AssetTree: React.FC = () => {
     const {
@@ -99,9 +120,359 @@ const AssetTree: React.FC = () => {
     const [editorConnType, setEditorConnType] = useState<ConnectionType>('ssh');
     const [editingAsset, setEditingAsset] = useState<any>(null);
 
+    // PG dynamic tree state
+    const [pgSessions, setPgSessions] = useState<Record<string, string>>({}); // assetId -> sessionID
+    const [pgDatabases, setPgDatabases] = useState<Record<string, string[]>>({}); // assetId -> databases
+    const [pgCurrentDB, setPgCurrentDB] = useState<Record<string, string>>({}); // assetId -> current db
+    const [pgSchemas, setPgSchemas] = useState<Record<string, string[]>>({}); // assetId:db -> schemas
+    const [pgObjects, setPgObjects] = useState<Record<string, {
+        tables: { name: string; type: string }[];
+        views: { name: string; comment: string }[];
+        materializedViews: { name: string; comment: string }[];
+        functions: { name: string; resultType: string; argTypes: string; type: string }[];
+    }>>({}); // assetId:db:schema -> objects
+    const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
+    const [pgLoading, setPgLoading] = useState<Record<string, boolean>>({});
+    const [initialExpanded, setInitialExpanded] = useState(false);
+
     useEffect(() => { loadAssets(); }, []);
 
-    const treeData = useMemo(() => convertToTreeData(assets), [assets]);
+    // Auto-expand group nodes on initial load
+    useEffect(() => {
+        if (assets.length > 0 && !initialExpanded) {
+            const groupKeys: string[] = [];
+            const collectGroups = (items: Asset[]) => {
+                items.forEach(a => {
+                    if (a.type === 'group') {
+                        groupKeys.push(a.id);
+                        if (a.children) collectGroups(a.children);
+                    }
+                });
+            };
+            collectGroups(assets);
+            setExpandedKeys(prev => [...new Set([...prev, ...groupKeys])]);
+            setInitialExpanded(true);
+        }
+    }, [assets, initialExpanded]);
+
+    // Connect to PG and load databases
+    const handlePgConnect = useCallback(async (assetId: string) => {
+        if (pgSessions[assetId]) {
+            // Already connected, just load dbs
+            return;
+        }
+        setPgLoading(prev => ({ ...prev, [assetId]: true }));
+        try {
+            const sid = await ConnectByAsset(assetId);
+            setPgSessions(prev => ({ ...prev, [assetId]: sid }));
+            const dbs = await ListDatabases(sid);
+            setPgDatabases(prev => ({ ...prev, [assetId]: dbs || [] }));
+        } catch (err: any) {
+            message.error('连接 PostgreSQL 失败: ' + (err?.message || err));
+        } finally {
+            setPgLoading(prev => ({ ...prev, [assetId]: false }));
+        }
+    }, [pgSessions]);
+
+    // Load schemas for a database
+    const handlePgLoadSchemas = useCallback(async (assetId: string, db: string) => {
+        const sid = pgSessions[assetId];
+        if (!sid) return;
+        const key = `${assetId}:${db}`;
+        setPgLoading(prev => ({ ...prev, [key]: true }));
+        try {
+            // Switch database if needed
+            if (pgCurrentDB[assetId] !== db) {
+                await SwitchDatabase(sid, db);
+                setPgCurrentDB(prev => ({ ...prev, [assetId]: db }));
+            }
+            const schemas = await ListSchemas(sid);
+            setPgSchemas(prev => ({ ...prev, [key]: schemas || [] }));
+        } catch (err: any) {
+            message.error('加载 Schema 失败: ' + (err?.message || err));
+        } finally {
+            setPgLoading(prev => ({ ...prev, [key]: false }));
+        }
+    }, [pgSessions, pgCurrentDB]);
+
+    // Load schema objects (tables, views, etc.)
+    const handlePgLoadObjects = useCallback(async (assetId: string, db: string, schema: string) => {
+        const sid = pgSessions[assetId];
+        if (!sid) return;
+        const key = `${assetId}:${db}:${schema}`;
+        if (pgObjects[key]) return; // Already loaded
+        setPgLoading(prev => ({ ...prev, [key]: true }));
+        try {
+            if (pgCurrentDB[assetId] !== db) {
+                await SwitchDatabase(sid, db);
+                setPgCurrentDB(prev => ({ ...prev, [assetId]: db }));
+            }
+            const [tablesRes, viewsRes, mvsRes, funcsRes] = await Promise.all([
+                ListTables(sid, schema),
+                ListViews(sid, schema),
+                ListMaterializedViews(sid, schema),
+                ListFunctions(sid, schema),
+            ]);
+            setPgObjects(prev => ({
+                ...prev,
+                [key]: {
+                    tables: (tablesRes || []).map((x: any) => ({ name: x.name, type: x.type || 'table' })),
+                    views: viewsRes || [],
+                    materializedViews: mvsRes || [],
+                    functions: funcsRes || [],
+                },
+            }));
+        } catch (err: any) {
+            message.error('加载对象失败: ' + (err?.message || err));
+        } finally {
+            setPgLoading(prev => ({ ...prev, [key]: false }));
+        }
+    }, [pgSessions, pgCurrentDB, pgObjects]);
+
+    // Build tree data with PG virtual nodes mixed in
+    const treeData = useMemo(() => {
+        const buildNodes = (assetList: Asset[]): DataNode[] => {
+            return (assetList || []).map((a) => {
+                const baseNode: DataNode = {
+                    key: a.id,
+                    title: a.name,
+                    icon: getIcon(a),
+                    isLeaf: a.type === 'host' && a.connectionType !== 'postgresql',
+                };
+
+                // If it's a PG asset, build virtual children
+                if (a.type === 'host' && a.connectionType === 'postgresql') {
+                    const dbs = pgDatabases[a.id] || [];
+                    if (dbs.length > 0) {
+                        baseNode.children = dbs.map(db => {
+                            const dbKey = `pg:${a.id}:db:${db}`;
+                            const schemas = pgSchemas[`${a.id}:${db}`] || [];
+                            const dbNode: DataNode = {
+                                key: dbKey,
+                                title: db,
+                                icon: <TbDatabase style={{ ...iconStyle, color: '#52c41a' }} />,
+                                isLeaf: false,
+                            };
+                            if (schemas.length > 0) {
+                                dbNode.children = schemas.map(schema => {
+                                    const schemaKey = `pg:${a.id}:db:${db}:s:${schema}`;
+                                    const objKey = `${a.id}:${db}:${schema}`;
+                                    const objects = pgObjects[objKey];
+                                    const schemaNode: DataNode = {
+                                        key: schemaKey,
+                                        title: schema,
+                                        icon: <FolderOutlined style={{ color: '#1677ff' }} />,
+                                        isLeaf: false,
+                                    };
+                                    if (objects) {
+                                        const catTitle = (label: string, count: number) => (
+                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                                {label}
+                                                <span style={{ color: '#999', fontSize: 11 }}>{count}</span>
+                                            </span>
+                                        );
+                                        const pfx = `pg:${a.id}:db:${db}:s:${schema}`;
+                                        schemaNode.children = [
+                                            // 表
+                                            {
+                                                key: `${pfx}:cat:tables`,
+                                                title: catTitle('表', objects.tables.length),
+                                                icon: <TableOutlined style={{ color: '#52c41a' }} />,
+                                                isLeaf: objects.tables.length === 0,
+                                                children: objects.tables.map(t => ({
+                                                    key: `${pfx}:tbl:${t.name}`,
+                                                    title: t.name,
+                                                    icon: <TableOutlined style={{ color: '#52c41a', fontSize: 13 }} />,
+                                                    isLeaf: true,
+                                                })),
+                                            },
+                                            // 视图
+                                            {
+                                                key: `${pfx}:cat:views`,
+                                                title: catTitle('视图', objects.views.length),
+                                                icon: <EyeOutlined style={{ color: '#1677ff' }} />,
+                                                isLeaf: objects.views.length === 0,
+                                                children: objects.views.map(v => ({
+                                                    key: `${pfx}:view:${v.name}`,
+                                                    title: v.name,
+                                                    icon: <EyeOutlined style={{ color: '#1677ff', fontSize: 13 }} />,
+                                                    isLeaf: true,
+                                                })),
+                                            },
+                                            // 物化视图
+                                            {
+                                                key: `${pfx}:cat:mvs`,
+                                                title: catTitle('物化视图', objects.materializedViews.length),
+                                                icon: <AppstoreOutlined style={{ color: '#722ed1' }} />,
+                                                isLeaf: objects.materializedViews.length === 0,
+                                                children: objects.materializedViews.map(mv => ({
+                                                    key: `${pfx}:mv:${mv.name}`,
+                                                    title: mv.name,
+                                                    icon: <AppstoreOutlined style={{ color: '#722ed1', fontSize: 13 }} />,
+                                                    isLeaf: true,
+                                                })),
+                                            },
+                                            // 存储过程/函数
+                                            {
+                                                key: `${pfx}:cat:funcs`,
+                                                title: catTitle('存储过程/函数', objects.functions.length),
+                                                icon: <FunctionOutlined style={{ color: '#fa8c16' }} />,
+                                                isLeaf: objects.functions.length === 0,
+                                                children: objects.functions.map(f => ({
+                                                    key: `${pfx}:fn:${f.name}:${f.argTypes}`,
+                                                    title: f.name,
+                                                    icon: <FunctionOutlined style={{ color: '#fa8c16', fontSize: 13 }} />,
+                                                    isLeaf: true,
+                                                })),
+                                            },
+                                            // 查询
+                                            {
+                                                key: `${pfx}:cat:queries`,
+                                                title: catTitle('查询', 0),
+                                                icon: <VscPulse style={{ color: '#13c2c2', fontSize: 14 }} />,
+                                                isLeaf: true,
+                                            },
+                                        ];
+                                    }
+                                    return schemaNode;
+                                });
+                            }
+                            return dbNode;
+                        });
+                        baseNode.isLeaf = false;
+                    } else {
+                        // Not yet connected or no dbs
+                        baseNode.isLeaf = false;
+                    }
+                } else if (a.children && a.children.length > 0) {
+                    baseNode.children = buildNodes(a.children);
+                }
+
+                return baseNode;
+            });
+        };
+        return buildNodes(assets);
+    }, [assets, pgDatabases, pgSchemas, pgObjects]);
+
+    // Handle tree expand — trigger PG lazy loading
+    const handleExpand = useCallback(async (keys: React.Key[], info: any) => {
+        setExpandedKeys(keys as string[]);
+        const key = info.node.key as string;
+
+        // Check if expanding a PG asset — don't auto-connect, user must double-click
+        const asset = findAsset(assets, key);
+        if (asset && asset.type === 'host' && asset.connectionType === 'postgresql') {
+            // Do nothing — connection is manual via double-click
+            return;
+        }
+
+        // Check if expanding a PG database node: pg:{assetId}:db:{dbName}
+        const dbMatch = key.match(/^pg:(.+?):db:(.+)$/);
+        if (dbMatch && !key.includes(':s:')) {
+            const [, assetId, db] = dbMatch;
+            if (!pgSchemas[`${assetId}:${db}`]) {
+                await handlePgLoadSchemas(assetId, db);
+            }
+            return;
+        }
+
+        // Check if expanding a PG schema node: pg:{assetId}:db:{dbName}:s:{schema}
+        const schemaMatch = key.match(/^pg:(.+?):db:(.+?):s:(.+)$/);
+        if (schemaMatch && !key.includes(':cat:') && !key.includes(':tbl:') && !key.includes(':view:') && !key.includes(':mv:') && !key.includes(':fn:')) {
+            const [, assetId, db, schema] = schemaMatch;
+            if (!pgObjects[`${assetId}:${db}:${schema}`]) {
+                await handlePgLoadObjects(assetId, db, schema);
+            }
+            return;
+        }
+    }, [assets, pgSessions, pgSchemas, pgObjects, handlePgConnect, handlePgLoadSchemas, handlePgLoadObjects]);
+
+    // Handle double-click — open tab for PG tables or other connections
+    const handleDoubleClick = useCallback(async (_e: React.MouseEvent, node: any) => {
+        const key = node.key as string;
+
+        // PG table category: pg:{assetId}:db:{dbName}:s:{schema}:cat:tables
+        const catMatch = key.match(/^pg:(.+?):db:(.+?):s:(.+?):cat:tables$/);
+        if (catMatch) {
+            const [, assetId, db, schema] = catMatch;
+            const asset = findAsset(assets, assetId);
+            if (!asset) return;
+            openTab({
+                id: `pg-list-${assetId}-${db}-${schema}`,
+                title: `${db}`,
+                assetId: assetId,
+                connectionType: 'postgresql',
+                pgMeta: { database: db, schema, type: 'tableList' },
+            });
+            return;
+        }
+
+        // PG table leaf: pg:{assetId}:db:{dbName}:s:{schema}:tbl:{tableName}
+        const tblMatch = key.match(/^pg:(.+?):db:(.+?):s:(.+?):tbl:(.+)$/);
+        if (tblMatch) {
+            const [, assetId, db, schema, table] = tblMatch;
+            const asset = findAsset(assets, assetId);
+            if (!asset) return;
+            openTab({
+                id: `pg-tbl-${assetId}-${db}-${schema}-${table}`,
+                title: table,
+                assetId: assetId,
+                connectionType: 'postgresql',
+                pgMeta: { database: db, schema, table, type: 'tableData' },
+            });
+            return;
+        }
+
+        // Regular asset double-click
+        const a = findAsset(assets, key);
+        if (a && a.type === 'host' && a.connectionType) {
+            if (a.connectionType === 'postgresql') {
+                if (pgSessions[a.id]) {
+                    // Already connected — disconnect
+                    setPgSessions(prev => { const next = { ...prev }; delete next[a.id]; return next; });
+                    setPgDatabases(prev => { const next = { ...prev }; delete next[a.id]; return next; });
+                    message.info(`已断开 ${a.name}`);
+                } else {
+                    // Connect
+                    await handlePgConnect(a.id);
+                    // Auto-expand the node
+                    setExpandedKeys(prev => [...new Set([...prev, a.id])]);
+                }
+                return;
+            }
+            if (a.connectionType === 'web_bookmark') {
+                const bookmarkUrl = a.host || '';
+                if (bookmarkUrl) {
+                    const fullUrl = bookmarkUrl.startsWith('http') ? bookmarkUrl : 'https://' + bookmarkUrl;
+                    openTab({
+                        id: `tab-${a.id}`,
+                        title: a.name,
+                        assetId: a.id,
+                        connectionType: 'web_bookmark',
+                        pgMeta: { url: fullUrl },
+                    });
+                } else {
+                    message.warning('该书签没有设置网址');
+                }
+                return;
+            }
+            if (a.connectionType === 'rest_client') {
+                openTab({
+                    id: `tab-${a.id}`,
+                    title: a.name,
+                    assetId: a.id,
+                    connectionType: 'rest_client',
+                });
+                return;
+            }
+            openTab({
+                id: `tab-${a.id}`,
+                title: a.name,
+                assetId: a.id,
+                connectionType: a.connectionType as ConnectionType,
+            });
+        }
+    }, [assets, openTab, pgSessions]);
 
     // Get parent ID for new connections
     const getTargetParentId = (): string => {
@@ -127,14 +498,12 @@ const AssetTree: React.FC = () => {
         message.success('群组已创建');
     };
 
-    // Open editor for new connection
     const handleNewConnection = (connType: ConnectionType) => {
         setEditorConnType(connType);
         setEditingAsset(null);
         setEditorOpen(true);
     };
 
-    // Open editor for editing existing connection
     const handleEditConnection = () => {
         if (!selectedAssetId) return;
         const selected = findAsset(assets, selectedAssetId);
@@ -144,20 +513,12 @@ const AssetTree: React.FC = () => {
         setEditorOpen(true);
     };
 
-    // Save from editor (create or update)
     const handleEditorSave = async (data: any) => {
         if (editingAsset) {
-            await updateAsset({
-                ...editingAsset,
-                ...data,
-                id: editingAsset.id,
-            });
+            await updateAsset({ ...editingAsset, ...data, id: editingAsset.id });
             message.success('已更新');
         } else {
-            await createAsset({
-                ...data,
-                parentId: getTargetParentId(),
-            });
+            await createAsset({ ...data, parentId: getTargetParentId() });
             message.success('连接已创建');
         }
         setEditorOpen(false);
@@ -168,13 +529,10 @@ const AssetTree: React.FC = () => {
         if (!selectedAssetId) return;
         const selected = findAsset(assets, selectedAssetId);
         if (!selected) return;
-
         Modal.confirm({
             title: '确认删除',
             content: `确定要删除 "${selected.name}" 吗？${selected.type === 'group' ? '（包含所有子项）' : ''}`,
-            okText: '删除',
-            okType: 'danger',
-            cancelText: '取消',
+            okText: '删除', okType: 'danger', cancelText: '取消',
             onOk: async () => {
                 await deleteAsset(selectedAssetId);
                 message.success('已删除');
@@ -198,18 +556,6 @@ const AssetTree: React.FC = () => {
         message.success('已重命名');
     };
 
-    const handleDoubleClick = (assetId: string) => {
-        const a = findAsset(assets, assetId);
-        if (a && a.type === 'host' && a.connectionType) {
-            openTab({
-                id: `tab-${a.id}`,
-                title: a.name,
-                assetId: a.id,
-                connectionType: a.connectionType as ConnectionType,
-            });
-        }
-    };
-
     const selectedIsHost = (() => {
         if (!selectedAssetId) return false;
         const a = findAsset(assets, selectedAssetId);
@@ -217,46 +563,18 @@ const AssetTree: React.FC = () => {
     })();
 
     const contextMenuItems: MenuProps['items'] = [
+        { key: 'new-group', label: '新建群组', icon: <FolderOutlined />, onClick: () => setGroupModalOpen(true) },
         {
-            key: 'new-group',
-            label: '新建群组',
-            icon: <FolderOutlined />,
-            onClick: () => setGroupModalOpen(true),
-        },
-        {
-            key: 'new-connection',
-            label: '新建连接',
-            icon: <PlusOutlined />,
+            key: 'new-connection', label: '新建连接', icon: <PlusOutlined />,
             children: newConnectionTypes.map((t, i) => ({
-                key: `new-${t.key}-${i}`,
-                label: t.label,
-                icon: t.icon,
+                key: `new-${t.key}-${i}`, label: t.label, icon: t.icon,
                 onClick: () => handleNewConnection(t.key),
             })),
         },
         { type: 'divider' as const },
-        {
-            key: 'edit',
-            label: '编辑',
-            icon: <SettingOutlined />,
-            disabled: !selectedIsHost,
-            onClick: handleEditConnection,
-        },
-        {
-            key: 'rename',
-            label: '重命名',
-            icon: <EditOutlined />,
-            disabled: !selectedAssetId,
-            onClick: handleRename,
-        },
-        {
-            key: 'delete',
-            label: '删除',
-            icon: <DeleteOutlined />,
-            danger: true,
-            disabled: !selectedAssetId,
-            onClick: handleDelete,
-        },
+        { key: 'edit', label: '编辑', icon: <SettingOutlined />, disabled: !selectedIsHost, onClick: handleEditConnection },
+        { key: 'rename', label: '重命名', icon: <EditOutlined />, disabled: !selectedAssetId, onClick: handleRename },
+        { key: 'delete', label: '删除', icon: <DeleteOutlined />, danger: true, disabled: !selectedAssetId, onClick: handleDelete },
     ];
 
     return (
@@ -293,26 +611,57 @@ const AssetTree: React.FC = () => {
                         ) : (
                             <Tree
                                 showIcon
+                                draggable={{
+                                    icon: false,
+                                    nodeDraggable: (node: any) => {
+                                        // Only allow dragging real asset nodes (not PG virtual nodes)
+                                        const key = String(node.key);
+                                        return !key.includes(':db:') && !key.includes(':s:') && !key.includes(':cat:') && !key.includes(':tbl:') && !key.includes(':view:') && !key.includes(':fn:');
+                                    },
+                                }}
+                                onDrop={async (info: any) => {
+                                    const dragKey = String(info.dragNode.key);
+                                    const dropKey = String(info.node.key);
+                                    const dropAsset = findAsset(assets, dropKey);
+
+                                    // Determine new parent
+                                    let newParentId = '';
+                                    if (info.dropToGap) {
+                                        // Dropped between nodes — same parent as drop target
+                                        newParentId = dropAsset?.parentId || '';
+                                    } else {
+                                        // Dropped onto a node
+                                        if (dropAsset?.type === 'group') {
+                                            newParentId = dropKey; // Move into this group
+                                        } else {
+                                            newParentId = dropAsset?.parentId || ''; // Same level as target
+                                        }
+                                    }
+
+                                    try {
+                                        await MoveAsset(dragKey, newParentId);
+                                        loadAssets();
+                                    } catch (err: any) {
+                                        message.error('移动失败: ' + (err?.message || err));
+                                    }
+                                }}
                                 treeData={treeData}
                                 selectedKeys={selectedAssetId ? [selectedAssetId] : []}
-                                defaultExpandAll
+                                expandedKeys={expandedKeys}
+                                onExpand={handleExpand}
                                 onSelect={(keys) => {
                                     selectAsset(keys.length > 0 ? keys[0] as string : null);
                                 }}
                                 onRightClick={({ node }) => {
-                                    // Select the node on right click so context menu items are enabled
                                     selectAsset(node.key as string);
                                 }}
-                                onDoubleClick={(_e, node) => {
-                                    handleDoubleClick(node.key as string);
-                                }}
+                                onDoubleClick={handleDoubleClick}
                             />
                         )}
                     </div>
                 </Dropdown>
             </div>
 
-            {/* Connection Editor Dialog */}
             <ConnectionEditor
                 open={editorOpen}
                 editingAsset={editingAsset}
@@ -322,42 +671,20 @@ const AssetTree: React.FC = () => {
                 onCancel={() => setEditorOpen(false)}
             />
 
-            {/* New Group Modal */}
             <Modal
-                title="新建群组"
-                open={groupModalOpen}
-                onOk={handleCreateGroup}
-                onCancel={() => { setGroupModalOpen(false); setGroupName(''); }}
-                okText="创建"
-                cancelText="取消"
-                width={360}
+                title="新建群组" open={groupModalOpen}
+                onOk={handleCreateGroup} onCancel={() => { setGroupModalOpen(false); setGroupName(''); }}
+                okText="创建" cancelText="取消" width={360}
             >
-                <Input
-                    placeholder="群组名称"
-                    value={groupName}
-                    onChange={(e) => setGroupName(e.target.value)}
-                    onPressEnter={handleCreateGroup}
-                    autoFocus
-                />
+                <Input placeholder="群组名称" value={groupName} onChange={(e) => setGroupName(e.target.value)} onPressEnter={handleCreateGroup} autoFocus />
             </Modal>
 
-            {/* Rename Modal */}
             <Modal
-                title="重命名"
-                open={renameModalOpen}
-                onOk={doRename}
-                onCancel={() => setRenameModalOpen(false)}
-                okText="确认"
-                cancelText="取消"
-                width={360}
+                title="重命名" open={renameModalOpen}
+                onOk={doRename} onCancel={() => setRenameModalOpen(false)}
+                okText="确认" cancelText="取消" width={360}
             >
-                <Input
-                    placeholder="新名称"
-                    value={renameValue}
-                    onChange={(e) => setRenameValue(e.target.value)}
-                    onPressEnter={doRename}
-                    autoFocus
-                />
+                <Input placeholder="新名称" value={renameValue} onChange={(e) => setRenameValue(e.target.value)} onPressEnter={doRename} autoFocus />
             </Modal>
         </div>
     );
