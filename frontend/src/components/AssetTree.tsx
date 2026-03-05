@@ -13,6 +13,8 @@ import {
     FunctionOutlined,
     AppstoreOutlined,
     GlobalOutlined,
+    CheckSquareOutlined,
+    FileTextOutlined,
 } from '@ant-design/icons';
 import {
     SiMysql, SiPostgresql, SiRedis, SiDocker,
@@ -25,7 +27,7 @@ import { TbDatabase } from 'react-icons/tb';
 import type { DataNode } from 'antd/es/tree';
 import { useConnectionStore, Asset, ConnectionType } from '../stores/connectionStore';
 import {
-    ConnectByAsset, ListDatabases, ListSchemas,
+    ConnectByAsset, ConnectByAssetViaSSH, ListDatabases, ListSchemas,
     ListTables, ListViews, ListFunctions,
     ListMaterializedViews, SwitchDatabase,
 } from '../../wailsjs/go/pg/PGService';
@@ -53,6 +55,8 @@ const connectionIcons: Record<string, React.ReactNode> = {
     oracle: <SiOracle style={{ ...iconStyle, color: '#f80000' }} />,
     web_bookmark: <GlobalOutlined style={{ ...iconStyle, color: '#1677ff' }} />,
     rest_client: <VscPulse style={{ ...iconStyle, color: '#722ed1' }} />,
+    todo: <CheckSquareOutlined style={{ ...iconStyle, color: '#52c41a' }} />,
+    memo: <FileTextOutlined style={{ ...iconStyle, color: '#faad14' }} />,
 };
 
 const getIcon = (a: Asset): React.ReactNode => {
@@ -88,6 +92,8 @@ const newConnectionTypes: { key: ConnectionType; label: string; icon: React.Reac
     { key: 'oracle', label: 'Oracle', icon: <SiOracle style={{ ...iconStyle, color: '#f80000' }} /> },
     { key: 'web_bookmark', label: '网页书签', icon: <GlobalOutlined style={{ ...iconStyle, color: '#1677ff' }} /> },
     { key: 'rest_client', label: 'REST Client', icon: <VscPulse style={{ ...iconStyle, color: '#722ed1' }} /> },
+    { key: 'todo', label: '待办事项', icon: <CheckSquareOutlined style={{ ...iconStyle, color: '#52c41a' }} /> },
+    { key: 'memo', label: '备忘录', icon: <FileTextOutlined style={{ ...iconStyle, color: '#faad14' }} /> },
 ];
 
 // ===== PG Tree Node Key format =====
@@ -158,12 +164,18 @@ const AssetTree: React.FC = () => {
     // Connect to PG and load databases
     const handlePgConnect = useCallback(async (assetId: string) => {
         if (pgSessions[assetId]) {
-            // Already connected, just load dbs
             return;
         }
         setPgLoading(prev => ({ ...prev, [assetId]: true }));
         try {
-            const sid = await ConnectByAsset(assetId);
+            // Check if asset has SSH tunnel configured
+            const asset = findAsset(assets, assetId);
+            let sid: string;
+            if (asset?.sshTunnelId) {
+                sid = await ConnectByAssetViaSSH(assetId, asset.sshTunnelId);
+            } else {
+                sid = await ConnectByAsset(assetId);
+            }
             setPgSessions(prev => ({ ...prev, [assetId]: sid }));
             const dbs = await ListDatabases(sid);
             setPgDatabases(prev => ({ ...prev, [assetId]: dbs || [] }));
@@ -172,7 +184,7 @@ const AssetTree: React.FC = () => {
         } finally {
             setPgLoading(prev => ({ ...prev, [assetId]: false }));
         }
-    }, [pgSessions]);
+    }, [pgSessions, assets]);
 
     // Load schemas for a database
     const handlePgLoadSchemas = useCallback(async (assetId: string, db: string) => {
@@ -237,7 +249,7 @@ const AssetTree: React.FC = () => {
                     key: a.id,
                     title: a.name,
                     icon: getIcon(a),
-                    isLeaf: a.type === 'host' && a.connectionType !== 'postgresql',
+                    isLeaf: a.type === 'group' ? false : (a.type === 'host' && a.connectionType !== 'postgresql'),
                 };
 
                 // If it's a PG asset, build virtual children
@@ -399,10 +411,10 @@ const AssetTree: React.FC = () => {
             if (!asset) return;
             openTab({
                 id: `pg-list-${assetId}-${db}-${schema}`,
-                title: `${db}`,
+                title: `${asset.name} - ${db}`,
                 assetId: assetId,
                 connectionType: 'postgresql',
-                pgMeta: { database: db, schema, type: 'tableList' },
+                pgMeta: { database: db, schema, type: 'tableList', sshAssetId: asset?.sshTunnelId || undefined },
             });
             return;
         }
@@ -415,10 +427,10 @@ const AssetTree: React.FC = () => {
             if (!asset) return;
             openTab({
                 id: `pg-tbl-${assetId}-${db}-${schema}-${table}`,
-                title: table,
+                title: `${asset.name} - ${table}`,
                 assetId: assetId,
                 connectionType: 'postgresql',
-                pgMeta: { database: db, schema, table, type: 'tableData' },
+                pgMeta: { database: db, schema, table, type: 'tableData', sshAssetId: asset?.sshTunnelId || undefined },
             });
             return;
         }
@@ -462,6 +474,24 @@ const AssetTree: React.FC = () => {
                     title: a.name,
                     assetId: a.id,
                     connectionType: 'rest_client',
+                });
+                return;
+            }
+            if (a.connectionType === 'todo') {
+                openTab({
+                    id: `tab-${a.id}`,
+                    title: a.name,
+                    assetId: a.id,
+                    connectionType: 'todo',
+                });
+                return;
+            }
+            if (a.connectionType === 'memo') {
+                openTab({
+                    id: `tab-${a.id}`,
+                    title: a.name,
+                    assetId: a.id,
+                    connectionType: 'memo',
                 });
                 return;
             }
@@ -611,18 +641,33 @@ const AssetTree: React.FC = () => {
                         ) : (
                             <Tree
                                 showIcon
+                                blockNode
                                 draggable={{
                                     icon: false,
                                     nodeDraggable: (node: any) => {
                                         // Only allow dragging real asset nodes (not PG virtual nodes)
                                         const key = String(node.key);
-                                        return !key.includes(':db:') && !key.includes(':s:') && !key.includes(':cat:') && !key.includes(':tbl:') && !key.includes(':view:') && !key.includes(':fn:');
+                                        return !key.startsWith('pg:');
                                     },
+                                }}
+                                allowDrop={({ dropNode, dropPosition }: any) => {
+                                    const key = String(dropNode.key);
+                                    // Disallow drop on PG virtual nodes
+                                    if (key.startsWith('pg:')) return false;
+                                    // dropPosition: -1=before, 0=inside, 1=after
+                                    if (dropPosition === 0) {
+                                        // Only allow dropping INTO group (folder) nodes
+                                        const target = findAsset(assets, key);
+                                        return target?.type === 'group';
+                                    }
+                                    return true;
                                 }}
                                 onDrop={async (info: any) => {
                                     const dragKey = String(info.dragNode.key);
                                     const dropKey = String(info.node.key);
                                     const dropAsset = findAsset(assets, dropKey);
+                                    // Don't move onto PG virtual nodes
+                                    if (dropKey.startsWith('pg:')) return;
 
                                     // Determine new parent
                                     let newParentId = '';
@@ -630,17 +675,21 @@ const AssetTree: React.FC = () => {
                                         // Dropped between nodes — same parent as drop target
                                         newParentId = dropAsset?.parentId || '';
                                     } else {
-                                        // Dropped onto a node
-                                        if (dropAsset?.type === 'group') {
-                                            newParentId = dropKey; // Move into this group
-                                        } else {
-                                            newParentId = dropAsset?.parentId || ''; // Same level as target
-                                        }
+                                        // Dropped directly onto a node (only groups reach here due to allowDrop)
+                                        newParentId = dropKey;
                                     }
+
+                                    // Prevent dropping a node into itself
+                                    if (dragKey === newParentId) return;
 
                                     try {
                                         await MoveAsset(dragKey, newParentId);
+                                        // Auto‑expand the target group so user sees the result
+                                        if (newParentId && !expandedKeys.includes(newParentId)) {
+                                            setExpandedKeys(prev => [...prev, newParentId]);
+                                        }
                                         loadAssets();
+                                        message.success('移动成功');
                                     } catch (err: any) {
                                         message.error('移动失败: ' + (err?.message || err));
                                     }

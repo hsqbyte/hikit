@@ -171,3 +171,23 @@
     text-align: center;
     line-height: 1.8;
 }
+
+/* Drag-and-drop visual feedback */
+.asset-tree .ant-tree .ant-tree-treenode.drop-target {
+    background: #e6f4ff !important;
+    border-radius: 4px;
+}
+
+.asset-tree .ant-tree .ant-tree-treenode.drag-over {
+    background: #e6f4ff !important;
+}
+
+.asset-tree .ant-tree .ant-tree-treenode.drag-over-gap-bottom>.ant-tree-node-content-wrapper,
+.asset-tree .ant-tree .ant-tree-treenode.drag-over-gap-top>.ant-tree-node-content-wrapper {
+    border-color: #1677ff;
+}
+
+.asset-tree .ant-tree-drop-indicator {
+    background: #1677ff !important;
+    height: 2px !important;
+}

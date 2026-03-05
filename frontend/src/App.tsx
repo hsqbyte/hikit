@@ -11,6 +11,8 @@ import PortForwardView from './components/PortForwardView';
 import ProxyView from './components/ProxyView';
 import WebProxyView from './components/WebProxyView';
 import RestClientView from './components/RestClientView';
+import TodoView from './components/TodoView';
+import MemoView from './components/MemoView';
 import { useConnectionStore, Asset } from './stores/connectionStore';
 import './App.css';
 
@@ -136,6 +138,27 @@ const App: React.FC = () => {
                 <RestClientView
                     key={activeTab.id}
                     name={activeTab.title}
+                    assetId={activeTab.assetId}
+                />
+            );
+        }
+
+        if (activeTab.connectionType === 'todo') {
+            return (
+                <TodoView
+                    key={activeTab.id}
+                    name={activeTab.title}
+                    assetId={activeTab.assetId}
+                />
+            );
+        }
+
+        if (activeTab.connectionType === 'memo') {
+            return (
+                <MemoView
+                    key={activeTab.id}
+                    name={activeTab.title}
+                    assetId={activeTab.assetId}
                 />
             );
         }

@@ -9,6 +9,7 @@ import {
     EyeInvisibleOutlined, EyeOutlined,
 } from '@ant-design/icons';
 import type { ConnectionType } from '../stores/connectionStore';
+import { useConnectionStore, Asset } from '../stores/connectionStore';
 import './ConnectionEditor.css';
 
 const { TextArea } = Input;
@@ -47,6 +48,8 @@ const typeLabels: Record<string, string> = {
     serial: '串口配置编辑',
     web_bookmark: '网页书签',
     rest_client: 'REST Client',
+    todo: '待办事项',
+    memo: '备忘录',
 };
 
 // Default ports by type
@@ -66,7 +69,7 @@ const typeFields: Record<string, string[]> = {
     rdp: ['host', 'port', 'username', 'password', 'notes'],
     mysql: ['host', 'port', 'username', 'password', 'database', 'notes'],
     mariadb: ['host', 'port', 'username', 'password', 'database', 'notes'],
-    postgresql: ['host', 'port', 'username', 'password', 'database', 'notes'],
+    postgresql: ['host', 'port', 'username', 'password', 'database', 'ssh_tunnel', 'notes'],
     redis: ['host', 'port', 'password', 'notes'],
     docker: ['host', 'port', 'notes'],
     clickhouse: ['host', 'port', 'username', 'password', 'database', 'notes'],
@@ -77,6 +80,8 @@ const typeFields: Record<string, string[]> = {
     local_terminal: ['shell', 'notes'],
     web_bookmark: ['url', 'notes'],
     rest_client: ['notes'],
+    todo: ['notes'],
+    memo: ['notes'],
 };
 
 const ConnectionEditor: React.FC<ConnectionEditorProps> = ({
@@ -86,6 +91,19 @@ const ConnectionEditor: React.FC<ConnectionEditorProps> = ({
     const [color, setColor] = useState('#40a9ff');
     const [authTab, setAuthTab] = useState('password');
     const [activeTab, setActiveTab] = useState('basic');
+    const [sshTunnelId, setSshTunnelId] = useState<string | undefined>(undefined);
+    const { assets } = useConnectionStore();
+
+    // Flatten assets to get all SSH assets for tunnel selector
+    const flattenAssets = (items: Asset[]): Asset[] => {
+        let result: Asset[] = [];
+        for (const item of items) {
+            if (item.type === 'host') result.push(item);
+            if (item.children) result = result.concat(flattenAssets(item.children));
+        }
+        return result;
+    };
+    const sshAssets = flattenAssets(assets).filter(a => a.connectionType === 'ssh');
 
     const isEdit = !!editingAsset;
     const fields = typeFields[connectionType] || ['host', 'port', 'username', 'password', 'notes'];
@@ -104,6 +122,8 @@ const ConnectionEditor: React.FC<ConnectionEditorProps> = ({
                     environment: editingAsset.environment || '',
                     database: editingAsset.database || '',
                 });
+                // Load SSH tunnel ID from asset
+                setSshTunnelId(editingAsset.sshTunnelId || undefined);
                 setColor(editingAsset.color || '#40a9ff');
             } else {
                 form.resetFields();
@@ -113,6 +133,7 @@ const ConnectionEditor: React.FC<ConnectionEditorProps> = ({
                     shell: connectionType === 'local_terminal' ? '' : undefined,
                 });
                 setColor('#40a9ff');
+                setSshTunnelId(undefined);
             }
             setActiveTab('basic');
             setAuthTab('password');
@@ -135,6 +156,10 @@ const ConnectionEditor: React.FC<ConnectionEditorProps> = ({
             if (connectionType === 'local_terminal') {
                 saveData.host = values.shell || '';
                 delete saveData.shell;
+            }
+            // Store SSH tunnel ID directly on asset
+            if (connectionType === 'postgresql') {
+                saveData.sshTunnelId = sshTunnelId || '';
             }
             onSave(saveData);
         });
@@ -287,6 +312,27 @@ const ConnectionEditor: React.FC<ConnectionEditorProps> = ({
                         {fields.includes('database') && (
                             <Form.Item name="database" label="数据库">
                                 <Input placeholder="数据库名称" />
+                            </Form.Item>
+                        )}
+
+                        {/* SSH Tunnel selector */}
+                        {fields.includes('ssh_tunnel') && (
+                            <Form.Item label="SSH 隧道（可选）">
+                                <Select
+                                    placeholder="不使用隧道（直连）"
+                                    allowClear
+                                    value={sshTunnelId}
+                                    onChange={(v) => setSshTunnelId(v)}
+                                >
+                                    {sshAssets.map(a => (
+                                        <Option key={a.id} value={a.id}>
+                                            {a.name} ({a.host}:{a.port || 22})
+                                        </Option>
+                                    ))}
+                                </Select>
+                                <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>
+                                    选择一个 SSH 资产作为跳板机，通过 SSH 隧道连接 PostgreSQL
+                                </div>
                             </Form.Item>
                         )}
 

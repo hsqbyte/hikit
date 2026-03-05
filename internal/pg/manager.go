@@ -23,6 +23,7 @@ type Session struct {
 	ID     string
 	DB     *sql.DB
 	Config ConnConfig
+	Tunnel *SSHTunnel // non-nil if connected via SSH tunnel
 }
 
 // PGService is the Wails-bindable service for PostgreSQL operations.
@@ -135,6 +136,9 @@ func (s *PGService) Disconnect(sessionID string) {
 	if ok && sess.DB != nil {
 		sess.DB.Close()
 	}
+	if ok && sess.Tunnel != nil {
+		sess.Tunnel.Close()
+	}
 }
 
 // DisconnectAll closes all sessions
@@ -150,6 +154,9 @@ func (s *PGService) DisconnectAll() {
 	for _, sess := range sessions {
 		if sess.DB != nil {
 			sess.DB.Close()
+		}
+		if sess.Tunnel != nil {
+			sess.Tunnel.Close()
 		}
 	}
 }

@@ -9,8 +9,8 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"nexushub/internal/asset"
-	"nexushub/internal/store"
+	"github.com/hsqbyte/hikit/internal/asset"
+	"github.com/hsqbyte/hikit/internal/store"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )

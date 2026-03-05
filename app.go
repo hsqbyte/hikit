@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"nexushub/internal/asset"
+	"github.com/hsqbyte/hikit/internal/asset"
 )
 
 // App struct — core application with asset management and DragAndDrop

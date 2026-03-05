@@ -9,11 +9,11 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 
-	localpkg "nexushub/internal/local"
-	pgpkg "nexushub/internal/pg"
-	proxypkg "nexushub/internal/proxy"
-	sshpkg "nexushub/internal/ssh"
-	"nexushub/internal/store"
+	localpkg "github.com/hsqbyte/hikit/internal/local"
+	pgpkg "github.com/hsqbyte/hikit/internal/pg"
+	proxypkg "github.com/hsqbyte/hikit/internal/proxy"
+	sshpkg "github.com/hsqbyte/hikit/internal/ssh"
+	"github.com/hsqbyte/hikit/internal/store"
 )
 
 //go:embed all:frontend/dist
@@ -35,7 +35,7 @@ func main() {
 
 	// Create application with options
 	err := wails.Run(&options.App{
-		Title:     "fastTool",
+		Title:     "HiKit",
 		Width:     1280,
 		Height:    800,
 		MinWidth:  900,

@@ -1,7 +1,7 @@
 package ssh
 
 import (
-	"nexushub/internal/store"
+	"github.com/hsqbyte/hikit/internal/store"
 
 	"github.com/google/uuid"
 )

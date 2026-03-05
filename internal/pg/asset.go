@@ -3,7 +3,7 @@ package pg
 import (
 	"fmt"
 
-	"nexushub/internal/store"
+	"github.com/hsqbyte/hikit/internal/store"
 )
 
 // loadAssetCredentials reads PG connection info from the local SQLite asset store

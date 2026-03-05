@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"time"
 
-	"nexushub/internal/store"
+	"github.com/hsqbyte/hikit/internal/store"
 
 	"github.com/google/uuid"
 )
@@ -21,6 +21,8 @@ type Asset struct {
 	Username       string  `json:"username,omitempty"`
 	Password       string  `json:"password,omitempty"`
 	PrivateKey     string  `json:"privateKey,omitempty"`
+	Database       string  `json:"database,omitempty"`
+	SshTunnelId    string  `json:"sshTunnelId,omitempty"`
 	SortOrder      int     `json:"sortOrder"`
 	CreatedAt      string  `json:"createdAt"`
 	UpdatedAt      string  `json:"updatedAt"`
@@ -34,7 +36,8 @@ func GetAll() ([]Asset, error) {
 		SELECT id, name, type, COALESCE(parent_id, ''), 
 		       COALESCE(connection_type, ''), COALESCE(host, ''), 
 		       port, COALESCE(username, ''), COALESCE(password, ''),
-		       COALESCE(private_key, ''), sort_order, created_at, updated_at
+		       COALESCE(private_key, ''), COALESCE(database, ''),
+		       COALESCE(ssh_tunnel_id, ''), sort_order, created_at, updated_at
 		FROM assets 
 		ORDER BY sort_order, name
 	`)
@@ -48,7 +51,8 @@ func GetAll() ([]Asset, error) {
 		var a Asset
 		err := rows.Scan(&a.ID, &a.Name, &a.Type, &a.ParentID,
 			&a.ConnectionType, &a.Host, &a.Port, &a.Username,
-			&a.Password, &a.PrivateKey, &a.SortOrder, &a.CreatedAt, &a.UpdatedAt)
+			&a.Password, &a.PrivateKey, &a.Database, &a.SshTunnelId,
+			&a.SortOrder, &a.CreatedAt, &a.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -67,32 +71,35 @@ func GetTree() ([]Asset, error) {
 }
 
 func buildTree(assets []Asset) []Asset {
-	// Create a map of id -> asset
-	assetMap := make(map[string]*Asset)
-	for i := range assets {
-		assets[i].Children = []Asset{}
-		assetMap[assets[i].ID] = &assets[i]
-	}
+	// Create a map of id -> asset and a map of parentID -> children ids
+	assetMap := make(map[string]Asset)
+	childrenMap := make(map[string][]string) // parentID -> list of child IDs
+	var rootIDs []string
 
-	// Build tree
-	var roots []Asset
-	for i := range assets {
-		if assets[i].ParentID == "" {
-			roots = append(roots, assets[i])
-		} else if parent, ok := assetMap[assets[i].ParentID]; ok {
-			parent.Children = append(parent.Children, assets[i])
+	for _, a := range assets {
+		a.Children = nil
+		assetMap[a.ID] = a
+		if a.ParentID == "" {
+			rootIDs = append(rootIDs, a.ID)
+		} else {
+			childrenMap[a.ParentID] = append(childrenMap[a.ParentID], a.ID)
 		}
 	}
 
-	// Update roots with their built children
-	for i := range roots {
-		if built, ok := assetMap[roots[i].ID]; ok {
-			roots[i].Children = built.Children
+	// Recursively build tree
+	var build func(id string) Asset
+	build = func(id string) Asset {
+		a := assetMap[id]
+		a.Children = []Asset{}
+		for _, childID := range childrenMap[id] {
+			a.Children = append(a.Children, build(childID))
 		}
+		return a
 	}
 
-	if roots == nil {
-		roots = []Asset{}
+	roots := make([]Asset, 0, len(rootIDs))
+	for _, id := range rootIDs {
+		roots = append(roots, build(id))
 	}
 	return roots
 }
@@ -108,9 +115,9 @@ func Create(a Asset) (Asset, error) {
 	a.UpdatedAt = now
 
 	_, err := db.Exec(`
-		INSERT INTO assets (id, name, type, parent_id, connection_type, host, port, username, password, private_key, sort_order, created_at, updated_at)
-		VALUES (?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), ?, ?, ?, ?, ?, ?, ?)
-	`, a.ID, a.Name, a.Type, a.ParentID, a.ConnectionType, a.Host, a.Port, a.Username, a.Password, a.PrivateKey, a.SortOrder, a.CreatedAt, a.UpdatedAt)
+		INSERT INTO assets (id, name, type, parent_id, connection_type, host, port, username, password, private_key, database, ssh_tunnel_id, sort_order, created_at, updated_at)
+		VALUES (?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, a.ID, a.Name, a.Type, a.ParentID, a.ConnectionType, a.Host, a.Port, a.Username, a.Password, a.PrivateKey, a.Database, a.SshTunnelId, a.SortOrder, a.CreatedAt, a.UpdatedAt)
 
 	if err != nil {
 		return Asset{}, err
@@ -125,10 +132,11 @@ func Update(a Asset) error {
 
 	_, err := db.Exec(`
 		UPDATE assets SET name=?, type=?, parent_id=NULLIF(?, ''), connection_type=NULLIF(?, ''),
-		       host=NULLIF(?, ''), port=?, username=?, password=?, private_key=?, 
+		       host=NULLIF(?, ''), port=?, username=?, password=?, private_key=?,
+		       database=?, ssh_tunnel_id=?,
 		       sort_order=?, updated_at=?
 		WHERE id=?
-	`, a.Name, a.Type, a.ParentID, a.ConnectionType, a.Host, a.Port, a.Username, a.Password, a.PrivateKey, a.SortOrder, a.UpdatedAt, a.ID)
+	`, a.Name, a.Type, a.ParentID, a.ConnectionType, a.Host, a.Port, a.Username, a.Password, a.PrivateKey, a.Database, a.SshTunnelId, a.SortOrder, a.UpdatedAt, a.ID)
 	return err
 }
 

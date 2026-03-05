@@ -1,0 +1,515 @@
+.todo-view {
+    display: flex;
+    height: 100%;
+    background: #f5f6f8;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* ========== Calendar Sidebar ========== */
+.todo-calendar-sidebar {
+    width: 280px;
+    min-width: 280px;
+    background: #fff;
+    border-right: 1px solid #eee;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.todo-calendar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 16px 8px;
+}
+
+.todo-calendar-month {
+    font-size: 15px;
+    font-weight: 600;
+    color: #1a1a1a;
+}
+
+.todo-calendar-nav {
+    display: flex;
+    gap: 2px;
+}
+
+.todo-calendar-nav button {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    color: #666;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+}
+
+.todo-calendar-nav button:hover {
+    background: #f0f0f0;
+    color: #333;
+}
+
+/* Calendar grid */
+.todo-calendar-grid {
+    padding: 4px 12px 12px;
+}
+
+.todo-calendar-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    text-align: center;
+    font-size: 11px;
+    color: #999;
+    margin-bottom: 4px;
+    font-weight: 500;
+}
+
+.todo-calendar-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+}
+
+.todo-cal-day {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 34px;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #333;
+    cursor: pointer;
+    transition: all 0.15s;
+    border: none;
+    background: transparent;
+}
+
+.todo-cal-day:hover {
+    background: #f0f0f0;
+}
+
+.todo-cal-day.other-month {
+    color: #ccc;
+}
+
+.todo-cal-day.today {
+    font-weight: 700;
+    color: #1677ff;
+}
+
+.todo-cal-day.selected {
+    background: #52c41a;
+    color: #fff;
+    font-weight: 600;
+}
+
+.todo-cal-day.selected.today {
+    color: #fff;
+}
+
+.todo-cal-day.has-tasks::after {
+    content: '';
+    position: absolute;
+    bottom: 4px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #52c41a;
+}
+
+.todo-cal-day.selected.has-tasks::after {
+    background: rgba(255, 255, 255, 0.7);
+}
+
+.todo-cal-day.has-incomplete::after {
+    background: #faad14;
+}
+
+.todo-cal-day.selected.has-incomplete::after {
+    background: rgba(255, 255, 255, 0.7);
+}
+
+/* Quick date list */
+.todo-date-shortcuts {
+    padding: 0 12px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    border-top: 1px solid #f0f0f0;
+    padding-top: 12px;
+}
+
+.todo-date-shortcut {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 13px;
+    color: #555;
+    transition: all 0.15s;
+    text-align: left;
+}
+
+.todo-date-shortcut:hover {
+    background: #f0f7ea;
+}
+
+.todo-date-shortcut.active {
+    background: #f0f7ea;
+    color: #52c41a;
+    font-weight: 500;
+}
+
+.todo-date-shortcut-count {
+    font-size: 11px;
+    color: #999;
+    background: #f5f5f5;
+    padding: 1px 7px;
+    border-radius: 10px;
+    min-width: 20px;
+    text-align: center;
+}
+
+/* ========== Task Panel (Right side) ========== */
+.todo-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+/* Header */
+.todo-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px 12px;
+    background: #fff;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.todo-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.todo-header-icon {
+    font-size: 20px;
+    color: #52c41a;
+}
+
+.todo-header-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #1a1a1a;
+}
+
+.todo-header-date {
+    font-size: 13px;
+    color: #888;
+    font-weight: 400;
+}
+
+.todo-header-count {
+    font-size: 12px;
+    color: #999;
+    background: #f5f5f5;
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+
+/* Filter tabs */
+.todo-filter-bar {
+    display: flex;
+    gap: 4px;
+    padding: 10px 24px;
+    background: #fff;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.todo-filter-btn {
+    padding: 4px 14px;
+    border-radius: 14px;
+    border: 1px solid #e8e8e8;
+    background: #fff;
+    color: #666;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    outline: none;
+}
+
+.todo-filter-btn:hover {
+    border-color: #52c41a;
+    color: #52c41a;
+}
+
+.todo-filter-btn.active {
+    background: #52c41a;
+    border-color: #52c41a;
+    color: #fff;
+}
+
+/* Add bar */
+.todo-add-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 24px;
+    background: #fff;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.todo-add-input {
+    flex: 1;
+    padding: 8px 14px;
+    border: 1.5px solid #e8e8e8;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #333;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    background: #fafafa;
+}
+
+.todo-add-input:focus {
+    border-color: #52c41a;
+    box-shadow: 0 0 0 2px rgba(82, 196, 26, 0.12);
+    background: #fff;
+}
+
+.todo-add-input::placeholder {
+    color: #bbb;
+}
+
+.todo-add-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: none;
+    background: #52c41a;
+    color: #fff;
+    font-size: 18px;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.15s;
+    flex-shrink: 0;
+}
+
+.todo-add-btn:hover {
+    background: #45a814;
+    transform: scale(1.05);
+}
+
+.todo-add-btn:active {
+    transform: scale(0.95);
+}
+
+/* List */
+.todo-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 16px;
+}
+
+.todo-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    color: #ccc;
+}
+
+.todo-empty-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+    opacity: 0.5;
+}
+
+.todo-empty-text {
+    font-size: 14px;
+}
+
+/* Item */
+.todo-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    margin-bottom: 4px;
+    border-radius: 8px;
+    background: #fff;
+    border: 1px solid #f0f0f0;
+    transition: all 0.2s;
+    cursor: default;
+    animation: todoSlideIn 0.25s ease-out;
+}
+
+@keyframes todoSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.todo-item:hover {
+    border-color: #d9d9d9;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+.todo-item.completed {
+    opacity: 0.55;
+}
+
+.todo-item.completed .todo-item-title {
+    text-decoration: line-through;
+    color: #bbb;
+}
+
+/* Checkbox */
+.todo-checkbox {
+    position: relative;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid #d9d9d9;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.todo-checkbox:hover {
+    border-color: #52c41a;
+}
+
+.todo-checkbox.checked {
+    background: #52c41a;
+    border-color: #52c41a;
+}
+
+.todo-checkbox.checked::after {
+    content: '✓';
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+/* Title */
+.todo-item-title {
+    flex: 1;
+    font-size: 14px;
+    color: #333;
+    cursor: text;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: background 0.15s;
+    min-height: 22px;
+    line-height: 22px;
+    word-break: break-word;
+}
+
+.todo-item-title:hover {
+    background: #f9f9f9;
+}
+
+/* Item date badge */
+.todo-item-date {
+    font-size: 11px;
+    color: #999;
+    flex-shrink: 0;
+}
+
+.todo-item-date.overdue {
+    color: #ff4d4f;
+}
+
+/* Edit input */
+.todo-edit-input {
+    flex: 1;
+    padding: 2px 6px;
+    border: 1.5px solid #52c41a;
+    border-radius: 4px;
+    font-size: 14px;
+    color: #333;
+    outline: none;
+    background: #fff;
+    min-height: 22px;
+    line-height: 22px;
+}
+
+/* Delete button */
+.todo-delete-btn {
+    opacity: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    border: none;
+    background: transparent;
+    color: #ccc;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+    flex-shrink: 0;
+}
+
+.todo-item:hover .todo-delete-btn {
+    opacity: 1;
+}
+
+.todo-delete-btn:hover {
+    color: #ff4d4f;
+    background: #fff1f0;
+}
+
+/* Footer */
+.todo-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 24px;
+    border-top: 1px solid #f0f0f0;
+    background: #fff;
+    font-size: 12px;
+    color: #999;
+}
+
+.todo-clear-btn {
+    border: none;
+    background: none;
+    color: #999;
+    font-size: 12px;
+    cursor: pointer;
+    padding: 2px 8px;
+    border-radius: 4px;
+    transition: all 0.15s;
+}
+
+.todo-clear-btn:hover {
+    color: #ff4d4f;
+    background: #fff1f0;
+}

@@ -60,6 +60,21 @@ func createTables() error {
 
 		CREATE INDEX IF NOT EXISTS idx_assets_parent ON assets(parent_id);
 		CREATE INDEX IF NOT EXISTS idx_assets_sort ON assets(sort_order);
+	`)
+	if err != nil {
+		return err
+	}
+
+	// Migrations — add columns if not exist (SQLite ignores duplicate ADD COLUMN)
+	for _, col := range []string{
+		"ALTER TABLE assets ADD COLUMN database TEXT DEFAULT ''",
+		"ALTER TABLE assets ADD COLUMN ssh_tunnel_id TEXT DEFAULT ''",
+		"ALTER TABLE todo_items ADD COLUMN due_date TEXT DEFAULT NULL",
+	} {
+		db.Exec(col) // ignore errors (column already exists)
+	}
+
+	_, err = db.Exec(`
 
 		CREATE TABLE IF NOT EXISTS forward_rules (
 			id TEXT PRIMARY KEY,
@@ -71,6 +86,30 @@ func createTables() error {
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (asset_id) REFERENCES assets(id) ON DELETE CASCADE
 		);
+
+		CREATE TABLE IF NOT EXISTS todo_items (
+			id TEXT PRIMARY KEY,
+			list_id TEXT NOT NULL,
+			title TEXT NOT NULL,
+			completed INTEGER DEFAULT 0,
+			sort_order INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (list_id) REFERENCES assets(id) ON DELETE CASCADE
+		);
+		CREATE INDEX IF NOT EXISTS idx_todo_items_list ON todo_items(list_id);
+
+		CREATE TABLE IF NOT EXISTS memos (
+			id TEXT PRIMARY KEY,
+			asset_id TEXT NOT NULL UNIQUE,
+			title TEXT DEFAULT '',
+			content TEXT DEFAULT '',
+			content_type TEXT DEFAULT 'markdown',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (asset_id) REFERENCES assets(id) ON DELETE CASCADE
+		);
+		CREATE INDEX IF NOT EXISTS idx_memos_asset ON memos(asset_id);
 	`)
 	return err
 }

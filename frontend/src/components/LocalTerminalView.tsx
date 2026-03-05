@@ -198,12 +198,12 @@ const LocalTerminalView: React.FC<LocalTerminalViewProps> = ({ name, shell }) =>
             if (tab.containerRef && !tab.containerRef.querySelector('.xterm')) {
                 tab.term.open(tab.containerRef);
                 setTimeout(() => {
-                    try { tab.fit.fit(); } catch {}
+                    try { tab.fit.fit(); } catch { }
                 }, 50);
 
                 const resizeObserver = new ResizeObserver(() => {
                     if (!isDraggingRef.current) {
-                        try { tab.fit.fit(); } catch {}
+                        try { tab.fit.fit(); } catch { }
                     }
                 });
                 resizeObserver.observe(tab.containerRef);
@@ -217,8 +217,8 @@ const LocalTerminalView: React.FC<LocalTerminalViewProps> = ({ name, shell }) =>
                 setTimeout(() => {
                     try {
                         tab.fit.fit();
-                        LocalResize(tab.sessionId, tab.term.cols, tab.term.rows).catch(() => {});
-                    } catch {}
+                        LocalResize(tab.sessionId, tab.term.cols, tab.term.rows).catch(() => { });
+                    } catch { }
                 }, 100);
             }
         });
@@ -232,7 +232,7 @@ const LocalTerminalView: React.FC<LocalTerminalViewProps> = ({ name, shell }) =>
         const activeTab = tabs.find(t => t.id === activeTabId);
         if (activeTab) {
             setTimeout(() => {
-                try { activeTab.fit.fit(); } catch {}
+                try { activeTab.fit.fit(); } catch { }
             }, 50);
         }
     }, [activeTabId]);
@@ -242,7 +242,7 @@ const LocalTerminalView: React.FC<LocalTerminalViewProps> = ({ name, shell }) =>
             <div className="ssh-header">
                 <Breadcrumb
                     items={[
-                        { title: <span className="breadcrumb-brand">fastTool</span> },
+                        { title: <span className="breadcrumb-brand">HiKit</span> },
                         { title: '本地终端' },
                         { title: name },
                     ]}

@@ -1,212 +1,408 @@
-/* ========== REST Client View ========== */
+/* ========== REST Client View — VSCode-style .http Editor ========== */
 .rc-view {
     display: flex;
     flex-direction: column;
     height: 100%;
-    background: #fff;
+    background: #1e1e1e;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: #d4d4d4;
 }
 
-.rc-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 16px;
-    background: #fafafa;
-    border-bottom: 1px solid #e8e8e8;
-}
-
-.rc-title {
-    font-size: 14px;
-    font-weight: 600;
-    color: #333;
-}
-
-.rc-name {
-    font-size: 12px;
-    color: #999;
-}
-
-/* URL Bar */
-.rc-urlbar {
-    display: flex;
-    gap: 8px;
-    padding: 10px 16px;
-    border-bottom: 1px solid #f0f0f0;
-    align-items: center;
-}
-
-.rc-url-input {
-    flex: 1;
-    font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
-    font-size: 13px;
-}
-
-/* Split layout */
+/* ── Split Layout ── */
 .rc-split {
     flex: 1;
     display: flex;
     overflow: hidden;
 }
 
-.rc-panel {
+/* ── Editor Panel (left) ── */
+.rc-editor-panel {
     flex: 1;
     display: flex;
     flex-direction: column;
+    min-width: 0;
     overflow: hidden;
+    border-right: 1px solid #333;
+}
+
+.rc-editor-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 16px;
+    background: #252526;
+    border-bottom: 1px solid #333;
+    flex-shrink: 0;
+}
+
+.rc-editor-title {
+    font-size: 12px;
+    color: #cccccc;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.rc-editor-title-icon {
+    color: #6a9955;
+    font-size: 13px;
+}
+
+.rc-editor-actions {
+    margin-left: auto;
+    display: flex;
+    gap: 4px;
+}
+
+.rc-editor-actions button {
+    background: none;
+    border: none;
+    color: #888;
+    cursor: pointer;
+    padding: 3px 6px;
+    border-radius: 3px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.rc-editor-actions button:hover {
+    background: #333;
+    color: #ccc;
+}
+
+/* ── Editor Body with line numbers + Send Request buttons ── */
+.rc-editor-body {
+    flex: 1;
+    display: flex;
+    overflow: auto;
+    position: relative;
+    background: #1e1e1e;
+}
+
+.rc-line-numbers {
+    flex-shrink: 0;
+    padding: 10px 0;
+    text-align: right;
+    color: #858585;
+    font-family: 'Menlo', 'Monaco', 'Consolas', 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 20px;
+    user-select: none;
+    min-width: 40px;
+    padding-right: 12px;
+    padding-left: 8px;
+    background: #1e1e1e;
+}
+
+.rc-editor-content {
+    flex: 1;
+    position: relative;
     min-width: 0;
 }
 
-.rc-request {
-    border-right: 1px solid #e8e8e8;
-}
-
-.rc-panel-label {
-    font-size: 11px;
-    font-weight: 600;
-    color: #999;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    padding: 6px 16px 2px;
-}
-
-.rc-panel .ant-tabs {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    padding: 0 12px;
-}
-
-.rc-panel .ant-tabs-content {
-    flex: 1;
-    overflow: auto;
-}
-
-/* Textarea */
-.rc-textarea {
+.rc-editor-textarea {
     width: 100%;
-    min-height: 120px;
-    flex: 1;
-    padding: 8px 12px;
-    font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
-    font-size: 12px;
-    line-height: 1.6;
-    border: 1px solid #e8e8e8;
-    border-radius: 6px;
+    height: 100%;
+    padding: 10px 12px;
+    font-family: 'Menlo', 'Monaco', 'Consolas', 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 20px;
+    background: transparent;
+    color: #d4d4d4;
+    border: none;
     outline: none;
     resize: none;
-    background: #fafbfc;
-    color: #333;
+    white-space: pre;
+    overflow-wrap: normal;
+    overflow-x: auto;
+    tab-size: 2;
+    caret-color: #d4d4d4;
 }
 
-.rc-textarea:focus {
-    border-color: #1677ff;
+.rc-editor-textarea::placeholder {
+    color: #555;
 }
 
-.rc-textarea::placeholder {
-    color: #bbb;
+.rc-editor-textarea::selection {
+    background: #264f78;
+    color: #d4d4d4;
 }
 
-.rc-body-area {
-    min-height: 200px;
+/* ── Send Request button (CodeLens style) ── */
+.rc-send-btn-container {
+    position: absolute;
+    right: 16px;
+    z-index: 10;
+    pointer-events: auto;
+    background: rgba(30, 30, 30, 0.85);
+    border-radius: 3px;
 }
 
-/* Response */
-.rc-placeholder {
+.rc-send-btn {
+    background: none;
+    border: none;
+    color: #6a9955;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+    padding: 0 4px;
+    line-height: 20px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    opacity: 0.85;
+    white-space: nowrap;
+}
+
+.rc-send-btn:hover {
+    opacity: 1;
+    color: #89d185;
+    text-decoration: underline;
+}
+
+.rc-send-btn .rc-send-icon {
+    font-size: 10px;
+}
+
+/* ── Resize Handle ── */
+.rc-resize-handle {
+    width: 4px;
+    cursor: col-resize;
+    background: transparent;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 5;
+}
+
+.rc-resize-handle:hover,
+.rc-resize-handle.active {
+    background: #007acc;
+}
+
+/* ── Response Panel (right) ── */
+.rc-response-panel {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+    background: #1e1e1e;
+}
+
+.rc-response-empty {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 12px;
     flex: 1;
-    color: #ccc;
+    gap: 12px;
+    color: #555;
     font-size: 13px;
 }
 
-.rc-status-bar {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 6px 12px;
-    border-bottom: 1px solid #f0f0f0;
-    flex-shrink: 0;
+.rc-response-empty-icon {
+    font-size: 36px;
+    color: #444;
 }
 
-.rc-status-text {
+/* ── Response Status Bar ── */
+.rc-resp-statusbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 16px;
+    background: #252526;
+    border-bottom: 1px solid #333;
+    flex-shrink: 0;
     font-size: 12px;
-    color: #333;
+}
+
+.rc-resp-status-badge {
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-weight: 600;
+    font-size: 12px;
+    color: #fff;
+}
+
+.rc-resp-status-badge.is-2xx {
+    background: #4caf50;
+}
+
+.rc-resp-status-badge.is-3xx {
+    background: #ff9800;
+}
+
+.rc-resp-status-badge.is-4xx {
+    background: #f44336;
+}
+
+.rc-resp-status-badge.is-5xx {
+    background: #9e9e9e;
+}
+
+.rc-resp-status-badge.is-err {
+    background: #f44336;
+}
+
+.rc-resp-status-text {
+    color: #ccc;
     font-weight: 500;
 }
 
-.rc-status-meta {
+.rc-resp-meta {
+    color: #888;
+    display: flex;
+    align-items: center;
+    gap: 4px;
     font-size: 11px;
-    color: #999;
+}
+
+.rc-resp-actions {
+    margin-left: auto;
+    display: flex;
+    gap: 4px;
+}
+
+.rc-resp-actions button {
+    background: none;
+    border: none;
+    color: #888;
+    cursor: pointer;
+    padding: 3px 6px;
+    border-radius: 3px;
+    font-size: 11px;
     display: flex;
     align-items: center;
     gap: 3px;
 }
 
-.rc-active-btn {
-    color: #1677ff !important;
+.rc-resp-actions button:hover {
+    background: #333;
+    color: #ccc;
 }
 
-/* Response body */
+/* ── Response Tabs ── */
+.rc-resp-tabs {
+    display: flex;
+    gap: 0;
+    background: #252526;
+    border-bottom: 1px solid #333;
+    flex-shrink: 0;
+}
+
+.rc-resp-tab {
+    padding: 6px 16px;
+    font-size: 12px;
+    color: #888;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    font-family: inherit;
+}
+
+.rc-resp-tab:hover {
+    color: #ccc;
+}
+
+.rc-resp-tab.active {
+    color: #fff;
+    border-bottom-color: #007acc;
+}
+
+/* ── Response Body ── */
+.rc-resp-body-wrap {
+    flex: 1;
+    overflow: auto;
+    padding: 0;
+}
+
 .rc-resp-body {
-    font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+    font-family: 'Menlo', 'Monaco', 'Consolas', 'Courier New', monospace;
     font-size: 12px;
     line-height: 1.6;
     white-space: pre-wrap;
     word-break: break-all;
-    padding: 12px;
+    padding: 12px 16px;
     margin: 0;
-    background: #f6f8fa;
-    border: 1px solid #e8e8e8;
-    border-radius: 6px;
-    overflow: auto;
-    max-height: calc(100vh - 280px);
-    color: #333;
+    background: #1e1e1e;
+    color: #d4d4d4;
 }
 
-/* Response headers */
-.rc-resp-headers {
+/* ── Response Headers ── */
+.rc-resp-headers-list {
     padding: 4px 0;
 }
 
-.rc-resp-header-row {
+.rc-resp-hdr-row {
     display: flex;
-    padding: 3px 12px;
-    border-bottom: 1px solid #f5f5f5;
+    padding: 3px 16px;
+    font-size: 12px;
+    font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+    border-bottom: 1px solid #2a2a2a;
+}
+
+.rc-resp-hdr-key {
+    color: #9cdcfe;
+    min-width: 200px;
+    flex-shrink: 0;
+    font-weight: 500;
+}
+
+.rc-resp-hdr-val {
+    color: #ce9178;
+    word-break: break-all;
+}
+
+/* ── Loading Spinner ── */
+.rc-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    gap: 8px;
+}
+
+.rc-loading-spinner {
+    width: 24px;
+    height: 24px;
+    border: 2px solid #333;
+    border-top: 2px solid #007acc;
+    border-radius: 50%;
+    animation: rc-spin 0.8s linear infinite;
+}
+
+@keyframes rc-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.rc-loading-text {
+    color: #888;
     font-size: 12px;
 }
 
-.rc-resp-header-key {
-    font-weight: 600;
-    color: #1677ff;
-    min-width: 160px;
-    flex-shrink: 0;
-    font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+/* ── Saving indicator ── */
+.rc-save-indicator {
+    font-size: 11px;
+    color: #666;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: opacity 0.3s;
 }
 
-.rc-resp-header-val {
-    color: #333;
-    word-break: break-all;
-    font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+.rc-save-indicator.saving {
+    color: #e8ab6a;
 }
 
-.rc-loading-dots {
-    color: #1677ff;
-    animation: rc-pulse 1.5s infinite;
-}
-
-@keyframes rc-pulse {
-
-    0%,
-    100% {
-        opacity: 0.4;
-    }
-
-    50% {
-        opacity: 1;
-    }
+.rc-save-indicator.saved {
+    color: #6a9955;
 }

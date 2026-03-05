@@ -1,4 +1,4 @@
-module nexushub
+module github.com/hsqbyte/hikit
 
 go 1.25.0
 

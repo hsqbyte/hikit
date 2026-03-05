@@ -13,7 +13,7 @@ export type ConnectionType =
     | 'rdp' | 'docker' | 'local_terminal'
     | 'redis' | 'mysql' | 'mariadb' | 'postgresql'
     | 'sqlserver' | 'clickhouse' | 'sqlite' | 'oracle'
-    | 'web_bookmark' | 'rest_client';
+    | 'web_bookmark' | 'rest_client' | 'todo' | 'memo';
 
 // Re-export the auto-generated Asset type with a simpler alias
 export type Asset = asset.Asset;
@@ -32,6 +32,7 @@ export interface Tab {
         table?: string;
         type?: 'tableData' | 'tableList' | 'sql';
         url?: string;
+        sshAssetId?: string;
     };
 }
 

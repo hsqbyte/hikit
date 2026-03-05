@@ -8,7 +8,29 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/hsqbyte/hikit/internal/store"
 )
+
+// SaveHTTPContent persists .http editor content for a REST Client asset
+// Reuses the private_key column to store .http text content
+func (a *App) SaveHTTPContent(assetId string, content string) error {
+	db := store.GetDB()
+	_, err := db.Exec("UPDATE assets SET private_key=?, updated_at=? WHERE id=?",
+		content, time.Now().Format("2006-01-02 15:04:05"), assetId)
+	return err
+}
+
+// LoadHTTPContent loads the .http editor content for a REST Client asset
+func (a *App) LoadHTTPContent(assetId string) string {
+	db := store.GetDB()
+	var content string
+	err := db.QueryRow("SELECT COALESCE(private_key, '') FROM assets WHERE id=?", assetId).Scan(&content)
+	if err != nil {
+		return ""
+	}
+	return content
+}
 
 // HTTPRequest describes a REST Client request from the frontend
 type HTTPRequest struct {

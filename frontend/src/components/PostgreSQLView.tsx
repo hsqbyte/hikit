@@ -10,7 +10,7 @@ import {
     SearchOutlined, UnorderedListOutlined as ListIcon,
 } from '@ant-design/icons';
 import {
-    ConnectByAsset, Disconnect, GetColumns,
+    ConnectByAsset, ConnectByAssetViaSSH, Disconnect, GetColumns,
     GetTableData, ExecuteQuery, GetTableDDL,
     GetPrimaryKeys, InsertRow, UpdateRow, DeleteRows,
     GetTableDataWithFilter, SwitchDatabase, ListTables, DropTable,
@@ -29,6 +29,7 @@ interface PostgreSQLViewProps {
         schema?: string;
         table?: string;
         type?: 'tableData' | 'tableList' | 'sql';
+        sshAssetId?: string;
     };
 }
 
@@ -177,7 +178,9 @@ const PostgreSQLView: React.FC<PostgreSQLViewProps> = ({
             try {
                 setConnecting(true);
                 setConnError('');
-                const sid = await ConnectByAsset(assetId);
+                const sid = pgMeta?.sshAssetId
+                    ? await ConnectByAssetViaSSH(assetId, pgMeta.sshAssetId)
+                    : await ConnectByAsset(assetId);
                 if (cancelled) return;
                 // Switch to the correct database
                 if (pgMeta?.database) {
@@ -440,12 +443,12 @@ const PostgreSQLView: React.FC<PostgreSQLViewProps> = ({
     const handleOpenTableFromList = useCallback((tableName: string) => {
         openTab({
             id: `pg-tbl-${assetId}-${pgMeta?.database || ''}-${schema}-${tableName}`,
-            title: tableName,
+            title: `${hostName} - ${tableName}`,
             assetId: assetId,
             connectionType: 'postgresql',
-            pgMeta: { database: pgMeta?.database, schema, table: tableName, type: 'tableData' },
+            pgMeta: { database: pgMeta?.database, schema, table: tableName, type: 'tableData', sshAssetId: pgMeta?.sshAssetId },
         });
-    }, [assetId, pgMeta?.database, schema, openTab]);
+    }, [assetId, hostName, pgMeta?.database, pgMeta?.sshAssetId, schema, openTab]);
 
     if (connecting) {
         return (
@@ -528,10 +531,10 @@ const PostgreSQLView: React.FC<PostgreSQLViewProps> = ({
         const handleNewQueryTab = () => {
             openTab({
                 id: `pg-sql-${assetId}-${pgMeta?.database || ''}-${Date.now()}`,
-                title: '查询',
+                title: `${hostName} - 查询`,
                 assetId: assetId,
                 connectionType: 'postgresql',
-                pgMeta: { database: pgMeta?.database, schema, type: 'sql' },
+                pgMeta: { database: pgMeta?.database, schema, type: 'sql', sshAssetId: pgMeta?.sshAssetId },
             });
         };
 

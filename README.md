@@ -1,19 +1,31 @@
-# README
+# HiKit
 
-## About
+> 一款基于 Wails + React + Go 的全能开发工具箱
 
-This is the official Wails React-TS template.
+## 功能模块
 
-You can configure the project by editing `wails.json`. More information about the project settings can be found
-here: https://wails.io/docs/reference/project-config
+- **SSH / SFTP** — 远程终端 & 文件管理
+- **PostgreSQL** — 数据库管理 & SQL 查询
+- **REST Client** — HTTP 接口调试（`.http` 文件格式）
+- **Web 代理** — HTTP/SOCKS 代理 + 抓包 + MITM 篡改
+- **本地终端** — 本地 Shell 终端
+- **待办事项** — 轻量级任务管理
+- **备忘录** — Markdown 笔记
+- **密码保险箱** — 安全凭证管理（规划中）
 
-## Live Development
+## 开发
 
-To run in live development mode, run `wails dev` in the project directory. This will run a Vite development
-server that will provide very fast hot reload of your frontend changes. If you want to develop in a browser
-and have access to your Go methods, there is also a dev server that runs on http://localhost:34115. Connect
-to this in your browser, and you can call your Go code from devtools.
+```bash
+# 开发模式
+wails dev
 
-## Building
+# 构建
+wails build
+```
 
-To build a redistributable, production mode package, use `wails build`.
+## 技术栈
+
+- **后端**: Go + Wails v2
+- **前端**: React + TypeScript + Ant Design
+- **数据库**: SQLite
+- **终端**: xterm.js

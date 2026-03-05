@@ -232,13 +232,13 @@ const SSHView: React.FC<SSHViewProps> = ({ hostName, groupName, host, assetId })
             if (tab.containerRef && !tab.containerRef.querySelector('.xterm')) {
                 tab.term.open(tab.containerRef);
                 setTimeout(() => {
-                    try { tab.fit.fit(); } catch {}
+                    try { tab.fit.fit(); } catch { }
                 }, 50);
 
                 // ResizeObserver for this terminal
                 const resizeObserver = new ResizeObserver(() => {
                     if (!isDraggingRef.current) {
-                        try { tab.fit.fit(); } catch {}
+                        try { tab.fit.fit(); } catch { }
                     }
                 });
                 resizeObserver.observe(tab.containerRef);
@@ -253,8 +253,8 @@ const SSHView: React.FC<SSHViewProps> = ({ hostName, groupName, host, assetId })
                 setTimeout(() => {
                     try {
                         tab.fit.fit();
-                        SSHResize(tab.sessionId, tab.term.cols, tab.term.rows).catch(() => {});
-                    } catch {}
+                        SSHResize(tab.sessionId, tab.term.cols, tab.term.rows).catch(() => { });
+                    } catch { }
                 }, 100);
             }
         });
@@ -269,7 +269,7 @@ const SSHView: React.FC<SSHViewProps> = ({ hostName, groupName, host, assetId })
         const activeTab = tabs.find(t => t.id === activeTabId);
         if (activeTab) {
             setTimeout(() => {
-                try { activeTab.fit.fit(); } catch {}
+                try { activeTab.fit.fit(); } catch { }
             }, 50);
         }
     }, [activeTabId]);
@@ -296,7 +296,7 @@ const SSHView: React.FC<SSHViewProps> = ({ hostName, groupName, host, assetId })
             setSplitRatio(ratioRef.current);
             // Fit all terminals after splitter release
             tabs.forEach(tab => {
-                try { tab.fit.fit(); } catch {}
+                try { tab.fit.fit(); } catch { }
             });
             document.removeEventListener('mousemove', handleMouseMove);
             document.removeEventListener('mouseup', handleMouseUp);
@@ -314,7 +314,7 @@ const SSHView: React.FC<SSHViewProps> = ({ hostName, groupName, host, assetId })
             <div className="ssh-header">
                 <Breadcrumb
                     items={[
-                        { title: <span className="breadcrumb-brand">fastTool</span> },
+                        { title: <span className="breadcrumb-brand">HiKit</span> },
                         ...(groupName ? [{ title: groupName }] : []),
                         { title: hostName },
                     ]}
@@ -336,7 +336,7 @@ const SSHView: React.FC<SSHViewProps> = ({ hostName, groupName, host, assetId })
                             onClick={() => {
                                 setShowFileManager(!showFileManager);
                                 setTimeout(() => {
-                                    tabs.forEach(tab => { try { tab.fit.fit(); } catch {} });
+                                    tabs.forEach(tab => { try { tab.fit.fit(); } catch { } });
                                 }, 200);
                             }}
                         >
