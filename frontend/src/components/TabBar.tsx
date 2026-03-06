@@ -1,7 +1,7 @@
 import React from 'react';
 import { Tabs, Dropdown } from 'antd';
 import type { MenuProps } from 'antd';
-import { MenuOutlined } from '@ant-design/icons';
+import { MenuOutlined, ToolOutlined } from '@ant-design/icons';
 import {
     SiMysql, SiPostgresql, SiRedis, SiDocker,
     SiMariadb, SiClickhouse, SiSqlite, SiOracle,
@@ -29,6 +29,7 @@ const typeIcons: Record<string, React.ReactNode> = {
     clickhouse: <SiClickhouse style={{ ...tis, color: '#ffcc00' }} />,
     sqlite: <SiSqlite style={{ ...tis, color: '#003b57' }} />,
     oracle: <SiOracle style={{ ...tis, color: '#f80000' }} />,
+    toolbox: <ToolOutlined style={{ ...tis, color: '#fa8c16' }} />,
 };
 
 interface TabBarProps {

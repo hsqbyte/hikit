@@ -13,6 +13,8 @@ import WebProxyView from './components/WebProxyView';
 import RestClientView from './components/RestClientView';
 import TodoView from './components/TodoView';
 import MemoView from './components/MemoView';
+import ToolboxPanel from './components/ToolboxPanel';
+import ToolboxView from './components/ToolboxView';
 import { useConnectionStore, Asset } from './stores/connectionStore';
 import './App.css';
 
@@ -163,6 +165,16 @@ const App: React.FC = () => {
             );
         }
 
+        if ((activeTab.connectionType as string) === 'toolbox') {
+            const toolKey = (activeTab.pgMeta?.type as string) || 'json_formatter';
+            return (
+                <ToolboxView
+                    key={activeTab.id}
+                    toolKey={toolKey}
+                />
+            );
+        }
+
         return (
             <div className="terminal-placeholder">
                 <p>连接到: {activeTab.title}</p>
@@ -205,7 +217,8 @@ const App: React.FC = () => {
                         <div className="app-sidebar" style={{ width: sidebarWidth }}>
                             {activityKey === 'proxy' ? <ProxyView />
                                 : activityKey === 'forwards' ? <PortForwardView />
-                                    : <AssetTree />}
+                                    : activityKey === 'toolbox' ? <ToolboxPanel />
+                                        : <AssetTree />}
                         </div>
                         <div className="app-sidebar-resize" onMouseDown={handleResizeStart} />
                     </div>

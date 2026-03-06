@@ -1,0 +1,161 @@
+.toolbox-panel {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.toolbox-panel-header {
+    padding: 12px 16px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+}
+
+.toolbox-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 8px 8px;
+}
+
+.toolbox-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    border: none;
+    background: transparent;
+    width: 100%;
+    text-align: left;
+    font-size: 13px;
+    color: #333;
+}
+
+.toolbox-item:hover {
+    background: #f0f0f0;
+}
+
+.toolbox-item.active {
+    background: #e6f4ff;
+    color: #1677ff;
+}
+
+.toolbox-item-icon {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.toolbox-item-icon.json {
+    background: #fff7e6;
+    color: #fa8c16;
+}
+
+.toolbox-item-icon.encode {
+    background: #f6ffed;
+    color: #52c41a;
+}
+
+.toolbox-item-icon.timestamp {
+    background: #e6f7ff;
+    color: #1890ff;
+}
+
+.toolbox-item-icon.hash {
+    background: #f9f0ff;
+    color: #722ed1;
+}
+
+.toolbox-item-icon.regex {
+    background: #fff1f0;
+    color: #f5222d;
+}
+
+.toolbox-item-icon.diff {
+    background: #fcffe6;
+    color: #a0d911;
+}
+
+.toolbox-item-icon.jwt {
+    background: #fff0f6;
+    color: #eb2f96;
+}
+
+.toolbox-item-icon.uuid {
+    background: #e6fffb;
+    color: #13c2c2;
+}
+
+.toolbox-item-icon.cron {
+    background: #f0f5ff;
+    color: #2f54eb;
+}
+
+.toolbox-item-icon.color {
+    background: linear-gradient(135deg, #fff1f0, #f6ffed, #e6f7ff, #f9f0ff);
+    color: #333;
+}
+
+.toolbox-item-icon.ip {
+    background: #e6f7ff;
+    color: #096dd9;
+}
+
+.toolbox-item-icon.qrcode {
+    background: #f6f6f6;
+    color: #333;
+}
+
+.toolbox-item-icon.image {
+    background: #fff0f6;
+    color: #c41d7f;
+}
+
+.toolbox-item-icon.text {
+    background: #fffbe6;
+    color: #d48806;
+}
+
+.toolbox-item-icon.markdown {
+    background: #f0f5ff;
+    color: #1d39c4;
+}
+
+.toolbox-item-icon.port {
+    background: #f6ffed;
+    color: #237804;
+}
+
+.toolbox-item-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.toolbox-item-name {
+    font-weight: 500;
+    line-height: 1.4;
+}
+
+.toolbox-item-desc {
+    font-size: 11px;
+    color: #999;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.toolbox-item.active .toolbox-item-desc {
+    color: #69b1ff;
+}
