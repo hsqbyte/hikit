@@ -19,12 +19,12 @@ func Init() error {
 		configDir = "."
 	}
 
-	dbDir := filepath.Join(configDir, "fastTool")
+	dbDir := filepath.Join(configDir, "HiKit")
 	if err := os.MkdirAll(dbDir, 0755); err != nil {
 		return fmt.Errorf("failed to create config dir: %w", err)
 	}
 
-	dbPath := filepath.Join(dbDir, "fasttool.db")
+	dbPath := filepath.Join(dbDir, "hikit.db")
 	db, err = sql.Open("sqlite", dbPath)
 	if err != nil {
 		return fmt.Errorf("failed to open database: %w", err)

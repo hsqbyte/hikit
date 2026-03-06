@@ -13,6 +13,27 @@
 - **备忘录** — Markdown 笔记
 - **密码保险箱** — 安全凭证管理（规划中）
 
+## 预览
+
+### SSH / SFTP
+![SSH 终端 & SFTP 文件管理](doc/screenshots/ssh_sftp.png)
+
+### PostgreSQL
+![PostgreSQL 数据库管理](doc/screenshots/postgresql.png)
+![SQL 查询结果](doc/screenshots/sql_query.png)
+
+### REST Client
+![REST Client 接口调试](doc/screenshots/rest_client.png)
+
+### Web 代理
+![Web 代理抓包](doc/screenshots/web_proxy.png)
+
+### 待办事项
+![待办事项](doc/screenshots/todo.png)
+
+### 备忘录
+![备忘录 Markdown 编辑器](doc/screenshots/memo.png)
+
 ## 开发
 
 ```bash
