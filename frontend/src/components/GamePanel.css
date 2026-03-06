@@ -1,0 +1,134 @@
+.game-panel {
+    padding: 12px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.game-panel-header {
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #f0f0f0;
+    margin-bottom: 12px;
+}
+
+.game-load-btn {
+    width: 100%;
+    height: 48px;
+    border: 2px dashed #d9d9d9;
+    border-radius: 8px;
+    background: #fafafa;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.2s;
+    color: #999;
+    font-size: 12px;
+}
+
+.game-load-btn:hover {
+    border-color: #722ed1;
+    background: #f9f0ff;
+    color: #722ed1;
+}
+
+.game-load-btn .load-icon {
+    font-size: 16px;
+}
+
+/* ── Game Library ── */
+.game-library-section {
+    margin-top: 14px;
+}
+
+.game-library-title {
+    font-size: 10px;
+    font-weight: 700;
+    color: #bbb;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+    padding: 0 4px;
+}
+
+.game-library-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+}
+
+.game-library-item:hover {
+    background: #f9f0ff;
+}
+
+.game-library-item:hover .game-play-icon {
+    opacity: 1;
+    color: #722ed1;
+}
+
+.game-library-item:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
+
+.game-library-item .game-emoji {
+    font-size: 16px;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f5f5f5;
+    border-radius: 6px;
+    flex-shrink: 0;
+}
+
+.game-library-item .game-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.game-library-item .game-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: #333;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.game-library-item .game-meta {
+    font-size: 10px;
+    color: #bbb;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.game-play-icon {
+    font-size: 16px;
+    color: #ccc;
+    opacity: 0;
+    transition: all 0.15s;
+    flex-shrink: 0;
+}
+
+.game-empty {
+    text-align: center;
+    padding: 20px;
+    color: #ccc;
+    font-size: 12px;
+}

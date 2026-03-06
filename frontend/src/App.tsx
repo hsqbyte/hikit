@@ -15,6 +15,12 @@ import TodoView from './components/TodoView';
 import MemoView from './components/MemoView';
 import ToolboxPanel from './components/ToolboxPanel';
 import ToolboxView from './components/ToolboxView';
+import GamePanel from './components/GamePanel';
+import EmulatorView from './components/EmulatorView';
+import PomodoroPanel from './components/PomodoroPanel';
+import MusicPanel from './components/MusicPanel';
+import MusicView from './components/MusicView';
+import GitPanel from './components/GitPanel';
 import { useConnectionStore, Asset } from './stores/connectionStore';
 import './App.css';
 
@@ -119,7 +125,7 @@ const App: React.FC = () => {
                     groupName={parentGroup?.name}
                     host={currentAsset?.host}
                     assetId={activeTab.assetId}
-                    pgMeta={activeTab.pgMeta}
+                    pgMeta={activeTab.pgMeta as any}
                 />
             );
         }
@@ -165,14 +171,34 @@ const App: React.FC = () => {
             );
         }
 
-        if ((activeTab.connectionType as string) === 'toolbox') {
-            const toolKey = (activeTab.pgMeta?.type as string) || 'json_formatter';
+        if (activeTab.connectionType === 'toolbox') {
+            const toolKey = activeTab.pgMeta?.type || 'json_formatter';
             return (
                 <ToolboxView
                     key={activeTab.id}
                     toolKey={toolKey}
                 />
             );
+        }
+
+        if (activeTab.connectionType === 'emulator') {
+            const core = activeTab.pgMeta?.type || 'nes';
+            const romUrl = activeTab.pgMeta?.host || '';
+            const romName = activeTab.pgMeta?.name || 'Game';
+            const biosUrl = activeTab.pgMeta?.url;
+            return (
+                <EmulatorView
+                    key={activeTab.id}
+                    romUrl={romUrl}
+                    core={core}
+                    romName={romName}
+                    biosUrl={biosUrl}
+                />
+            );
+        }
+
+        if (activeTab.connectionType === 'music') {
+            return <MusicView />;
         }
 
         return (
@@ -218,7 +244,11 @@ const App: React.FC = () => {
                             {activityKey === 'proxy' ? <ProxyView />
                                 : activityKey === 'forwards' ? <PortForwardView />
                                     : activityKey === 'toolbox' ? <ToolboxPanel />
-                                        : <AssetTree />}
+                                        : activityKey === 'emulator' ? <GamePanel />
+                                            : activityKey === 'pomodoro' ? <PomodoroPanel />
+                                                : activityKey === 'music' ? <MusicPanel />
+                                                    : activityKey === 'git' ? <GitPanel />
+                                                        : <AssetTree />}
                         </div>
                         <div className="app-sidebar-resize" onMouseDown={handleResizeStart} />
                     </div>
@@ -226,10 +256,7 @@ const App: React.FC = () => {
 
                 {/* Main Content Area */}
                 <div className="app-main">
-                    {/* Tab Bar with right toolbar */}
                     <TabBar />
-
-                    {/* Content Area */}
                     <div className="app-content">
                         {renderContent()}
                     </div>

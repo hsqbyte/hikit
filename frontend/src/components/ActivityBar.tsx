@@ -11,6 +11,8 @@ import {
     ApiOutlined,
     ToolOutlined,
 } from '@ant-design/icons';
+import { IoGameControllerOutline } from 'react-icons/io5';
+import { VscGitMerge } from 'react-icons/vsc';
 import './ActivityBar.css';
 
 interface ActivityBarItem {
@@ -24,14 +26,13 @@ const topItems: ActivityBarItem[] = [
     { key: 'forwards', icon: <SwapOutlined />, label: '端口转发' },
     { key: 'proxy', icon: <ApiOutlined />, label: 'Web 代理' },
     { key: 'toolbox', icon: <ToolOutlined />, label: '工具箱' },
-    { key: 'search', icon: <SearchOutlined />, label: '搜索' },
+    { key: 'git', icon: <VscGitMerge style={{ fontSize: 18 }} />, label: 'Git' },
 ];
 
 const bottomItems: ActivityBarItem[] = [
-    { key: 'terminal', icon: <UnorderedListOutlined />, label: '终端记录' },
-    { key: 'chat', icon: <MessageOutlined />, label: '消息' },
-    { key: 'links', icon: <LinkOutlined />, label: '链接' },
-    { key: 'settings', icon: <SettingOutlined />, label: '设置' },
+    { key: 'music', icon: <span style={{ fontSize: 17 }}>🎵</span>, label: '音乐播放器' },
+    { key: 'pomodoro', icon: <span style={{ fontSize: 18 }}>🍅</span>, label: '番茄钟' },
+    { key: 'emulator', icon: <IoGameControllerOutline style={{ fontSize: 18 }} />, label: '游戏模拟器' },
 ];
 
 interface ActivityBarProps {

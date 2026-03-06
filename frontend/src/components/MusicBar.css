@@ -1,0 +1,164 @@
+.music-bar {
+    height: 56px;
+    background: linear-gradient(180deg, #1a1a2e 0%, #16162a 100%);
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 12px;
+    flex-shrink: 0;
+    color: #fff;
+}
+
+.music-bar-cover {
+    width: 40px;
+    height: 40px;
+    border-radius: 6px;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: #2a2a4a;
+}
+
+.music-bar-cover.spinning {
+    border-radius: 50%;
+    animation: spin-bar 10s linear infinite;
+}
+
+@keyframes spin-bar {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.music-bar-info {
+    min-width: 120px;
+    max-width: 180px;
+    overflow: hidden;
+}
+
+.music-bar-name {
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #e0e0e0;
+}
+
+.music-bar-artist {
+    font-size: 10px;
+    color: #888;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.music-bar-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.music-bar-btn {
+    background: none;
+    border: none;
+    color: #aaa;
+    font-size: 14px;
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    transition: all 0.15s;
+}
+
+.music-bar-btn:hover {
+    color: #fff;
+    transform: scale(1.15);
+}
+
+.music-bar-btn.main {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #722ed1;
+    color: #fff;
+    font-size: 16px;
+    justify-content: center;
+}
+
+.music-bar-btn.main:hover {
+    background: #9b59b6;
+    transform: scale(1.08);
+}
+
+.music-bar-progress {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.music-bar-time {
+    font-size: 10px;
+    color: #666;
+    font-family: 'SF Mono', monospace;
+    min-width: 28px;
+    text-align: center;
+}
+
+.music-bar-track {
+    flex: 1;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    cursor: pointer;
+    min-width: 60px;
+}
+
+.music-bar-track:hover {
+    height: 5px;
+}
+
+.music-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #722ed1, #eb2f96);
+    border-radius: 2px;
+    transition: width 0.3s linear;
+}
+
+.music-bar-volume {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.music-bar-vol-slider {
+    width: 60px;
+    height: 3px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    outline: none;
+}
+
+.music-bar-vol-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #722ed1;
+    cursor: pointer;
+}
+
+.music-bar-empty {
+    color: #555;
+    font-size: 12px;
+    flex: 1;
+    text-align: center;
+}

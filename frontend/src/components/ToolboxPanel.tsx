@@ -156,8 +156,8 @@ const ToolboxPanel: React.FC = () => {
                 id: tabId,
                 title: tool.name,
                 assetId: tabId,
-                connectionType: 'toolbox' as any,
-                pgMeta: { type: tool.key as any },
+                connectionType: 'toolbox',
+                pgMeta: { type: tool.key },
             });
         }
     };

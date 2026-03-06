@@ -1,47 +1,26 @@
-package main
+package restclient
 
 import (
 	"bytes"
 	"crypto/tls"
+	"database/sql"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"time"
-
-	"github.com/hsqbyte/hikit/internal/store"
 )
 
-// SaveHTTPContent persists .http editor content for a REST Client asset
-// Reuses the private_key column to store .http text content
-func (a *App) SaveHTTPContent(assetId string, content string) error {
-	db := store.GetDB()
-	_, err := db.Exec("UPDATE assets SET private_key=?, updated_at=? WHERE id=?",
-		content, time.Now().Format("2006-01-02 15:04:05"), assetId)
-	return err
-}
-
-// LoadHTTPContent loads the .http editor content for a REST Client asset
-func (a *App) LoadHTTPContent(assetId string) string {
-	db := store.GetDB()
-	var content string
-	err := db.QueryRow("SELECT COALESCE(private_key, '') FROM assets WHERE id=?", assetId).Scan(&content)
-	if err != nil {
-		return ""
-	}
-	return content
-}
-
-// HTTPRequest describes a REST Client request from the frontend
-type HTTPRequest struct {
+// Request describes a REST Client request
+type Request struct {
 	Method  string            `json:"method"`
 	URL     string            `json:"url"`
 	Headers map[string]string `json:"headers"`
 	Body    string            `json:"body"`
 }
 
-// HTTPResponse is the result returned to the frontend
-type HTTPResponse struct {
+// Response is the result returned to the frontend
+type Response struct {
 	StatusCode int               `json:"statusCode"`
 	Status     string            `json:"status"`
 	Headers    map[string]string `json:"headers"`
@@ -51,15 +30,31 @@ type HTTPResponse struct {
 	Error      string            `json:"error,omitempty"`
 }
 
-// SendHTTPRequest executes an HTTP request on behalf of the frontend (no CORS)
-func (a *App) SendHTTPRequest(req HTTPRequest) HTTPResponse {
+// SaveHTTPContent persists .http editor content for a REST Client asset
+func SaveHTTPContent(db *sql.DB, assetId string, content string) error {
+	_, err := db.Exec("UPDATE assets SET private_key=?, updated_at=? WHERE id=?",
+		content, time.Now().Format("2006-01-02 15:04:05"), assetId)
+	return err
+}
+
+// LoadHTTPContent loads the .http editor content for a REST Client asset
+func LoadHTTPContent(db *sql.DB, assetId string) string {
+	var content string
+	err := db.QueryRow("SELECT COALESCE(private_key, '') FROM assets WHERE id=?", assetId).Scan(&content)
+	if err != nil {
+		return ""
+	}
+	return content
+}
+
+// Send executes an HTTP request on behalf of the frontend (no CORS)
+func Send(req Request) Response {
 	start := time.Now()
 
 	if req.URL == "" {
-		return HTTPResponse{Error: "URL is required"}
+		return Response{Error: "URL is required"}
 	}
 
-	// Ensure URL has scheme
 	if !strings.HasPrefix(req.URL, "http://") && !strings.HasPrefix(req.URL, "https://") {
 		req.URL = "https://" + req.URL
 	}
@@ -76,7 +71,7 @@ func (a *App) SendHTTPRequest(req HTTPRequest) HTTPResponse {
 
 	httpReq, err := http.NewRequest(method, req.URL, bodyReader)
 	if err != nil {
-		return HTTPResponse{Error: fmt.Sprintf("failed to create request: %v", err)}
+		return Response{Error: fmt.Sprintf("failed to create request: %v", err)}
 	}
 
 	for k, v := range req.Headers {
@@ -92,13 +87,13 @@ func (a *App) SendHTTPRequest(req HTTPRequest) HTTPResponse {
 
 	resp, err := client.Do(httpReq)
 	if err != nil {
-		return HTTPResponse{Error: fmt.Sprintf("request failed: %v", err), Duration: time.Since(start).Milliseconds()}
+		return Response{Error: fmt.Sprintf("request failed: %v", err), Duration: time.Since(start).Milliseconds()}
 	}
 	defer resp.Body.Close()
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return HTTPResponse{
+		return Response{
 			StatusCode: resp.StatusCode,
 			Status:     resp.Status,
 			Error:      fmt.Sprintf("failed to read body: %v", err),
@@ -111,7 +106,7 @@ func (a *App) SendHTTPRequest(req HTTPRequest) HTTPResponse {
 		headers[k] = strings.Join(v, ", ")
 	}
 
-	return HTTPResponse{
+	return Response{
 		StatusCode: resp.StatusCode,
 		Status:     resp.Status,
 		Headers:    headers,

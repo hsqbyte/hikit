@@ -72,7 +72,6 @@
     padding-top: 4px;
 }
 
-/* Tab label with icon */
 .tab-label {
     display: flex;
     align-items: center;
@@ -91,39 +90,413 @@
     white-space: nowrap;
 }
 
-/* Right side toolbar */
-.tab-bar-right {
+/* ========== Music Area ========== */
+.tab-bar-music {
     flex-shrink: 0;
-    padding-right: 8px;
-}
-
-.header-toolbar {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 8px;
+    padding: 0 12px;
+    height: 100%;
+    border-left: 1px solid #eee;
+    position: relative;
+    overflow: visible;
+    min-width: 0;
+    cursor: default;
 }
 
-.header-btn {
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.15s;
+.tbm-progress {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 2px;
+    background: linear-gradient(90deg, #722ed1, #eb2f96);
+    transition: width 0.3s linear;
+    z-index: 1;
+}
+
+/* Idle music icon (no track playing) */
+.tbm-idle-icon {
     font-size: 14px;
+    cursor: default;
+    opacity: 0.6;
 }
 
-.header-btn:hover {
+/* Default view: song name + lyric line */
+.tbm-default {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    max-width: 200px;
+}
+
+.tbm-name {
+    font-size: 11px;
+    font-weight: 600;
+    color: #333;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.3;
+}
+
+.tbm-lyric-current {
+    font-size: 10px;
+    color: #999;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.3;
+    transition: all 0.3s ease;
+}
+
+.tbm-lyric-current.has-lyric {
+    color: #722ed1;
+    font-weight: 500;
+}
+
+.tbm-btn {
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 12px;
+    cursor: pointer;
+    padding: 3px;
+    display: flex;
+    align-items: center;
+    transition: all 0.15s;
+    border-radius: 4px;
+}
+
+.tbm-btn:hover {
+    color: #333;
     background: #f0f0f0;
 }
 
-.avatar-btn {
+.tbm-btn.main {
     width: 28px;
     height: 28px;
     border-radius: 50%;
+    background: #722ed1;
+    color: #fff;
+    font-size: 12px;
+    justify-content: center;
+}
+
+.tbm-btn.main:hover {
+    background: #9b59b6;
+}
+
+.tbm-btn.search-toggle {
+    font-size: 13px;
+    color: #722ed1;
+}
+
+/* ========== Hover Popup Panel ========== */
+.tbm-hover-panel {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    width: 340px;
+    background: #fff;
+    border: 1px solid #e8e8e8;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.14);
+    z-index: 1000;
+    margin-top: 4px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+
+    /* Hidden by default, show on hover */
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-4px);
+    transition: all 0.2s ease;
+    pointer-events: none;
+}
+
+.tab-bar-music:hover .tbm-hover-panel {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    pointer-events: all;
+}
+
+/* Keep panel open when interacting with it */
+.tbm-hover-panel:hover {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    pointer-events: all;
+}
+
+/* Track info */
+.tbm-hp-track {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.tbm-hp-cover {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: linear-gradient(135deg, #722ed1, #eb2f96);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    box-shadow: 0 2px 8px rgba(114, 46, 209, 0.2);
+}
+
+.tbm-hp-cover.spinning {
+    animation: tbm-spin 8s linear infinite;
+}
+
+@keyframes tbm-spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.tbm-hp-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.tbm-hp-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1a1a2e;
+    display: block;
+    white-space: nowrap;
     overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tbm-hp-artist {
+    font-size: 11px;
+    color: #999;
+    margin-top: 2px;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Progress */
+.tbm-hp-progress-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.tbm-hp-time {
+    font-size: 10px;
+    color: #aaa;
+    font-family: 'SF Mono', monospace;
+    min-width: 30px;
+    text-align: center;
+}
+
+.tbm-hp-progress {
+    flex: 1;
+    height: 3px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: #e8e8e8;
+    border-radius: 2px;
+    outline: none;
+}
+
+.tbm-hp-progress::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #722ed1;
+    cursor: pointer;
+    box-shadow: 0 0 4px rgba(114, 46, 209, 0.3);
+}
+
+/* Controls */
+.tbm-hp-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.tbm-hp-volume {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+}
+
+.tbm-hp-vol {
+    width: 60px;
+    height: 3px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: #e8e8e8;
+    border-radius: 2px;
+    outline: none;
+}
+
+.tbm-hp-vol::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #722ed1;
+    cursor: pointer;
+}
+
+/* Search in popup */
+.tbm-hp-search {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    border-top: 1px solid #f0f0f0;
+    padding-top: 10px;
+}
+
+.tbm-hp-search-input {
+    flex: 1;
+    height: 28px;
+    border: 1px solid #d9d9d9;
+    border-radius: 14px;
+    padding: 0 12px;
+    font-size: 11px;
+    outline: none;
+    transition: all 0.2s;
+    background: #fafafa;
+}
+
+.tbm-hp-search-input:focus {
+    border-color: #722ed1;
+    background: #fff;
+    box-shadow: 0 0 0 2px rgba(114, 46, 209, 0.1);
+}
+
+/* Search results in popup */
+.tbm-hp-results {
+    max-height: 280px;
+    overflow-y: auto;
+    border-top: 1px solid #f0f0f0;
+    margin: -4px -14px -14px;
+    border-radius: 0 0 12px 12px;
+}
+
+.tbm-drop-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 14px;
+    gap: 10px;
+    cursor: pointer;
+    border-bottom: 1px solid #fafafa;
+    transition: background 0.12s;
+}
+
+.tbm-drop-item:last-child {
+    border-bottom: none;
+}
+
+.tbm-drop-item:hover {
+    background: #f5f0ff;
+}
+
+.tbm-drop-item.active {
+    background: linear-gradient(135deg, #f0e6ff, #e8f4ff);
+}
+
+.tbm-drop-item.active .tbm-drop-name {
+    color: #722ed1;
+}
+
+.tbm-drop-cover {
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    flex-shrink: 0;
+    background: linear-gradient(135deg, #e8d5f5, #d4c4f0);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+}
+
+.tbm-drop-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.tbm-drop-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: #333;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tbm-drop-artist {
+    font-size: 10px;
+    color: #999;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 1px;
+}
+
+.tbm-drop-dur {
+    font-size: 10px;
+    color: #bbb;
+    flex-shrink: 0;
+}
+
+.tbm-drop-empty {
+    padding: 20px;
+    text-align: center;
+    color: #ccc;
+    font-size: 12px;
+}
+
+/* Notification */
+.tbm-notification {
+    position: absolute;
+    top: 100%;
+    right: 10px;
+    margin-top: 6px;
+    background: linear-gradient(135deg, #722ed1, #9b59b6);
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 11px;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(114, 46, 209, 0.3);
+    z-index: 1001;
+    animation: tbm-notify-in 0.3s ease;
+}
+
+@keyframes tbm-notify-in {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }

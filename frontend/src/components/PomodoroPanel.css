@@ -1,0 +1,217 @@
+.pomodoro-panel {
+    padding: 12px;
+    color: #333;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.pomodoro-panel-header {
+    font-size: 14px;
+    font-weight: 600;
+    padding: 4px 0 12px 0;
+    border-bottom: 1px solid #eee;
+    margin-bottom: 16px;
+}
+
+/* ─── Timer Circle ─── */
+.pomodoro-timer-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px 0 16px;
+}
+
+.pomodoro-circle-wrapper {
+    position: relative;
+    width: 180px;
+    height: 180px;
+}
+
+.pomodoro-circle-svg {
+    transform: rotate(-90deg);
+    width: 180px;
+    height: 180px;
+}
+
+.pomodoro-circle-bg {
+    fill: none;
+    stroke: #f0f0f0;
+    stroke-width: 8;
+}
+
+.pomodoro-circle-progress {
+    fill: none;
+    stroke-width: 8;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1s linear, stroke 0.5s ease;
+}
+
+.pomodoro-circle-progress.work {
+    stroke: url(#workGradient);
+}
+
+.pomodoro-circle-progress.short-break {
+    stroke: #52c41a;
+}
+
+.pomodoro-circle-progress.long-break {
+    stroke: #1890ff;
+}
+
+.pomodoro-time-display {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+}
+
+.pomodoro-time {
+    font-size: 36px;
+    font-weight: 700;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    color: #1a1a2e;
+    letter-spacing: 2px;
+}
+
+.pomodoro-phase-label {
+    font-size: 12px;
+    color: #999;
+    margin-top: 2px;
+}
+
+/* ─── Controls ─── */
+.pomodoro-controls {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin: 12px 0 20px;
+}
+
+.pomodoro-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    transition: all 0.2s ease;
+    color: white;
+}
+
+.pomodoro-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.pomodoro-btn:active {
+    transform: scale(0.95);
+}
+
+.pomodoro-btn.start {
+    background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+    width: 56px;
+    height: 56px;
+    font-size: 22px;
+}
+
+.pomodoro-btn.pause {
+    background: linear-gradient(135deg, #ffa502, #e67e22);
+    width: 56px;
+    height: 56px;
+    font-size: 22px;
+}
+
+.pomodoro-btn.resume {
+    background: linear-gradient(135deg, #52c41a, #27ae60);
+    width: 56px;
+    height: 56px;
+    font-size: 22px;
+}
+
+.pomodoro-btn.stop {
+    background: linear-gradient(135deg, #aaa, #888);
+}
+
+.pomodoro-btn.skip {
+    background: linear-gradient(135deg, #9b59b6, #8e44ad);
+}
+
+/* ─── Stats ─── */
+.pomodoro-stats {
+    display: flex;
+    justify-content: space-around;
+    padding: 12px 0;
+    border-top: 1px solid #f0f0f0;
+    margin-top: auto;
+}
+
+.pomodoro-stat-item {
+    text-align: center;
+}
+
+.pomodoro-stat-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1a1a2e;
+}
+
+.pomodoro-stat-label {
+    font-size: 11px;
+    color: #999;
+    margin-top: 2px;
+}
+
+/* ─── Tomato Icons ─── */
+.pomodoro-tomatoes {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    margin: 8px 0;
+}
+
+.pomodoro-tomato {
+    font-size: 20px;
+    opacity: 0.25;
+    transition: all 0.3s ease;
+}
+
+.pomodoro-tomato.filled {
+    opacity: 1;
+    animation: tomato-pop 0.4s ease;
+}
+
+@keyframes tomato-pop {
+    0% {
+        transform: scale(0.5);
+    }
+
+    50% {
+        transform: scale(1.3);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* ─── Pulse animation for active timer ─── */
+.pomodoro-circle-wrapper.active .pomodoro-time {
+    animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.7;
+    }
+}
