@@ -1,5 +1,9 @@
 import { create } from 'zustand';
-import { GetMusicURL, GetMusicLyric } from '../../wailsjs/go/main/App';
+import {
+    GetURL as GetMusicURL, GetLyric as GetMusicLyric,
+    GetOfflineSettings, SetOfflineEnabled as SetOfflineEnabledAPI,
+    AutoCacheTrackOffline, IsTrackCached,
+} from '../../wailsjs/go/music/MusicService';
 
 export interface MusicTrack {
     id: string;
@@ -42,6 +46,7 @@ interface MusicState {
     searchHistory: string[];
     notification: string;
     audio: HTMLAudioElement;
+    offlineEnabled: boolean;
 
     playTrack: (track: MusicTrack) => Promise<void>;
     togglePlay: () => void;
@@ -55,6 +60,8 @@ interface MusicState {
     cyclePlayMode: () => void;
     addSearchHistory: (keyword: string) => void;
     clearNotification: () => void;
+    setOfflineEnabled: (enabled: boolean) => Promise<void>;
+    loadOfflineSettings: () => Promise<void>;
 }
 
 const HISTORY_KEY = 'hikit_music_history';
@@ -146,32 +153,47 @@ export const useMusicStore = create<MusicState>((set, get) => {
         searchHistory: loadSearchHistory(),
         notification: '',
         audio,
+        offlineEnabled: false,
 
         playTrack: async (track: MusicTrack) => {
             try {
-                const artist = track.artists.join(', ');
-                const info = await GetMusicURL(track.id, track.source, track.name, artist, track.duration);
-                if (!info.url) {
-                    set({ notification: `❌ ${track.name} 暂无可用音源` });
-                    setTimeout(() => get().clearNotification(), 3000);
-                    return;
-                }
+                const { offlineEnabled } = get();
 
-                // Check if source was switched (URL contains different source)
-                const urlParams = new URLSearchParams(info.url.split('?')[1] || '');
-                const actualSource = urlParams.get('source') || track.source;
-                if (actualSource !== track.source) {
-                    const sourceNames: Record<string, string> = {
-                        netease: '网易云', qq: 'QQ音乐', kugou: '酷狗',
-                        kuwo: '酷我', migu: '咪咕', bilibili: 'B站',
-                    };
-                    set({ notification: `🔄 已切换到 ${sourceNames[actualSource] || actualSource}` });
-                    setTimeout(() => get().clearNotification(), 3000);
+                // Check if track is cached offline
+                let playURL = '';
+                try {
+                    const cached = await IsTrackCached(track.id, track.source);
+                    if (cached) {
+                        playURL = `${PROXY_BASE}/music/offline?id=${encodeURIComponent(track.id)}&source=${encodeURIComponent(track.source)}`;
+                    }
+                } catch { /* fallback to online */ }
+
+                if (!playURL) {
+                    const artist = track.artists.join(', ');
+                    const info = await GetMusicURL(track.id, track.source, track.name, artist, track.duration);
+                    if (!info.url) {
+                        set({ notification: `❌ ${track.name} 暂无可用音源` });
+                        setTimeout(() => get().clearNotification(), 3000);
+                        return;
+                    }
+
+                    // Check if source was switched (URL contains different source)
+                    const urlParams = new URLSearchParams(info.url.split('?')[1] || '');
+                    const actualSource = urlParams.get('source') || track.source;
+                    if (actualSource !== track.source) {
+                        const sourceNames: Record<string, string> = {
+                            netease: '网易云', qq: 'QQ音乐', kugou: '酷狗',
+                            kuwo: '酷我', migu: '咪咕', bilibili: 'B站',
+                        };
+                        set({ notification: `🔄 已切换到 ${sourceNames[actualSource] || actualSource}` });
+                        setTimeout(() => get().clearNotification(), 3000);
+                    }
+                    playURL = info.url;
                 }
 
                 audio.pause();
                 set({ currentTrack: track, currentTime: 0, duration: 0, lyrics: [], currentLyricIndex: -1 });
-                audio.src = info.url;
+                audio.src = playURL;
                 audio.load();
 
                 // Add to history
@@ -194,6 +216,15 @@ export const useMusicStore = create<MusicState>((set, get) => {
                         set({ lyrics: parseLRC(lyricData.lyric) });
                     }
                 } catch { /* optional */ }
+
+                // Auto cache offline if enabled
+                if (offlineEnabled) {
+                    AutoCacheTrackOffline(track as any).then(() => {
+                        // Silently cached
+                    }).catch(() => {
+                        // Non-critical, ignore
+                    });
+                }
             } catch (e) {
                 console.error('Play failed:', e);
                 set({ notification: `❌ 播放失败` });
@@ -282,5 +313,21 @@ export const useMusicStore = create<MusicState>((set, get) => {
         },
 
         clearNotification: () => { set({ notification: '' }); },
+
+        setOfflineEnabled: async (enabled: boolean) => {
+            try {
+                await SetOfflineEnabledAPI(enabled);
+                set({ offlineEnabled: enabled });
+            } catch (e) {
+                console.error('Failed to set offline enabled:', e);
+            }
+        },
+
+        loadOfflineSettings: async () => {
+            try {
+                const settings = await GetOfflineSettings();
+                set({ offlineEnabled: settings.enabled });
+            } catch { /* defaults to false */ }
+        },
     };
 });

@@ -1,0 +1,492 @@
+.welcome-page {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: #fafbfc;
+    overflow: hidden;
+}
+
+.welcome-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+/* ===== Empty state overlay ===== */
+.welcome-empty-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+
+.welcome-empty-text {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    color: #bfbfbf;
+    font-size: 13px;
+}
+
+.welcome-empty-text p {
+    margin: 0;
+}
+
+/* ===== Stats badge ===== */
+.welcome-stats {
+    position: absolute;
+    bottom: 12px;
+    left: 16px;
+    font-size: 11px;
+    color: #aaa;
+    font-family: 'Menlo', 'Monaco', monospace;
+    letter-spacing: 0.3px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* ===== Zoom Controls ===== */
+.zoom-controls {
+    position: absolute;
+    bottom: 12px;
+    right: 16px;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: 8px;
+    padding: 2px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.zoom-btn {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #555;
+    font-size: 14px;
+    transition: all 0.15s;
+}
+
+.zoom-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: #1677ff;
+}
+
+.zoom-label {
+    min-width: 44px;
+    text-align: center;
+    font-size: 11px;
+    color: #888;
+    font-family: 'Menlo', 'Monaco', monospace;
+    user-select: none;
+}
+
+/* ===== Command Ring (Floating FAB) ===== */
+.command-ring {
+    position: absolute;
+    bottom: 56px;
+    right: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    pointer-events: none;
+}
+
+.command-ring-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    opacity: 0;
+    transform: translateY(10px) scale(0.95);
+    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    pointer-events: none;
+}
+
+.command-ring.open .command-ring-actions {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+
+.ring-action {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px 0 12px;
+    height: 36px;
+    border: none;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(16px);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+    font-size: 12px;
+    color: #333;
+    white-space: nowrap;
+    transition: all 0.18s;
+    pointer-events: auto;
+}
+
+.ring-action:hover {
+    background: #fff;
+    box-shadow: 0 4px 16px rgba(22, 119, 255, 0.15);
+    transform: translateX(-4px);
+}
+
+.ring-action .ring-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: #fff;
+}
+
+.ring-action.add .ring-icon {
+    background: linear-gradient(135deg, #1677ff, #40a9ff);
+}
+
+.ring-action.group .ring-icon {
+    background: linear-gradient(135deg, #faad14, #ffd666);
+}
+
+.ring-action.edit .ring-icon {
+    background: linear-gradient(135deg, #52c41a, #95de64);
+}
+
+.ring-action.delete .ring-icon {
+    background: linear-gradient(135deg, #ff4d4f, #ff7875);
+}
+
+.ring-action.log .ring-icon {
+    background: linear-gradient(135deg, #722ed1, #b37feb);
+}
+
+.ring-fab {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: none;
+    background: linear-gradient(135deg, #1677ff, #4096ff);
+    color: #fff;
+    font-size: 22px;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(22, 119, 255, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    pointer-events: auto;
+}
+
+.ring-fab:hover {
+    transform: scale(1.08);
+    box-shadow: 0 6px 24px rgba(22, 119, 255, 0.4);
+}
+
+.command-ring.open .ring-fab {
+    transform: rotate(45deg);
+    background: linear-gradient(135deg, #ff4d4f, #ff7875);
+    box-shadow: 0 4px 16px rgba(255, 77, 79, 0.3);
+}
+
+/* ===== AI Command Bar ===== */
+.ai-command-bar {
+    position: absolute;
+    bottom: 56px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(520px, calc(100% - 160px));
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px 6px 14px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(22, 119, 255, 0.12);
+    border-radius: 24px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    transition: all 0.2s;
+    z-index: 10;
+}
+
+.ai-command-bar:focus-within {
+    border-color: rgba(22, 119, 255, 0.35);
+    box-shadow: 0 4px 24px rgba(22, 119, 255, 0.12);
+}
+
+.ai-command-prefix {
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: #1677ff;
+    flex-shrink: 0;
+}
+
+.ai-command-input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    outline: none;
+    font-size: 13px;
+    color: #333;
+    padding: 6px 0;
+}
+
+.ai-command-input::placeholder {
+    color: #bfbfbf;
+}
+
+.ai-command-send {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: linear-gradient(135deg, #1677ff, #4096ff);
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    transition: all 0.15s;
+    flex-shrink: 0;
+}
+
+.ai-command-send:hover {
+    transform: scale(1.06);
+    box-shadow: 0 2px 8px rgba(22, 119, 255, 0.3);
+}
+
+.ai-command-send:disabled {
+    opacity: 0.4;
+    cursor: default;
+    transform: none;
+}
+
+/* ===== Operation Log Drawer ===== */
+.op-log-drawer {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 320px;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.97);
+    backdrop-filter: blur(16px);
+    border-left: 1px solid rgba(0, 0, 0, 0.06);
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.06);
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    z-index: 20;
+}
+
+.op-log-drawer.open {
+    transform: translateX(0);
+}
+
+.op-log-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+}
+
+.op-log-header button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #999;
+    font-size: 16px;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: all 0.15s;
+}
+
+.op-log-header button:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: #333;
+}
+
+.op-log-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+}
+
+.op-log-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    color: #555;
+    transition: background 0.15s;
+    position: relative;
+}
+
+.op-log-item:hover {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.op-log-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: #fff;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.op-log-icon.create {
+    background: linear-gradient(135deg, #52c41a, #95de64);
+}
+
+.op-log-icon.delete {
+    background: linear-gradient(135deg, #ff4d4f, #ff7875);
+}
+
+.op-log-icon.move {
+    background: linear-gradient(135deg, #1677ff, #40a9ff);
+}
+
+.op-log-icon.rename {
+    background: linear-gradient(135deg, #faad14, #ffd666);
+}
+
+.op-log-icon.ai {
+    background: linear-gradient(135deg, #722ed1, #b37feb);
+}
+
+.op-log-detail {
+    flex: 1;
+    min-width: 0;
+}
+
+.op-log-desc {
+    color: #333;
+    line-height: 1.4;
+    word-break: break-all;
+}
+
+.op-log-time {
+    color: #bbb;
+    font-size: 11px;
+    margin-top: 2px;
+}
+
+.op-log-undo {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: 1px solid rgba(22, 119, 255, 0.2);
+    color: #1677ff;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    opacity: 0;
+    transition: all 0.15s;
+}
+
+.op-log-item:hover .op-log-undo {
+    opacity: 1;
+}
+
+.op-log-undo:hover {
+    background: #1677ff;
+    color: #fff;
+    border-color: #1677ff;
+}
+
+.op-log-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    color: #ccc;
+    font-size: 12px;
+    gap: 8px;
+}
+
+.op-log-empty span {
+    font-size: 28px;
+    opacity: 0.4;
+}
+
+/* ===== AI Response Toast ===== */
+.ai-toast {
+    position: absolute;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 8px 16px;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
+    border-radius: 8px;
+    color: #fff;
+    font-size: 12px;
+    max-width: 400px;
+    text-align: center;
+    animation: toastIn 0.3s ease;
+    z-index: 30;
+}
+
+@keyframes toastIn {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+/* ===== Minimap ===== */
+.minimap {
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    width: 120px;
+    height: 80px;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    overflow: hidden;
+    pointer-events: none;
+}

@@ -1,26 +1,20 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { ConfigProvider } from 'antd';
-import ActivityBar from './components/ActivityBar';
-import AssetTree from './components/AssetTree';
-import TabBar from './components/TabBar';
-import WelcomePage from './components/WelcomePage';
-import SSHView from './components/SSHView';
-import LocalTerminalView from './components/LocalTerminalView';
-import PostgreSQLView from './components/PostgreSQLView';
-import PortForwardView from './components/PortForwardView';
-import ProxyView from './components/ProxyView';
-import WebProxyView from './components/WebProxyView';
-import RestClientView from './components/RestClientView';
-import TodoView from './components/TodoView';
-import MemoView from './components/MemoView';
-import ToolboxPanel from './components/ToolboxPanel';
-import ToolboxView from './components/ToolboxView';
-import GamePanel from './components/GamePanel';
-import EmulatorView from './components/EmulatorView';
-import PomodoroPanel from './components/PomodoroPanel';
-import MusicPanel from './components/MusicPanel';
-import MusicView from './components/MusicView';
-import GitPanel from './components/GitPanel';
+import { ActivityBar, TabBar } from './components/Layout';
+import { AssetTree } from './features/asset-tree';
+import { WelcomePage } from './features/network-graph';
+import { SSHView, LocalTerminalView } from './features/terminal';
+import { PostgreSQLView, RedisView } from './features/database';
+import { PortForwardView, ProxyView, WebProxyView } from './features/proxy';
+import { RestClientView } from './features/rest-client';
+import { TodoView } from './features/todo';
+import { MemoView } from './features/memo';
+import { ToolboxPanel, ToolboxView } from './features/toolbox';
+import { GamePanel, EmulatorView } from './features/emulator';
+import { PomodoroPanel } from './features/pomodoro';
+import { MusicPanel, MusicView } from './features/music';
+import { GitPanel } from './features/git';
+import { ChatView } from './features/chat';
 import { useConnectionStore, Asset } from './stores/connectionStore';
 import './App.css';
 
@@ -28,7 +22,17 @@ const App: React.FC = () => {
     const { activeTabId, tabs, assets } = useConnectionStore();
     const activeTab = tabs.find((t) => t.id === activeTabId);
     const [activityKey, setActivityKey] = useState('assets');
-    const [sidebarVisible, setSidebarVisible] = useState(true);
+    const [sidebarVisible, setSidebarVisible] = useState(false);
+    const isOnWelcome = !activeTab;
+
+    // Auto-hide sidebar on welcome page, auto-show when tab opens
+    useEffect(() => {
+        if (isOnWelcome) {
+            setSidebarVisible(false);
+        } else {
+            setSidebarVisible(true);
+        }
+    }, [isOnWelcome]);
 
     // Resizable sidebar
     const [sidebarWidth, setSidebarWidth] = useState(240);
@@ -126,6 +130,17 @@ const App: React.FC = () => {
                     host={currentAsset?.host}
                     assetId={activeTab.assetId}
                     pgMeta={activeTab.pgMeta as any}
+                />
+            );
+        }
+
+        if (activeTab.connectionType === 'redis') {
+            return (
+                <RedisView
+                    key={activeTab.id}
+                    hostName={activeTab.title}
+                    groupName={parentGroup?.name}
+                    assetId={activeTab.assetId}
                 />
             );
         }
@@ -238,7 +253,7 @@ const App: React.FC = () => {
                 />
 
                 {/* Sidebar wrapper */}
-                {sidebarVisible && (
+                {sidebarVisible && !isOnWelcome && activityKey !== 'chat' && (
                     <div className="app-sidebar-wrapper">
                         <div className="app-sidebar" style={{ width: sidebarWidth }}>
                             {activityKey === 'proxy' ? <ProxyView />
@@ -256,10 +271,16 @@ const App: React.FC = () => {
 
                 {/* Main Content Area */}
                 <div className="app-main">
-                    <TabBar />
-                    <div className="app-content">
-                        {renderContent()}
-                    </div>
+                    {activityKey === 'chat' ? (
+                        <ChatView />
+                    ) : (
+                        <>
+                            <TabBar />
+                            <div className="app-content">
+                                {renderContent()}
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
         </ConfigProvider>

@@ -1,11 +1,11 @@
 import { create } from 'zustand';
 import {
-    GetAssetTree,
-    CreateAsset,
-    DeleteAsset,
-    RenameAsset,
-    UpdateAsset,
-} from '../../wailsjs/go/main/App';
+    GetTree as GetAssetTree,
+    Create as CreateAsset,
+    Delete as DeleteAsset,
+    Rename as RenameAsset,
+    Update as UpdateAsset,
+} from '../../wailsjs/go/asset/AssetService';
 import { asset } from '../../wailsjs/go/models';
 
 export type ConnectionType =
