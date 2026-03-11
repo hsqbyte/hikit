@@ -1,0 +1,101 @@
+version: "3"
+
+vars:
+  APP: HiKit
+  VERSION:
+    sh: git describe --tags --always --dirty 2>/dev/null || echo 'dev'
+
+tasks:
+  default:
+    desc: 显示所有可用任务
+    cmds:
+      - task --list
+
+  dev:
+    desc: 启动开发模式
+    cmd: wails dev
+
+  # ── macOS ──────────────────────────────────────────────────
+  build:darwin:amd64:
+    desc: 构建 macOS (amd64/Intel)
+    cmds:
+      - mkdir -p dist
+      - wails build -platform darwin/amd64 -clean -o {{.APP}}-macos-amd64
+      - |
+        cd build/bin
+        if [ -d "{{.APP}}-macos-amd64.app" ]; then
+          zip -r ../../dist/{{.APP}}-{{.VERSION}}-macos-amd64.zip {{.APP}}-macos-amd64.app
+        else
+          zip -r ../../dist/{{.APP}}-{{.VERSION}}-macos-amd64.zip {{.APP}}-macos-amd64
+        fi
+      - echo "✅ dist/{{.APP}}-{{.VERSION}}-macos-amd64.zip"
+
+  build:darwin:arm64:
+    desc: 构建 macOS (arm64/Apple Silicon)
+    cmds:
+      - mkdir -p dist
+      - wails build -platform darwin/arm64 -clean -o {{.APP}}-macos-arm64
+      - |
+        cd build/bin
+        if [ -d "{{.APP}}-macos-arm64.app" ]; then
+          zip -r ../../dist/{{.APP}}-{{.VERSION}}-macos-arm64.zip {{.APP}}-macos-arm64.app
+        else
+          zip -r ../../dist/{{.APP}}-{{.VERSION}}-macos-arm64.zip {{.APP}}-macos-arm64
+        fi
+      - echo "✅ dist/{{.APP}}-{{.VERSION}}-macos-arm64.zip"
+
+  build:darwin:
+    desc: 构建 macOS 全架构
+    deps: [build:darwin:amd64, build:darwin:arm64]
+
+  # ── Linux (Docker) ─────────────────────────────────────────
+  build:linux:
+    desc: 构建 Linux amd64+arm64 (需要 Docker)
+    cmds:
+      - mkdir -p dist
+      - |
+        docker run --rm \
+          -v "$(pwd):/app" -w /app \
+          ghcr.io/wailsapp/wails-linux-builder:latest \
+          bash -c '
+            set -e
+            wails build -platform linux/amd64 -clean -o {{.APP}}-linux-amd64
+            cd build/bin && tar -czf ../../dist/{{.APP}}-{{.VERSION}}-linux-amd64.tar.gz {{.APP}}-linux-amd64 && cd ../..
+            wails build -platform linux/arm64 -clean -o {{.APP}}-linux-arm64
+            cd build/bin && tar -czf ../../dist/{{.APP}}-{{.VERSION}}-linux-arm64.tar.gz {{.APP}}-linux-arm64 && cd ../..
+          '
+      - echo "✅ dist/{{.APP}}-{{.VERSION}}-linux-*.tar.gz"
+
+  # ── Windows (Docker) ───────────────────────────────────────
+  build:windows:
+    desc: 构建 Windows amd64 (需要 Docker)
+    cmds:
+      - mkdir -p dist
+      - |
+        docker run --rm \
+          -v "$(pwd):/app" -w /app \
+          ghcr.io/wailsapp/wails-cross-windows:latest \
+          bash -c '
+            set -e
+            wails build -platform windows/amd64 -clean -o {{.APP}}-windows-amd64.exe
+            cd build/bin && zip -r ../../dist/{{.APP}}-{{.VERSION}}-windows-amd64.zip {{.APP}}-windows-amd64.exe && cd ../..
+          '
+      - echo "✅ dist/{{.APP}}-{{.VERSION}}-windows-amd64.zip"
+
+  # ── 全量构建 ───────────────────────────────────────────────
+  build:all:
+    desc: 构建所有平台
+    deps: [build:darwin]
+    cmds:
+      - task: build:linux
+      - task: build:windows
+      - echo ""
+      - echo "====== 所有构建完成 ======"
+      - ls -lh dist/
+
+  # ── 清理 ───────────────────────────────────────────────────
+  clean:
+    desc: 清理构建产物
+    cmds:
+      - rm -rf dist/ build/bin/
+      - echo "✅ 清理完成"
