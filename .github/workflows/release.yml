@@ -74,13 +74,12 @@ jobs:
         run: |
           mkdir -p dist build/bin
           wails build -platform linux/amd64 -o HiKit-linux-amd64
-          cd build/bin
-          tar -czf "../../dist/HiKit-${{ github.ref_name }}-linux-amd64.tar.gz" HiKit-linux-amd64
+          cp build/bin/HiKit-linux-amd64 dist/HiKit-${{ github.ref_name }}-linux-amd64
 
       - uses: actions/upload-artifact@v4
         with:
           name: linux-amd64
-          path: dist/*.tar.gz
+          path: dist/HiKit-*-linux-amd64
 
   # ── Linux arm64 (native runner) ───────────────────────────
   build-linux-arm64:
@@ -122,13 +121,12 @@ jobs:
         run: |
           mkdir -p dist build/bin
           wails build -platform linux/arm64 -o HiKit-linux-arm64
-          cd build/bin
-          tar -czf "../../dist/HiKit-${{ github.ref_name }}-linux-arm64.tar.gz" HiKit-linux-arm64
+          cp build/bin/HiKit-linux-arm64 dist/HiKit-${{ github.ref_name }}-linux-arm64
 
       - uses: actions/upload-artifact@v4
         with:
           name: linux-arm64
-          path: dist/*.tar.gz
+          path: dist/HiKit-*-linux-arm64
 
   # ── Windows (amd64) ───────────────────────────────────────
   build-windows:
@@ -152,12 +150,12 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path dist, build/bin
           wails build -platform windows/amd64 -o HiKit-windows-amd64.exe
-          Compress-Archive -Path build/bin/HiKit-windows-amd64.exe -DestinationPath "dist/HiKit-${{ github.ref_name }}-windows-amd64.zip"
+          Copy-Item build/bin/HiKit-windows-amd64.exe dist/HiKit-${{ github.ref_name }}-windows-amd64.exe
 
       - uses: actions/upload-artifact@v4
         with:
           name: windows-amd64
-          path: dist/*.zip
+          path: dist/HiKit-*-windows-amd64.exe
 
   # ── 创建 Release ──────────────────────────────────────────
   release:
@@ -186,9 +184,9 @@ jobs:
             |------|------|------|
             | macOS | Intel (amd64) | HiKit-${{ github.ref_name }}-macos-amd64.zip |
             | macOS | Apple Silicon (arm64) | HiKit-${{ github.ref_name }}-macos-arm64.zip |
-            | Linux | amd64 | HiKit-${{ github.ref_name }}-linux-amd64.tar.gz |
-            | Linux | arm64 | HiKit-${{ github.ref_name }}-linux-arm64.tar.gz |
-            | Windows | amd64 | HiKit-${{ github.ref_name }}-windows-amd64.zip |
+            | Linux | amd64 | HiKit-${{ github.ref_name }}-linux-amd64 |
+            | Linux | arm64 | HiKit-${{ github.ref_name }}-linux-arm64 |
+            | Windows | amd64 | HiKit-${{ github.ref_name }}-windows-amd64.exe |
           files: dist/*
           draft: false
           prerelease: false

@@ -11,7 +11,8 @@
 set -euo pipefail
 
 APP_NAME="HiKit"
-VERSION="${VERSION:-$(git describe --tags --always --dirty 2>/dev/null || echo 'dev')}"
+# 去掉 -dirty 后缀，保持版本号干净
+VERSION="${VERSION:-$(git describe --tags --always 2>/dev/null | sed 's/-dirty//' || echo 'dev')}"
 DIST="dist"
 
 mkdir -p "$DIST"
@@ -36,15 +37,20 @@ check_deps() {
 # ── macOS amd64 ─────────────────────────────────────────────
 build_darwin_amd64() {
     log "构建 macOS (amd64)..."
-    wails build \
-        -platform darwin/amd64 \
-        -clean \
-        -o "${APP_NAME}-macos-amd64"
-    local out="build/bin/${APP_NAME}-macos-amd64"
-    if [[ -d "${out}.app" ]]; then
-        cd build/bin && zip -r "../../${DIST}/${APP_NAME}-${VERSION}-macos-amd64.zip" "${APP_NAME}-macos-amd64.app" && cd ../..
+    # 不用 -clean，避免删除 wails.json；手动清理 bin
+    rm -rf build/bin && mkdir -p build/bin
+    wails build -platform darwin/amd64
+    # wails 在 macOS 下输出 <appname>.app（小写 wails.json name 字段）
+    local app_file
+    app_file=$(ls -d build/bin/*.app 2>/dev/null | head -1)
+    if [[ -z "$app_file" ]]; then
+        # fallback: 找第一个文件
+        app_file=$(ls build/bin/ | head -1)
+        cd build/bin && zip -r "../../${DIST}/${APP_NAME}-${VERSION}-macos-amd64.zip" "$app_file" && cd ../..
     else
-        cd build/bin && zip -r "../../${DIST}/${APP_NAME}-${VERSION}-macos-amd64.zip" "${APP_NAME}-macos-amd64" && cd ../..
+        local app_name
+        app_name=$(basename "$app_file")
+        cd build/bin && zip -r "../../${DIST}/${APP_NAME}-${VERSION}-macos-amd64.zip" "$app_name" && cd ../..
     fi
     ok "macOS amd64 → ${DIST}/${APP_NAME}-${VERSION}-macos-amd64.zip"
 }
@@ -52,15 +58,18 @@ build_darwin_amd64() {
 # ── macOS arm64 (Apple Silicon) ────────────────────────────
 build_darwin_arm64() {
     log "构建 macOS (arm64)..."
-    wails build \
-        -platform darwin/arm64 \
-        -clean \
-        -o "${APP_NAME}-macos-arm64"
-    local out="build/bin/${APP_NAME}-macos-arm64"
-    if [[ -d "${out}.app" ]]; then
-        cd build/bin && zip -r "../../${DIST}/${APP_NAME}-${VERSION}-macos-arm64.zip" "${APP_NAME}-macos-arm64.app" && cd ../..
+    rm -rf build/bin && mkdir -p build/bin
+    wails build -platform darwin/arm64
+    local app_file
+    app_file=$(ls -d build/bin/*.app 2>/dev/null | head -1)
+    if [[ -z "$app_file" ]]; then
+        local f
+        f=$(ls build/bin/ | head -1)
+        cd build/bin && zip -r "../../${DIST}/${APP_NAME}-${VERSION}-macos-arm64.zip" "$f" && cd ../..
     else
-        cd build/bin && zip -r "../../${DIST}/${APP_NAME}-${VERSION}-macos-arm64.zip" "${APP_NAME}-macos-arm64" && cd ../..
+        local app_name
+        app_name=$(basename "$app_file")
+        cd build/bin && zip -r "../../${DIST}/${APP_NAME}-${VERSION}-macos-arm64.zip" "$app_name" && cd ../..
     fi
     ok "macOS arm64 → ${DIST}/${APP_NAME}-${VERSION}-macos-arm64.zip"
 }
@@ -73,7 +82,6 @@ build_linux() {
     fi
     log "构建 Linux (amd64/arm64) via Docker..."
 
-    # 使用官方 Wails Linux 构建镜像
     docker run --rm \
         -v "$(pwd):/app" \
         -w /app \
@@ -81,16 +89,14 @@ build_linux() {
         ghcr.io/wailsapp/wails-linux-builder:latest \
         bash -c '
             set -e
-            # amd64
             echo "▶  Linux amd64..."
-            wails build -platform linux/amd64 -clean -o HiKit-linux-amd64
+            wails build -platform linux/amd64 -o HiKit-linux-amd64
             cd build/bin
             tar -czf ../../dist/'"${APP_NAME}-${VERSION}"'-linux-amd64.tar.gz HiKit-linux-amd64
             cd ../..
 
-            # arm64
             echo "▶  Linux arm64..."
-            wails build -platform linux/arm64 -clean -o HiKit-linux-arm64
+            wails build -platform linux/arm64 -o HiKit-linux-arm64
             cd build/bin
             tar -czf ../../dist/'"${APP_NAME}-${VERSION}"'-linux-arm64.tar.gz HiKit-linux-arm64
             cd ../..
@@ -114,7 +120,7 @@ build_windows() {
         bash -c '
             set -e
             echo "▶  Windows amd64..."
-            wails build -platform windows/amd64 -clean -o HiKit-windows-amd64.exe
+            wails build -platform windows/amd64 -o HiKit-windows-amd64.exe
             cd build/bin
             zip -r ../../dist/'"${APP_NAME}-${VERSION}"'-windows-amd64.zip HiKit-windows-amd64.exe
             cd ../..

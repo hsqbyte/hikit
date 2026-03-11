@@ -163,27 +163,15 @@ const TabBar: React.FC<TabBarProps> = ({ onShowList }) => {
         playTrack(track);
     };
 
-    const items = [
-        {
-            key: '__list__',
-            label: (
-                <span className="tab-label tab-list-label">
-                    <MenuOutlined />
-                    <span className="tab-title">列表</span>
-                </span>
-            ),
-            closable: false,
-        },
-        ...tabs.map((tab) => ({
-            key: tab.id,
-            label: (
-                <span className="tab-label">
-                    {typeIcons[tab.connectionType] || <VscTerminal style={tis} />}
-                    <span className="tab-title">{tab.title}</span>
-                </span>
-            ),
-        })),
-    ];
+    const items = tabs.map((tab) => ({
+        key: tab.id,
+        label: (
+            <span className="tab-label">
+                {typeIcons[tab.connectionType] || <VscTerminal style={tis} />}
+                <span className="tab-title">{tab.title}</span>
+            </span>
+        ),
+    }));
 
     const modeInfo = playModeIcons[playMode];
 
@@ -192,14 +180,13 @@ const TabBar: React.FC<TabBarProps> = ({ onShowList }) => {
             <div className="tab-bar-tabs">
                 <Tabs
                     type="editable-card"
-                    activeKey={activeTabId || '__list__'}
+                    activeKey={activeTabId || undefined}
                     items={items}
                     onChange={(key) => {
-                        if (key === '__list__') onShowList?.();
-                        else setActiveTab(key);
+                        setActiveTab(key);
                     }}
                     onEdit={(key, action) => {
-                        if (action === 'remove' && typeof key === 'string' && key !== '__list__')
+                        if (action === 'remove' && typeof key === 'string')
                             closeTab(key);
                     }}
                     hideAdd

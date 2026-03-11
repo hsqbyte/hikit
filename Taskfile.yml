@@ -20,28 +20,23 @@ tasks:
     desc: 构建 macOS (amd64/Intel)
     cmds:
       - mkdir -p dist
-      - wails build -platform darwin/amd64 -clean -o {{.APP}}-macos-amd64
+      - wails build -platform darwin/amd64 -clean
       - |
         cd build/bin
-        if [ -d "{{.APP}}-macos-amd64.app" ]; then
-          zip -r ../../dist/{{.APP}}-{{.VERSION}}-macos-amd64.zip {{.APP}}-macos-amd64.app
-        else
-          zip -r ../../dist/{{.APP}}-{{.VERSION}}-macos-amd64.zip {{.APP}}-macos-amd64
-        fi
+        # Wails outputs using the 'name' in wails.json (lowercase)
+        APP_FILE=$(ls -d *.app 2>/dev/null | head -1 || ls | head -1)
+        zip -r ../../dist/{{.APP}}-{{.VERSION}}-macos-amd64.zip "$APP_FILE"
       - echo "✅ dist/{{.APP}}-{{.VERSION}}-macos-amd64.zip"
 
   build:darwin:arm64:
     desc: 构建 macOS (arm64/Apple Silicon)
     cmds:
       - mkdir -p dist
-      - wails build -platform darwin/arm64 -clean -o {{.APP}}-macos-arm64
+      - wails build -platform darwin/arm64 -clean
       - |
         cd build/bin
-        if [ -d "{{.APP}}-macos-arm64.app" ]; then
-          zip -r ../../dist/{{.APP}}-{{.VERSION}}-macos-arm64.zip {{.APP}}-macos-arm64.app
-        else
-          zip -r ../../dist/{{.APP}}-{{.VERSION}}-macos-arm64.zip {{.APP}}-macos-arm64
-        fi
+        APP_FILE=$(ls -d *.app 2>/dev/null | head -1 || ls | head -1)
+        zip -r ../../dist/{{.APP}}-{{.VERSION}}-macos-arm64.zip "$APP_FILE"
       - echo "✅ dist/{{.APP}}-{{.VERSION}}-macos-arm64.zip"
 
   build:darwin:

@@ -634,7 +634,7 @@ const AssetTree: React.FC = () => {
     return (
         <div className="asset-tree">
             <div className="asset-tree-header">
-                <span className="asset-tree-title">Nexus 中枢</span>
+                <span className="asset-tree-title">资产列表</span>
                 <div className="asset-tree-toolbar">
                     <Tooltip title="刷新" placement="bottom">
                         <button className="toolbar-btn" onClick={() => loadAssets()}>
