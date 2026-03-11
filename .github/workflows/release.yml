@@ -101,12 +101,19 @@ jobs:
         run: |
           sudo apt-get update
           # Ubuntu 24.04: webkit2gtk-4.0 renamed to webkit2gtk-4.1
-          # Install 4.1 and create a 4.0 pkg-config alias so Wails can find it
           sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev
-          # Create alias pkgconfig for webkit2gtk-4.0 pointing to 4.1
+          # Create pkgconfig alias: webkit2gtk-4.0 -> 4.1
           PKG_DIR=/usr/lib/aarch64-linux-gnu/pkgconfig
           sudo cp "$PKG_DIR/webkit2gtk-4.1.pc" "$PKG_DIR/webkit2gtk-4.0.pc"
           sudo sed -i 's/webkit2gtk-4.1/webkit2gtk-4.0/g' "$PKG_DIR/webkit2gtk-4.0.pc"
+          # Create .so symlink so linker can find -lwebkit2gtk-4.0
+          LIB_DIR=/usr/lib/aarch64-linux-gnu
+          sudo ln -sf "$LIB_DIR/libwebkit2gtk-4.1.so" "$LIB_DIR/libwebkit2gtk-4.0.so" 2>/dev/null || true
+          # Find and symlink any versioned .so files
+          for f in "$LIB_DIR"/libwebkit2gtk-4.1.so*; do
+            target="${f/webkit2gtk-4.1/webkit2gtk-4.0}"
+            sudo ln -sf "$f" "$target" 2>/dev/null || true
+          done
 
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
