@@ -1,0 +1,160 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  # ── macOS (amd64 + arm64) ─────────────────────────────────
+  build-macos:
+    name: macOS ${{ matrix.arch }}
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            platform: darwin/amd64
+          - arch: arm64
+            platform: darwin/arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Build
+        run: |
+          mkdir -p dist build/bin
+          wails build -platform ${{ matrix.platform }}
+          APP=$(ls -d build/bin/*.app 2>/dev/null | head -1 | xargs basename)
+          cd build/bin
+          zip -r "../../dist/HiKit-${{ github.ref_name }}-macos-${{ matrix.arch }}.zip" "$APP"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}
+          path: dist/*.zip
+
+  # ── Linux (amd64 + arm64) ─────────────────────────────────
+  build-linux:
+    name: Linux ${{ matrix.arch }}
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            goarch: amd64
+            cc: gcc
+          - arch: arm64
+            goarch: arm64
+            cc: aarch64-linux-gnu-gcc
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.0-dev libgtk-3-dev \
+            gcc-aarch64-linux-gnu
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Build
+        env:
+          CC: ${{ matrix.cc }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          mkdir -p dist build/bin
+          wails build -platform linux/${{ matrix.goarch }} -o HiKit-linux-${{ matrix.arch }}
+          cd build/bin
+          tar -czf "../../dist/HiKit-${{ github.ref_name }}-linux-${{ matrix.arch }}.tar.gz" HiKit-linux-${{ matrix.arch }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.arch }}
+          path: dist/*.tar.gz
+
+  # ── Windows (amd64) ───────────────────────────────────────
+  build-windows:
+    name: Windows amd64
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Build
+        run: |
+          New-Item -ItemType Directory -Force -Path dist, build/bin
+          wails build -platform windows/amd64 -o HiKit-windows-amd64.exe
+          Compress-Archive -Path build/bin/HiKit-windows-amd64.exe -DestinationPath "dist/HiKit-${{ github.ref_name }}-windows-amd64.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-amd64
+          path: dist/*.zip
+
+  # ── 创建 Release ──────────────────────────────────────────
+  release:
+    name: Create Release
+    needs: [build-macos, build-linux, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -lh dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "HiKit ${{ github.ref_name }}"
+          body: |
+            ## 🎉 HiKit ${{ github.ref_name }}
+
+            ### 下载
+
+            | 平台 | 架构 | 文件 |
+            |------|------|------|
+            | macOS | Intel (amd64) | HiKit-${{ github.ref_name }}-macos-amd64.zip |
+            | macOS | Apple Silicon (arm64) | HiKit-${{ github.ref_name }}-macos-arm64.zip |
+            | Linux | amd64 | HiKit-${{ github.ref_name }}-linux-amd64.tar.gz |
+            | Linux | arm64 | HiKit-${{ github.ref_name }}-linux-arm64.tar.gz |
+            | Windows | amd64 | HiKit-${{ github.ref_name }}-windows-amd64.zip |
+          files: dist/*
+          draft: false
+          prerelease: false
