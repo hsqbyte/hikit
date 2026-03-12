@@ -1,160 +1,162 @@
 # HiKit
 
-> 一款基于 **Wails + React + Go** 的全能开发工具箱，为开发者打造的多合一桌面利器。
+> A full-featured developer toolbox built with **Wails + React + Go**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/Platform-macOS-lightgrey.svg)]()
+[![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)]()
 [![Built with Wails](https://img.shields.io/badge/Built%20with-Wails%20v2-red.svg)](https://wails.io)
 [![Go](https://img.shields.io/badge/Go-1.21+-00ADD8.svg)](https://golang.org)
 [![React](https://img.shields.io/badge/React-TypeScript-61DAFB.svg)](https://react.dev)
 
----
-
-## 目录
-
-- [功能模块](#功能模块)
-- [预览](#预览)
-- [开发](#开发)
-- [技术栈](#技术栈)
+English | [简体中文](doc/readme/README_zh.md) | [繁體中文](doc/readme/README_zh-TW.md) | [日本語](doc/readme/README_ja.md) | [한국어](doc/readme/README_ko.md) | [Español](doc/readme/README_es.md) | [Deutsch](doc/readme/README_de.md) | [Français](doc/readme/README_fr.md) | [Português](doc/readme/README_pt.md)
 
 ---
 
-## 功能模块
+## Table of Contents
 
-| 模块 | 描述 |
-|------|------|
-| 🖥️ **SSH / SFTP** | 远程终端 & 文件管理 |
-| � **SSH 端口转发** | SSH 隧道本地/远程端口转发 |
-| 🗄️ **数据库** | Redis · MySQL · MariaDB · PostgreSQL · SQLite · SQL Server · ClickHouse · Oracle |
-| 🌐 **REST Client** | HTTP 接口调试（`.http` 文件格式）|
-| 🕵️ **Web 代理** | HTTP/SOCKS 代理 + 抓包 + MITM 篡改 |
-| 💻 **本地终端** | 本地 Shell 终端 |
-| 🔧 **工具箱** | JSON格式化、编解码、Hash、JWT、正则、Diff 等 17 个工具 |
-| 📋 **待办事项** | 轻量级任务管理 |
-| 📝 **备忘录** | Markdown 笔记 |
-| 📦 **Git 管理** | 本地仓库可视化管理 |
-| 🎵 **音乐播放器** | 在线音乐搜索与播放 |
-| 🎮 **游戏模拟器** | 内置 FC / SFC / NEO GEO 经典游戏 |
-| 🔐 **密码保险箱** | 安全凭证管理（规划中）|
+- [Features](#features)
+- [Preview](#preview)
+- [Development](#development)
+- [Tech Stack](#tech-stack)
 
 ---
 
-## 预览
+## Features
 
-### 新建连接
+| Module | Description |
+|--------|-------------|
+| 🖥️ **SSH / SFTP** | Remote terminal & file manager |
+| 🔀 **SSH Port Forward** | Local / remote SSH tunnel |
+| 🗄️ **Database** | Redis · MySQL · MariaDB · PostgreSQL · SQLite · SQL Server · ClickHouse · Oracle |
+| 🌐 **REST Client** | HTTP debugging with `.http` file support |
+| 🕵️ **Web Proxy** | HTTP/SOCKS proxy + packet capture + MITM tampering |
+| 💻 **Local Terminal** | Embedded local shell |
+| 🔧 **Toolbox** | JSON, JWT, Hash, Regex, Diff, UUID, Cron, QR Code... 17 tools |
+| 📋 **Todo** | Lightweight task management |
+| 📝 **Memo** | Markdown notes with live preview |
+| 📦 **Git Manager** | Visual local repository management |
+| 🎵 **Music Player** | Online search + lyrics sync |
+| 🎮 **Game Emulator** | FC / SFC / NEO GEO classic games |
+| 🔐 **Vault** | Secure credential manager *(planned)* |
 
-支持 SSH、本地终端、SSH 隧道、Telnet、RDP、Docker，以及 Redis、MySQL、MariaDB、PostgreSQL、SQLite、SQL Server、ClickHouse、Oracle 等多种数据库连接。
+---
 
-![新建连接](doc/screenshots/main.png)
+## Preview
+
+### New Connection
+
+Supports SSH, Local Terminal, SSH Tunnel, Telnet, RDP, Docker, and databases including Redis, MySQL, MariaDB, PostgreSQL, SQLite, SQL Server, ClickHouse, Oracle.
+
+![New Connection](doc/screenshots/main.png)
 
 ---
 
 ### SSH / SFTP
 
-SSH 远程终端与 SFTP 文件管理，支持多标签页并行操作。
+Multi-tab remote terminal with integrated SFTP file management.
 
-![SSH 终端 & SFTP 文件管理](doc/screenshots/ssh_sftp.png)
-
----
-
-### SSH 端口转发
-
-SSH 隧道本地转发 / 远程转发，快速打通内网端口。
-
-![SSH 端口转发](doc/screenshots/ssh_proxy.png)
+![SSH Terminal & SFTP](doc/screenshots/ssh_sftp.png)
 
 ---
 
-### 数据库管理
+### SSH Port Forwarding
 
-支持 Redis、MySQL、MariaDB、PostgreSQL、SQLite、SQL Server、ClickHouse、Oracle，资产树浏览 + SQL 编辑器 + 查询结果展示。
+Local & remote SSH tunneling, quickly expose internal network ports.
 
-![PostgreSQL 数据库管理](doc/screenshots/postgresql.png)
-![SQL 查询结果](doc/screenshots/sql_query.png)
+![SSH Port Forwarding](doc/screenshots/ssh_proxy.png)
+
+---
+
+### Database Management
+
+Supports Redis, MySQL, MariaDB, PostgreSQL, SQLite, SQL Server, ClickHouse, Oracle — asset tree + SQL editor + query results.
+
+![Database Management](doc/screenshots/postgresql.png)
+![SQL Query Results](doc/screenshots/sql_query.png)
 
 ---
 
 ### REST Client
 
-兼容 `.http` 文件格式的 HTTP 接口调试工具。
+HTTP interface debugging tool compatible with `.http` file format.
 
-![REST Client 接口调试](doc/screenshots/rest_client.png)
-
----
-
-### Web 代理
-
-HTTP/HTTPS 抓包分析，支持 MITM 中间人流量篡改。
-
-![Web 代理抓包](doc/screenshots/web_proxy.png)
+![REST Client](doc/screenshots/rest_client.png)
 
 ---
 
-### 工具箱
+### Web Proxy
 
-内置 17 个开发常用工具：JSON 格式化、编解码、Hash 计算、JWT 解析、正则测试、Diff 对比、UUID 生成、Cron 解析、二维码生成等。
+HTTP/HTTPS packet capture with MITM traffic tampering support.
 
-![工具箱](doc/screenshots/tool.png)
-
----
-
-### Git 管理
-
-本地 Git 仓库可视化管理，支持更改、日志、分支管理。
-
-![Git 管理](doc/screenshots/git.png)
+![Web Proxy](doc/screenshots/web_proxy.png)
 
 ---
 
-### 待办事项
+### Toolbox
 
-轻量级任务管理，快速记录与追踪待办项。
+17 built-in developer tools: JSON formatter, encoding/decoding, Hash, JWT, Regex, Diff, UUID, Cron, QR Code generator and more.
 
-![待办事项](doc/screenshots/todo.png)
-
----
-
-### 备忘录
-
-支持实时预览的 Markdown 笔记编辑器。
-
-![备忘录 Markdown 编辑器](doc/screenshots/memo.png)
+![Toolbox](doc/screenshots/tool.png)
 
 ---
 
-### 音乐播放器
+### Git Manager
 
-在线音乐搜索、歌词同步显示、离线播放。
+Visual management of local Git repositories: changes, logs, branches.
 
-![音乐播放器](doc/screenshots/music.png)
-
----
-
-### 游戏模拟器
-
-内置经典街机游戏模拟器，支持 FC、SFC、NEO GEO 平台。
-
-![游戏模拟器](doc/screenshots/game.png)
+![Git Manager](doc/screenshots/git.png)
 
 ---
 
-## 开发
+### Todo
+
+Lightweight task management to quickly track your work items.
+
+![Todo](doc/screenshots/todo.png)
+
+---
+
+### Memo
+
+Markdown editor with real-time preview.
+
+![Memo](doc/screenshots/memo.png)
+
+---
+
+### Music Player
+
+Online music search, lyrics sync, and offline playback.
+
+![Music Player](doc/screenshots/music.png)
+
+---
+
+### Game Emulator
+
+Built-in classic game emulator supporting FC, SFC, and NEO GEO platforms.
+
+![Game Emulator](doc/screenshots/game.png)
+
+---
+
+## Development
 
 ```bash
-# 开发模式
+# Dev mode
 wails dev
 
-# 构建
+# Build
 wails build
 ```
 
 ---
 
-## 技术栈
+## Tech Stack
 
-| 层 | 技术 |
-|----|------|
-| **后端** | Go + Wails v2 |
-| **前端** | React + TypeScript + Ant Design |
-| **数据库** | SQLite |
-| **终端** | xterm.js |
+| Layer | Technology |
+|-------|------------|
+| **Backend** | Go + Wails v2 |
+| **Frontend** | React + TypeScript + Ant Design |
+| **Database** | SQLite |
+| **Terminal** | xterm.js |

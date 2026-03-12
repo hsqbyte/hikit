@@ -1,0 +1,95 @@
+# HiKit
+
+> Uma caixa de ferramentas de desktop tudo-em-um para desenvolvedores, construída com **Wails + React + Go**
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](../../LICENSE)
+[![Built with Wails](https://img.shields.io/badge/Built%20with-Wails%20v2-red.svg)](https://wails.io)
+
+[English](../../README.md) | [简体中文](README_zh.md) | [繁體中文](README_zh-TW.md) | [日本語](README_ja.md) | [한국어](README_ko.md) | [Español](README_es.md) | [Deutsch](README_de.md) | [Français](README_fr.md) | Português
+
+---
+
+## Módulos
+
+| Módulo | Descrição |
+|--------|-----------|
+| 🖥️ **SSH / SFTP** | Terminal remoto & gerenciador de arquivos |
+| 🔀 **SSH Port Forwarding** | Túnel SSH local/remoto |
+| 🗄️ **Banco de Dados** | Redis · MySQL · MariaDB · PostgreSQL · SQLite · SQL Server · ClickHouse · Oracle |
+| 🌐 **REST Client** | Depuração HTTP com suporte a arquivos `.http` |
+| 🕵️ **Proxy Web** | Proxy HTTP/SOCKS + captura + manipulação MITM |
+| 💻 **Terminal Local** | Shell local integrado |
+| 🔧 **Caixa de Ferramentas** | JSON, JWT, Hash, Regex, Diff, UUID, QR Code... 17 ferramentas |
+| 📋 **Tarefas** | Gerenciamento leve de tarefas |
+| 📝 **Notas** | Editor Markdown com visualização em tempo real |
+| 📦 **Git** | Gerenciamento visual de repositórios locais |
+| 🎵 **Player de Música** | Pesquisa online + sincronização de letras |
+| 🎮 **Emulador** | Jogos clássicos FC / SFC / NEO GEO |
+| 🔐 **Cofre** | Gerenciamento seguro de credenciais (em breve)|
+
+---
+
+## Prévia
+
+### Nova Conexão
+
+![Nova Conexão](../screenshots/main.png)
+
+### SSH / SFTP
+
+![SSH & SFTP](../screenshots/ssh_sftp.png)
+
+### SSH Port Forwarding
+
+![SSH Port Forwarding](../screenshots/ssh_proxy.png)
+
+### Banco de Dados
+
+![Banco de Dados](../screenshots/postgresql.png)
+![Resultados SQL](../screenshots/sql_query.png)
+
+### REST Client
+
+![REST Client](../screenshots/rest_client.png)
+
+### Proxy Web
+
+![Proxy Web](../screenshots/web_proxy.png)
+
+### Caixa de Ferramentas
+
+![Caixa de Ferramentas](../screenshots/tool.png)
+
+### Git
+
+![Git](../screenshots/git.png)
+
+### Tarefas & Notas
+
+![Tarefas](../screenshots/todo.png)
+![Notas](../screenshots/memo.png)
+
+### Player de Música & Emulador
+
+![Player de Música](../screenshots/music.png)
+![Emulador](../screenshots/game.png)
+
+---
+
+## Desenvolvimento
+
+```bash
+wails dev    # Modo desenvolvimento
+wails build  # Compilar
+```
+
+---
+
+## Stack Tecnológico
+
+| Camada | Tecnologia |
+|--------|------------|
+| **Backend** | Go + Wails v2 |
+| **Frontend** | React + TypeScript + Ant Design |
+| **Banco de dados** | SQLite |
+| **Terminal** | xterm.js |
