@@ -24,9 +24,9 @@
 | 模块 | 描述 |
 |------|------|
 | 🖥️ **SSH / SFTP** | 远程终端 & 文件管理 |
-| 🐘 **PostgreSQL** | 数据库管理 & SQL 查询 |
+| � **SSH 端口转发** | SSH 隧道本地/远程端口转发 |
+| 🗄️ **数据库** | Redis · MySQL · MariaDB · PostgreSQL · SQLite · SQL Server · ClickHouse · Oracle |
 | 🌐 **REST Client** | HTTP 接口调试（`.http` 文件格式）|
-| 🔀 **SSH 端口转发** | SSH 隧道本地/远程端口转发 |
 | 🕵️ **Web 代理** | HTTP/SOCKS 代理 + 抓包 + MITM 篡改 |
 | 💻 **本地终端** | 本地 Shell 终端 |
 | 🔧 **工具箱** | JSON格式化、编解码、Hash、JWT、正则、Diff 等 17 个工具 |
@@ -43,7 +43,7 @@
 
 ### 新建连接
 
-支持 SSH、本地终端、SSH 隧道、Telnet、RDP、Docker，以及 Redis、MySQL、PostgreSQL、SQLite 等多种数据库连接。
+支持 SSH、本地终端、SSH 隧道、Telnet、RDP、Docker，以及 Redis、MySQL、MariaDB、PostgreSQL、SQLite、SQL Server、ClickHouse、Oracle 等多种数据库连接。
 
 ![新建连接](doc/screenshots/main.png)
 
@@ -65,9 +65,9 @@ SSH 隧道本地转发 / 远程转发，快速打通内网端口。
 
 ---
 
-### PostgreSQL
+### 数据库管理
 
-完整的 PostgreSQL 数据库管理，支持资产树浏览、SQL 编辑与查询结果展示。
+支持 Redis、MySQL、MariaDB、PostgreSQL、SQLite、SQL Server、ClickHouse、Oracle，资产树浏览 + SQL 编辑器 + 查询结果展示。
 
 ![PostgreSQL 数据库管理](doc/screenshots/postgresql.png)
 ![SQL 查询结果](doc/screenshots/sql_query.png)
