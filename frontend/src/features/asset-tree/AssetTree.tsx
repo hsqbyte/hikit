@@ -160,23 +160,42 @@ const AssetTree: React.FC = () => {
 
     useEffect(() => { loadAssets(); }, []);
 
-    // Auto-expand group nodes on initial load
+    // Auto-expand group nodes and type-separator nodes on initial load
     useEffect(() => {
         if (assets.length > 0 && !initialExpanded) {
-            const groupKeys: string[] = [];
+            const keys: string[] = [];
             const collectGroups = (items: Asset[]) => {
                 items.forEach(a => {
                     if (a.type === 'group') {
-                        groupKeys.push(a.id);
+                        keys.push(a.id);
                         if (a.children) collectGroups(a.children);
                     }
                 });
             };
             collectGroups(assets);
-            setExpandedKeys(prev => [...new Set([...prev, ...groupKeys])]);
+
+            // Collect vg: type-separator keys so they are expanded by default
+            const collectVgFromAssets = (items: Asset[], parentId = '') => {
+                const typeMap = new Map<string, boolean>();
+                items.filter(a => a.type === 'host').forEach(a => {
+                    const t = a.connectionType || 'ssh';
+                    if (!typeMap.has(t)) {
+                        typeMap.set(t, true);
+                        keys.push(`vg:${parentId}:${t}`);
+                    }
+                });
+                items.filter(a => a.type === 'group').forEach(g => {
+                    if (g.children) collectVgFromAssets(g.children, g.id);
+                });
+            };
+            collectVgFromAssets(assets);
+
+            setExpandedKeys(prev => [...new Set([...prev, ...keys])]);
             setInitialExpanded(true);
         }
     }, [assets, initialExpanded]);
+
+
 
     // Connect to PG and load databases
     const handlePgConnect = useCallback(async (assetId: string) => {
@@ -299,10 +318,6 @@ const AssetTree: React.FC = () => {
                 key: a.id,
                 title: (
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, width: '100%' }}>
-                        <span style={{
-                            width: 7, height: 7, borderRadius: '50%',
-                            background: dotColor, flexShrink: 0, display: 'inline-block',
-                        }} />
                         <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {a.name}
                         </span>
@@ -317,8 +332,16 @@ const AssetTree: React.FC = () => {
                         )}
                     </span>
                 ),
-                icon: null,
-                isLeaf: a.connectionType === 'postgresql' ? false : true,
+                icon: (
+                    <span style={{
+                        width: 7, height: 7, borderRadius: '50%',
+                        background: dotColor, flexShrink: 0, display: 'inline-block',
+                        marginTop: 1,
+                    }} />
+                ),
+                // 只在 PG 已连接时才显示展开箭头（未连接时 isLeaf=true，不显示箭头）
+                isLeaf: a.connectionType === 'postgresql' ? !pgSessions[a.id] : true,
+
             };
             if (a.connectionType === 'postgresql') {
                 const dbs = pgDatabases[a.id] || [];
@@ -444,33 +467,30 @@ const AssetTree: React.FC = () => {
                 });
             }
 
-            // Type separators + hosts at SAME level (no extra nesting)
+            // Type separators as PARENT nodes — assets are their children
             for (const [type, items] of typeMap.entries()) {
                 const sepKey = `vg:${parentId}:${type}`;
-                // Separator label — same depth as the connections below it
                 result.push({
                     key: sepKey,
                     title: (
-                        <span style={{ color: '#aaa', fontSize: 11, letterSpacing: 0.3, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <span style={{ color: '#888', fontSize: 11, letterSpacing: 0.3, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                             {typeLabel[type] || type}
                             <span style={{ color: '#ccc', fontSize: 10 }}>{items.length}</span>
                         </span>
                     ),
                     icon: connectionIcons[type],
-                    isLeaf: true,
+                    isLeaf: false,
                     selectable: false,
+                    children: items.map(a => buildHostNode(a)),
                 });
-                // Connections follow at the same level
-                for (const a of items) {
-                    result.push(buildHostNode(a));
-                }
             }
 
             return result;
         };
 
         return buildNodes(assets);
-    }, [assets, pgDatabases, pgSchemas, pgObjects]);
+    }, [assets, pgSessions, pgDatabases, pgSchemas, pgObjects]);
+
 
     // Handle tree expand — trigger PG lazy loading
     const handleExpand = useCallback(async (keys: React.Key[], info: any) => {

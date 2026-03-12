@@ -85,6 +85,30 @@
     margin-top: 4px;
 }
 
+/* ── Screenshot ── */
+.screenshot-tool {
+    background: #fff;
+    border-radius: 8px;
+    border: 1px solid #f0f0f0;
+    padding: 16px;
+}
+
+.screenshot-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.screenshot-hint {
+    margin-top: 10px;
+    font-size: 12px;
+    color: #666;
+}
+
+.screenshot-hint.muted {
+    color: #999;
+}
+
 /* ── Encoder ── */
 .encoder-section {
     background: #fff;

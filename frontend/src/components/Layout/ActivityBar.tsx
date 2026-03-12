@@ -32,7 +32,6 @@ const topItems: ActivityBarItem[] = [
 
 const bottomItems: ActivityBarItem[] = [
     { key: 'music', icon: <span style={{ fontSize: 17 }}>🎵</span>, label: '音乐播放器' },
-    { key: 'pomodoro', icon: <span style={{ fontSize: 18 }}>🍅</span>, label: '番茄钟' },
     { key: 'emulator', icon: <IoGameControllerOutline style={{ fontSize: 18 }} />, label: '游戏模拟器' },
 ];
 

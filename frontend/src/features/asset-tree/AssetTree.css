@@ -62,7 +62,7 @@
     font-size: 12px;
 }
 
-/* Reduce indent per level */
+/* Indent per level */
 .asset-tree .ant-tree-indent-unit {
     width: 10px !important;
 }

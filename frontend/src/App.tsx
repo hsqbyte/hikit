@@ -11,7 +11,7 @@ import { TodoView } from './features/todo';
 import { MemoView } from './features/memo';
 import { ToolboxPanel, ToolboxView } from './features/toolbox';
 import { GamePanel, EmulatorView } from './features/emulator';
-import { PomodoroPanel } from './features/pomodoro';
+
 import { MusicPanel, MusicView } from './features/music';
 import { GitPanel } from './features/git';
 import { ChatView } from './features/chat';
@@ -256,10 +256,9 @@ const App: React.FC = () => {
                                 : activityKey === 'forwards' ? <PortForwardView />
                                     : activityKey === 'toolbox' ? <ToolboxPanel />
                                         : activityKey === 'emulator' ? <GamePanel />
-                                            : activityKey === 'pomodoro' ? <PomodoroPanel />
-                                                : activityKey === 'music' ? <MusicPanel />
-                                                    : activityKey === 'git' ? <GitPanel />
-                                                        : <AssetTree />}
+                                            : activityKey === 'music' ? <MusicPanel />
+                                                : activityKey === 'git' ? <GitPanel />
+                                                    : <AssetTree />}
                         </div>
                         <div className="app-sidebar-resize" onMouseDown={handleResizeStart} />
                     </div>

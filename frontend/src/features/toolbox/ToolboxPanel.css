@@ -3,6 +3,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    background: #fff;
 }
 
 .toolbox-panel-header {
@@ -12,168 +13,211 @@
     color: #333;
     flex-shrink: 0;
     border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
-/* Grid layout — 2 columns */
-.toolbox-grid {
+.toolbox-panel-title {
+    flex: 1;
+}
+
+.toolbox-panel-count {
+    font-size: 10px;
+    color: #bbb;
+    background: #f5f5f5;
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-weight: 400;
+}
+
+/* ===== List layout ===== */
+.toolbox-list {
     flex: 1;
     overflow-y: auto;
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 4px;
-    padding: 6px;
-    align-content: start;
-}
-
-/* Card item */
-.toolbox-card {
+    padding: 4px 6px;
     display: flex;
     flex-direction: column;
+    gap: 1px;
+}
+
+.toolbox-item {
+    display: flex;
     align-items: center;
-    gap: 4px;
-    padding: 10px 4px 8px;
+    gap: 10px;
+    padding: 7px 8px;
     border-radius: 6px;
     cursor: pointer;
-    transition: all 0.15s;
-    border: 1px solid transparent;
+    border: none;
     background: transparent;
-    text-align: center;
+    text-align: left;
+    width: 100%;
+    transition: all 0.12s;
     color: #333;
 }
 
-.toolbox-card:hover {
+.toolbox-item:hover {
     background: #f5f7fa;
-    border-color: #f0f0f0;
 }
 
-.toolbox-card.active {
+.toolbox-item.active {
     background: #e6f4ff;
-    border-color: #91caff;
     color: #1677ff;
 }
 
 /* Icon badge */
-.toolbox-card-icon {
-    width: 32px;
-    height: 32px;
+.toolbox-item-icon {
+    width: 28px;
+    height: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 8px;
-    font-size: 16px;
+    border-radius: 7px;
+    font-size: 15px;
     flex-shrink: 0;
+    transition: transform 0.12s;
 }
 
-.toolbox-card-name {
-    font-size: 11px;
+.toolbox-item:hover .toolbox-item-icon {
+    transform: scale(1.08);
+}
+
+/* Text block */
+.toolbox-item-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+}
+
+.toolbox-item-name {
+    font-size: 12px;
     font-weight: 500;
-    line-height: 1.3;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 100%;
+    line-height: 1.4;
+}
+
+.toolbox-item-desc {
+    font-size: 10px;
+    color: #aaa;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.3;
+}
+
+.toolbox-item.active .toolbox-item-desc {
+    color: #69b1ff;
 }
 
 /* ===== Icon color themes ===== */
-.toolbox-card-icon.json {
+.toolbox-item-icon.json {
     background: #fff7e6;
     color: #fa8c16;
 }
 
-.toolbox-card-icon.encode {
+.toolbox-item-icon.encode {
     background: #f6ffed;
     color: #52c41a;
 }
 
-.toolbox-card-icon.timestamp {
+.toolbox-item-icon.timestamp {
     background: #e6f7ff;
     color: #1890ff;
 }
 
-.toolbox-card-icon.hash {
+.toolbox-item-icon.hash {
     background: #f9f0ff;
     color: #722ed1;
 }
 
-.toolbox-card-icon.regex {
+.toolbox-item-icon.regex {
     background: #fff1f0;
     color: #f5222d;
 }
 
-.toolbox-card-icon.diff {
+.toolbox-item-icon.diff {
     background: #fcffe6;
     color: #7cb305;
 }
 
-.toolbox-card-icon.jwt {
+.toolbox-item-icon.jwt {
     background: #fff0f6;
     color: #eb2f96;
 }
 
-.toolbox-card-icon.uuid {
+.toolbox-item-icon.uuid {
     background: #e6fffb;
     color: #13c2c2;
 }
 
-.toolbox-card-icon.cron {
+.toolbox-item-icon.cron {
     background: #f0f5ff;
     color: #2f54eb;
 }
 
-.toolbox-card-icon.color {
+.toolbox-item-icon.color {
     background: linear-gradient(135deg, #fff1f0, #f6ffed, #e6f7ff, #f9f0ff);
     color: #333;
 }
 
-.toolbox-card-icon.ip {
+.toolbox-item-icon.ip {
     background: #e6f7ff;
     color: #096dd9;
 }
 
-.toolbox-card-icon.qrcode {
+.toolbox-item-icon.qrcode {
     background: #fafafa;
     color: #333;
+    border: 1px solid #f0f0f0;
 }
 
-.toolbox-card-icon.image {
+.toolbox-item-icon.image {
     background: #fff0f6;
     color: #c41d7f;
 }
 
-.toolbox-card-icon.text {
+.toolbox-item-icon.screenshot {
+    background: #f0f5ff;
+    color: #2f54eb;
+}
+
+.toolbox-item-icon.text {
     background: #fffbe6;
     color: #d48806;
 }
 
-.toolbox-card-icon.markdown {
+.toolbox-item-icon.markdown {
     background: #f0f5ff;
     color: #1d39c4;
 }
 
-.toolbox-card-icon.port {
+.toolbox-item-icon.port {
     background: #f6ffed;
     color: #237804;
 }
 
-/* Active state overrides */
-.toolbox-card.active .toolbox-card-icon {
-    box-shadow: 0 0 0 1px rgba(22, 119, 255, 0.15);
+/* Active icon glow */
+.toolbox-item.active .toolbox-item-icon {
+    box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.12);
 }
 
 /* Scrollbar */
-.toolbox-grid::-webkit-scrollbar {
+.toolbox-list::-webkit-scrollbar {
     width: 4px;
 }
 
-.toolbox-grid::-webkit-scrollbar-track {
+.toolbox-list::-webkit-scrollbar-track {
     background: transparent;
 }
 
-.toolbox-grid::-webkit-scrollbar-thumb {
+.toolbox-list::-webkit-scrollbar-thumb {
     background: #e8e8e8;
     border-radius: 2px;
 }
 
-.toolbox-grid::-webkit-scrollbar-thumb:hover {
+.toolbox-list::-webkit-scrollbar-thumb:hover {
     background: #d9d9d9;
 }

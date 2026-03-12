@@ -1,12 +1,10 @@
 import React from 'react';
-import {
-    VscJson, VscLock, VscRegex, VscDiff, VscMarkdown,
-    VscKey, VscSymbolColor, VscFileMedia,
-} from 'react-icons/vsc';
+import { VscJson, VscRegex, VscDiff, VscMarkdown } from 'react-icons/vsc';
 import {
     TbClock, TbHash, TbShieldCheck, TbFingerprint,
     TbCalendarTime, TbPalette, TbNetwork, TbQrcode,
-    TbPhoto, TbTextResize, TbRadar,
+    TbPhoto, TbTextSize, TbRadar, TbBinaryTree,
+    TbLock, TbCamera,
 } from 'react-icons/tb';
 import { useConnectionStore } from '../../stores/connectionStore';
 import './ToolboxPanel.css';
@@ -30,21 +28,21 @@ export const toolList: ToolItem[] = [
     {
         key: 'encoder',
         name: '编码 / 解码',
-        desc: 'Base64, URL, HTML Entity',
-        icon: <VscLock />,
+        desc: 'Base64 · URL · HTML',
+        icon: <TbLock />,
         colorClass: 'encode',
     },
     {
         key: 'timestamp',
         name: '时间戳转换',
-        desc: 'Unix ↔ 日期',
+        desc: 'Unix ↔ 日期时间',
         icon: <TbClock />,
         colorClass: 'timestamp',
     },
     {
         key: 'hash',
         name: 'Hash 计算',
-        desc: 'MD5, SHA1, SHA256',
+        desc: 'MD5 · SHA1 · SHA256',
         icon: <TbHash />,
         colorClass: 'hash',
     },
@@ -58,14 +56,14 @@ export const toolList: ToolItem[] = [
     {
         key: 'diff',
         name: 'Diff 对比',
-        desc: '文本差异比较',
+        desc: '文本差异对比',
         icon: <VscDiff />,
         colorClass: 'diff',
     },
     {
         key: 'jwt',
         name: 'JWT 解析',
-        desc: '解码 Header / Payload',
+        desc: 'Header · Payload 解码',
         icon: <TbShieldCheck />,
         colorClass: 'jwt',
     },
@@ -86,7 +84,7 @@ export const toolList: ToolItem[] = [
     {
         key: 'color',
         name: '颜色工具',
-        desc: 'HEX / RGB / HSL 转换',
+        desc: 'HEX · RGB · HSL 转换',
         icon: <TbPalette />,
         colorClass: 'color',
     },
@@ -112,10 +110,17 @@ export const toolList: ToolItem[] = [
         colorClass: 'image',
     },
     {
+        key: 'screenshot',
+        name: '桌面截图',
+        desc: '选区 / 窗口 → 剪贴板',
+        icon: <TbCamera />,
+        colorClass: 'screenshot',
+    },
+    {
         key: 'text_tool',
         name: '文本处理',
         desc: '大小写 / 去重 / 排序',
-        icon: <TbTextResize />,
+        icon: <TbTextSize />,
         colorClass: 'text',
     },
     {
@@ -155,22 +160,27 @@ const ToolboxPanel: React.FC = () => {
 
     return (
         <div className="toolbox-panel">
-            <div className="toolbox-panel-header">工具箱</div>
-            <div className="toolbox-grid">
+            <div className="toolbox-panel-header">
+                <span className="toolbox-panel-title">工具箱</span>
+                <span className="toolbox-panel-count">{toolList.length}</span>
+            </div>
+            <div className="toolbox-list">
                 {toolList.map((tool) => {
                     const tabId = `toolbox_${tool.key}`;
                     const isActive = activeTabId === tabId;
                     return (
                         <button
                             key={tool.key}
-                            className={`toolbox-card ${isActive ? 'active' : ''}`}
+                            className={`toolbox-item ${isActive ? 'active' : ''}`}
                             onClick={() => handleClick(tool)}
-                            title={tool.desc}
                         >
-                            <div className={`toolbox-card-icon ${tool.colorClass}`}>
+                            <div className={`toolbox-item-icon ${tool.colorClass}`}>
                                 {tool.icon}
                             </div>
-                            <div className="toolbox-card-name">{tool.name}</div>
+                            <div className="toolbox-item-text">
+                                <span className="toolbox-item-name">{tool.name}</span>
+                                <span className="toolbox-item-desc">{tool.desc}</span>
+                            </div>
                         </button>
                     );
                 })}

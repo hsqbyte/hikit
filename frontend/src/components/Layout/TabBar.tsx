@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Tabs } from 'antd';
-import { MenuOutlined, ToolOutlined, SearchOutlined, CloseOutlined, SoundOutlined } from '@ant-design/icons';
+import { Tabs, Dropdown, message } from 'antd';
+import { MenuOutlined, ToolOutlined, SearchOutlined, CloseOutlined, SoundOutlined, CameraOutlined, LoadingOutlined } from '@ant-design/icons';
 import {
     CaretRightOutlined,
     PauseOutlined,
@@ -21,6 +21,7 @@ import { TbDatabase } from 'react-icons/tb';
 import { useConnectionStore } from '../../stores/connectionStore';
 import { useMusicStore, MusicTrack, PlayMode } from '../../stores/musicStore';
 import { Search as SearchMusic } from '../../../wailsjs/go/music/MusicService';
+import { CaptureScreenshot } from '../../../wailsjs/go/screenshot/ScreenshotService';
 import './TabBar.css';
 
 const tis = { fontSize: 13, verticalAlign: 'middle' };
@@ -75,11 +76,73 @@ const TabBar: React.FC<TabBarProps> = ({ onShowList }) => {
     const [searching, setSearching] = useState(false);
     const [lyricsOpen, setLyricsOpen] = useState(false);
     const [volumeOpen, setVolumeOpen] = useState(false);
+    const [captureLoading, setCaptureLoading] = useState<'region' | 'window' | null>(null);
     const searchRef = useRef<HTMLDivElement>(null);
     const lyricsRef = useRef<HTMLDivElement>(null);
     const volumeRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const lyricListRef = useRef<HTMLDivElement>(null);
+
+    // ── Countdown state ──
+    const [cdOpen, setCdOpen] = useState(false);
+    const [cdTotal, setCdTotal] = useState(0);       // total seconds set
+    const [cdRemain, setCdRemain] = useState(0);     // remaining seconds
+    const [cdRunning, setCdRunning] = useState(false);
+    const [cdFinished, setCdFinished] = useState(false);
+    const [cdCustomM, setCdCustomM] = useState('5');
+    const [cdCustomS, setCdCustomS] = useState('0');
+    const cdRef = useRef<HTMLDivElement>(null);
+    const cdTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    const cdFmt = (s: number) => {
+        const m = Math.floor(s / 60);
+        const sec = s % 60;
+        return `${m}:${String(sec).padStart(2, '0')}`;
+    };
+
+    const cdStart = (secs: number) => {
+        if (secs <= 0) return;
+        if (cdTickRef.current) clearInterval(cdTickRef.current);
+        setCdTotal(secs); setCdRemain(secs); setCdRunning(true); setCdFinished(false); setCdOpen(false);
+        cdTickRef.current = setInterval(() => {
+            setCdRemain(prev => {
+                if (prev <= 1) {
+                    clearInterval(cdTickRef.current!);
+                    setCdRunning(false); setCdFinished(true);
+                    // play beep
+                    try {
+                        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+                        [880, 1100, 880, 1100].forEach((freq, i) => {
+                            const o = ctx.createOscillator(), g = ctx.createGain();
+                            o.connect(g); g.connect(ctx.destination);
+                            o.frequency.value = freq; o.type = 'sine';
+                            g.gain.setValueAtTime(0.4, ctx.currentTime + i * 0.22);
+                            g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.22 + 0.2);
+                            o.start(ctx.currentTime + i * 0.22); o.stop(ctx.currentTime + i * 0.22 + 0.22);
+                        });
+                    } catch (_) { }
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+    };
+
+    const cdReset = () => {
+        if (cdTickRef.current) clearInterval(cdTickRef.current!);
+        setCdRemain(0); setCdRunning(false); setCdFinished(false); setCdTotal(0);
+    };
+
+    // close countdown dropdown on outside click
+    useEffect(() => {
+        const h = (e: MouseEvent) => {
+            if (cdRef.current && !cdRef.current.contains(e.target as Node)) setCdOpen(false);
+        };
+        document.addEventListener('mousedown', h);
+        return () => document.removeEventListener('mousedown', h);
+    }, []);
+
+    const CD_PRESETS = [1, 3, 5, 10, 15, 25, 30];
 
     const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
@@ -113,6 +176,23 @@ const TabBar: React.FC<TabBarProps> = ({ onShowList }) => {
         }
     }, [currentLyricIndex, lyricsOpen]);
 
+    const handleCapture = async (mode: 'region' | 'window') => {
+        setCaptureLoading(mode);
+        try {
+            await CaptureScreenshot(mode);
+            message.success('已复制到剪贴板');
+        } catch (e: any) {
+            const msg = e?.message || String(e) || '截图失败';
+            if (msg.includes('已取消')) {
+                message.info(msg);
+            } else {
+                message.error(msg);
+            }
+        } finally {
+            setCaptureLoading(null);
+        }
+    };
+
     // Global keyboard shortcuts
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
@@ -134,11 +214,16 @@ const TabBar: React.FC<TabBarProps> = ({ onShowList }) => {
             } else if (meta && e.key === 'ArrowDown') {
                 e.preventDefault();
                 setVolume(Math.max(0, volume - 0.1));
+            } else if (meta && e.shiftKey && (e.key === 'a' || e.key === 'A')) {
+                // Cmd+Shift+A：区域截图（类似微信截图快捷键）
+                e.preventDefault();
+                handleCapture('region');
             }
         };
         document.addEventListener('keydown', handler);
         return () => document.removeEventListener('keydown', handler);
-    }, [playNext, playPrev, setVolume, volume]);
+    }, [playNext, playPrev, setVolume, volume, handleCapture]);
+
 
     const handleSearch = async () => {
         if (!keyword.trim()) return;
@@ -175,6 +260,17 @@ const TabBar: React.FC<TabBarProps> = ({ onShowList }) => {
 
     const modeInfo = playModeIcons[playMode];
 
+
+    const captureMenuItems = [
+        { key: 'region', label: '选区截图 (复制)' },
+        { key: 'window', label: '窗口截图 (复制)' },
+    ];
+
+    const captureMenu = {
+        items: captureMenuItems,
+        onClick: ({ key }: { key: string }) => handleCapture(key as 'region' | 'window'),
+    };
+
     return (
         <div className="tab-bar">
             <div className="tab-bar-tabs">
@@ -192,6 +288,90 @@ const TabBar: React.FC<TabBarProps> = ({ onShowList }) => {
                     hideAdd
                     size="small"
                 />
+            </div>
+
+
+            <div className="tab-bar-actions">
+                {/* ── Countdown Button ── */}
+                <div className="tba-cd-wrap" ref={cdRef}>
+                    <button
+                        type="button"
+                        className={`tab-bar-action-btn tba-cd-btn ${cdRunning ? 'cd-running' : ''} ${cdFinished ? 'cd-finished' : ''}`}
+                        title={cdRunning ? '倒计时进行中' : '倒计时'}
+                        onClick={() => { if (cdFinished) { cdReset(); } else { setCdOpen(o => !o); } }}
+                    >
+                        {cdRunning
+                            ? <span className="cd-btn-time">{cdFmt(cdRemain)}</span>
+                            : cdFinished
+                                ? <span className="cd-btn-time cd-done">⏰!</span>
+                                : <span style={{ fontSize: 14 }}>⏱</span>
+                        }
+                    </button>
+
+                    {/* Dropdown panel */}
+                    {cdOpen && (
+                        <div className="tba-cd-panel">
+                            <div className="tba-cd-title">倒计时</div>
+                            {/* Presets */}
+                            <div className="tba-cd-presets">
+                                {CD_PRESETS.map(m => (
+                                    <button key={m} className="tba-cd-preset" onClick={() => cdStart(m * 60)}>
+                                        {m}m
+                                    </button>
+                                ))}
+                            </div>
+                            {/* Custom */}
+                            <div className="tba-cd-custom">
+                                <input
+                                    className="tba-cd-input"
+                                    type="number" min="0" max="999" placeholder="分"
+                                    value={cdCustomM}
+                                    onChange={e => setCdCustomM(e.target.value)}
+                                    onKeyDown={e => e.key === 'Enter' && cdStart((parseInt(cdCustomM) || 0) * 60 + (parseInt(cdCustomS) || 0))}
+                                />
+                                <span className="tba-cd-sep">:</span>
+                                <input
+                                    className="tba-cd-input"
+                                    type="number" min="0" max="59" placeholder="秒"
+                                    value={cdCustomS}
+                                    onChange={e => setCdCustomS(e.target.value)}
+                                    onKeyDown={e => e.key === 'Enter' && cdStart((parseInt(cdCustomM) || 0) * 60 + (parseInt(cdCustomS) || 0))}
+                                />
+                                <button className="tba-cd-go" onClick={() => cdStart((parseInt(cdCustomM) || 0) * 60 + (parseInt(cdCustomS) || 0))}>开始</button>
+                            </div>
+                            {cdRunning && (
+                                <button className="tba-cd-stop" onClick={cdReset}>停止</button>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {/* ── Screenshot Button ── */}
+                <Dropdown
+                    menu={captureMenu}
+                    trigger={['click']}
+                    placement="bottomRight"
+                    disabled={!!captureLoading}
+                >
+                    <button
+                        type="button"
+                        className="tab-bar-action-btn"
+                        title="截图"
+                        disabled={!!captureLoading}
+                    >
+                        {captureLoading ? <LoadingOutlined spin /> : (
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ verticalAlign: 'middle' }}>
+                                <rect x="2" y="2" width="14" height="14" rx="1"
+                                    stroke="currentColor" strokeWidth="1.8"
+                                    strokeDasharray="3 2" fill="none" />
+                                <circle cx="17.5" cy="17.5" r="2.5" stroke="currentColor" strokeWidth="1.6" fill="none" />
+                                <circle cx="21.5" cy="21.5" r="1.5" stroke="currentColor" strokeWidth="1.4" fill="none" />
+                                <line x1="15.5" y1="15.5" x2="10" y2="10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                                <line x1="19.5" y1="15.5" x2="14.5" y2="10.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                            </svg>
+                        )}
+                    </button>
+                </Dropdown>
             </div>
 
             {/* Music area — default: lyrics only, hover: full controls */}
