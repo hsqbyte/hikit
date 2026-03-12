@@ -119,7 +119,7 @@ const ConnectionEditor: React.FC<ConnectionEditorProps> = ({
                     password: editingAsset.password,
                     privateKey: editingAsset.privateKey,
                     notes: editingAsset.notes || '',
-                    environment: editingAsset.environment || '',
+                    env: editingAsset.env || '',
                     database: editingAsset.database || '',
                 });
                 // Load SSH tunnel ID from asset
@@ -145,6 +145,7 @@ const ConnectionEditor: React.FC<ConnectionEditorProps> = ({
             const saveData: any = {
                 ...values,
                 color,
+                env: values.env || '',
                 connectionType,
                 parentId: parentId || '',
                 type: 'host',
@@ -227,18 +228,19 @@ const ConnectionEditor: React.FC<ConnectionEditorProps> = ({
                                 </div>
                             </div>
                             <div className="editor-field" style={{ width: 160 }}>
-                                <div className="field-label">环境</div>
-                                <Select
-                                    placeholder="无"
-                                    allowClear
-                                    style={{ width: '100%' }}
-                                    size="small"
-                                >
-                                    <Option value="production">生产</Option>
-                                    <Option value="staging">预发布</Option>
-                                    <Option value="development">开发</Option>
-                                    <Option value="testing">测试</Option>
-                                </Select>
+                                <Form.Item name="env" label="环境" style={{ marginBottom: 0 }}>
+                                    <Select
+                                        placeholder="无"
+                                        allowClear
+                                        style={{ width: '100%' }}
+                                        size="small"
+                                    >
+                                        <Option value="prod">生产</Option>
+                                        <Option value="staging">预发布</Option>
+                                        <Option value="dev">开发</Option>
+                                        <Option value="test">测试</Option>
+                                    </Select>
+                                </Form.Item>
                             </div>
                         </div>
 

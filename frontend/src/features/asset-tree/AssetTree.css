@@ -64,7 +64,7 @@
 
 /* Reduce indent per level */
 .asset-tree .ant-tree-indent-unit {
-    width: 16px !important;
+    width: 10px !important;
 }
 
 /* Node row */

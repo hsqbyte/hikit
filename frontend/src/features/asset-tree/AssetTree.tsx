@@ -258,130 +258,217 @@ const AssetTree: React.FC = () => {
         }
     }, [pgSessions, pgCurrentDB, pgObjects]);
 
+    // Type display names for virtual group headers
+    const typeLabel: Record<string, string> = {
+        ssh: 'SSH',
+        local_terminal: '本地终端',
+        ssh_tunnel: 'SSH 隧道',
+        telnet: 'Telnet',
+        rdp: 'RDP',
+        docker: 'Docker',
+        redis: 'Redis',
+        mysql: 'MySQL',
+        mariadb: 'MariaDB',
+        postgresql: 'PostgreSQL',
+        sqlserver: 'SQL Server',
+        clickhouse: 'ClickHouse',
+        sqlite: 'SQLite',
+        oracle: 'Oracle',
+        web_bookmark: '网页书签',
+        rest_client: 'REST Client',
+        todo: '待办事项',
+        memo: '备忘录',
+    };
+
     // Build tree data with PG virtual nodes mixed in
     const treeData = useMemo(() => {
-        const buildNodes = (assetList: Asset[]): DataNode[] => {
-            return (assetList || []).map((a) => {
-                const baseNode: DataNode = {
-                    key: a.id,
-                    title: a.name,
-                    icon: getIcon(a),
-                    isLeaf: a.type === 'group' ? false
-                        : a.type === 'host' && a.connectionType === 'postgresql' ? false
-                            : !(a.children && a.children.length > 0),
-                };
-
-                // If it's a PG asset, build virtual children
-                if (a.type === 'host' && a.connectionType === 'postgresql') {
-                    const dbs = pgDatabases[a.id] || [];
-                    if (dbs.length > 0) {
-                        baseNode.children = dbs.map(db => {
-                            const dbKey = `pg:${a.id}:db:${db}`;
-                            const schemas = pgSchemas[`${a.id}:${db}`] || [];
-                            const dbNode: DataNode = {
-                                key: dbKey,
-                                title: db,
-                                icon: <TbDatabase style={{ ...iconStyle, color: '#52c41a' }} />,
-                                isLeaf: false,
-                            };
-                            if (schemas.length > 0) {
-                                dbNode.children = schemas.map(schema => {
-                                    const schemaKey = `pg:${a.id}:db:${db}:s:${schema}`;
-                                    const objKey = `${a.id}:${db}:${schema}`;
-                                    const objects = pgObjects[objKey];
-                                    const schemaNode: DataNode = {
-                                        key: schemaKey,
-                                        title: schema,
-                                        icon: <FolderOutlined style={{ color: '#1677ff' }} />,
-                                        isLeaf: false,
-                                    };
-                                    if (objects) {
-                                        const catTitle = (label: string, count: number) => (
-                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                                {label}
-                                                <span style={{ color: '#999', fontSize: 11 }}>{count}</span>
-                                            </span>
-                                        );
-                                        const pfx = `pg:${a.id}:db:${db}:s:${schema}`;
-                                        schemaNode.children = [
-                                            // 表
-                                            {
-                                                key: `${pfx}:cat:tables`,
-                                                title: catTitle('表', objects.tables.length),
-                                                icon: <TableOutlined style={{ color: '#52c41a' }} />,
-                                                isLeaf: objects.tables.length === 0,
-                                                children: objects.tables.map(t => ({
-                                                    key: `${pfx}:tbl:${t.name}`,
-                                                    title: t.name,
-                                                    icon: <TableOutlined style={{ color: '#52c41a', fontSize: 13 }} />,
-                                                    isLeaf: true,
-                                                })),
-                                            },
-                                            // 视图
-                                            {
-                                                key: `${pfx}:cat:views`,
-                                                title: catTitle('视图', objects.views.length),
-                                                icon: <EyeOutlined style={{ color: '#1677ff' }} />,
-                                                isLeaf: objects.views.length === 0,
-                                                children: objects.views.map(v => ({
-                                                    key: `${pfx}:view:${v.name}`,
-                                                    title: v.name,
-                                                    icon: <EyeOutlined style={{ color: '#1677ff', fontSize: 13 }} />,
-                                                    isLeaf: true,
-                                                })),
-                                            },
-                                            // 物化视图
-                                            {
-                                                key: `${pfx}:cat:mvs`,
-                                                title: catTitle('物化视图', objects.materializedViews.length),
-                                                icon: <AppstoreOutlined style={{ color: '#722ed1' }} />,
-                                                isLeaf: objects.materializedViews.length === 0,
-                                                children: objects.materializedViews.map(mv => ({
-                                                    key: `${pfx}:mv:${mv.name}`,
-                                                    title: mv.name,
-                                                    icon: <AppstoreOutlined style={{ color: '#722ed1', fontSize: 13 }} />,
-                                                    isLeaf: true,
-                                                })),
-                                            },
-                                            // 存储过程/函数
-                                            {
-                                                key: `${pfx}:cat:funcs`,
-                                                title: catTitle('存储过程/函数', objects.functions.length),
-                                                icon: <FunctionOutlined style={{ color: '#fa8c16' }} />,
-                                                isLeaf: objects.functions.length === 0,
-                                                children: objects.functions.map(f => ({
-                                                    key: `${pfx}:fn:${f.name}:${f.argTypes}`,
-                                                    title: f.name,
-                                                    icon: <FunctionOutlined style={{ color: '#fa8c16', fontSize: 13 }} />,
-                                                    isLeaf: true,
-                                                })),
-                                            },
-                                            // 查询
-                                            {
-                                                key: `${pfx}:cat:queries`,
-                                                title: catTitle('查询', 0),
-                                                icon: <VscPulse style={{ color: '#13c2c2', fontSize: 14 }} />,
-                                                isLeaf: true,
-                                            },
-                                        ];
-                                    }
-                                    return schemaNode;
-                                });
-                            }
-                            return dbNode;
-                        });
-                        baseNode.isLeaf = false;
-                    } else {
-                        // Not yet connected or no dbs
-                        baseNode.isLeaf = false;
-                    }
-                } else if (a.children && a.children.length > 0) {
-                    baseNode.children = buildNodes(a.children);
-                }
-
-                return baseNode;
-            });
+        // Dot colors per connection type
+        const typeColor: Record<string, string> = {
+            ssh: '#595959', local_terminal: '#52c41a', ssh_tunnel: '#8c8c8c',
+            telnet: '#8c8c8c', rdp: '#0078d4', docker: '#2496ed',
+            redis: '#dc382d', mysql: '#4479a1', mariadb: '#003545',
+            postgresql: '#4169e1', sqlserver: '#cc2927', clickhouse: '#faad14',
+            sqlite: '#003b57', oracle: '#f00', web_bookmark: '#1677ff',
+            rest_client: '#722ed1', todo: '#52c41a', memo: '#faad14',
         };
+
+        // Build a single host asset node — colored dot + name + optional env badge
+        const buildHostNode = (a: Asset): DataNode => {
+            const dotColor = a.color || typeColor[a.connectionType || 'ssh'] || '#999';
+            const node: DataNode = {
+                key: a.id,
+                title: (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, width: '100%' }}>
+                        <span style={{
+                            width: 7, height: 7, borderRadius: '50%',
+                            background: dotColor, flexShrink: 0, display: 'inline-block',
+                        }} />
+                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {a.name}
+                        </span>
+                        {a.env && (
+                            <span style={{
+                                fontSize: 10, padding: '0 5px', borderRadius: 3,
+                                background: 'rgba(0,0,0,0.06)', color: '#888',
+                                flexShrink: 0, lineHeight: '16px',
+                            }}>
+                                {a.env}
+                            </span>
+                        )}
+                    </span>
+                ),
+                icon: null,
+                isLeaf: a.connectionType === 'postgresql' ? false : true,
+            };
+            if (a.connectionType === 'postgresql') {
+                const dbs = pgDatabases[a.id] || [];
+                if (dbs.length > 0) {
+                    node.children = dbs.map(db => {
+                        const dbKey = `pg:${a.id}:db:${db}`;
+                        const schemas = pgSchemas[`${a.id}:${db}`] || [];
+                        const dbNode: DataNode = {
+                            key: dbKey,
+                            title: db,
+                            icon: <TbDatabase style={{ ...iconStyle, color: '#52c41a' }} />,
+                            isLeaf: false,
+                        };
+                        if (schemas.length > 0) {
+                            dbNode.children = schemas.map(schema => {
+                                const schemaKey = `pg:${a.id}:db:${db}:s:${schema}`;
+                                const objKey = `${a.id}:${db}:${schema}`;
+                                const objects = pgObjects[objKey];
+                                const schemaNode: DataNode = {
+                                    key: schemaKey,
+                                    title: schema,
+                                    icon: <FolderOutlined style={{ color: '#1677ff' }} />,
+                                    isLeaf: false,
+                                };
+                                if (objects) {
+                                    const catTitle = (label: string, count: number) => (
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                            {label}
+                                            <span style={{ color: '#999', fontSize: 11 }}>{count}</span>
+                                        </span>
+                                    );
+                                    const pfx = `pg:${a.id}:db:${db}:s:${schema}`;
+                                    schemaNode.children = [
+                                        {
+                                            key: `${pfx}:cat:tables`,
+                                            title: catTitle('表', objects.tables.length),
+                                            icon: <TableOutlined style={{ color: '#52c41a' }} />,
+                                            isLeaf: objects.tables.length === 0,
+                                            children: objects.tables.map(t => ({
+                                                key: `${pfx}:tbl:${t.name}`,
+                                                title: t.name,
+                                                icon: <TableOutlined style={{ color: '#52c41a', fontSize: 13 }} />,
+                                                isLeaf: true,
+                                            })),
+                                        },
+                                        {
+                                            key: `${pfx}:cat:views`,
+                                            title: catTitle('视图', objects.views.length),
+                                            icon: <EyeOutlined style={{ color: '#1677ff' }} />,
+                                            isLeaf: objects.views.length === 0,
+                                            children: objects.views.map(v => ({
+                                                key: `${pfx}:view:${v.name}`,
+                                                title: v.name,
+                                                icon: <EyeOutlined style={{ color: '#1677ff', fontSize: 13 }} />,
+                                                isLeaf: true,
+                                            })),
+                                        },
+                                        {
+                                            key: `${pfx}:cat:mvs`,
+                                            title: catTitle('物化视图', objects.materializedViews.length),
+                                            icon: <AppstoreOutlined style={{ color: '#722ed1' }} />,
+                                            isLeaf: objects.materializedViews.length === 0,
+                                            children: objects.materializedViews.map(mv => ({
+                                                key: `${pfx}:mv:${mv.name}`,
+                                                title: mv.name,
+                                                icon: <AppstoreOutlined style={{ color: '#722ed1', fontSize: 13 }} />,
+                                                isLeaf: true,
+                                            })),
+                                        },
+                                        {
+                                            key: `${pfx}:cat:funcs`,
+                                            title: catTitle('存储过程/函数', objects.functions.length),
+                                            icon: <FunctionOutlined style={{ color: '#fa8c16' }} />,
+                                            isLeaf: objects.functions.length === 0,
+                                            children: objects.functions.map(f => ({
+                                                key: `${pfx}:fn:${f.name}:${f.argTypes}`,
+                                                title: f.name,
+                                                icon: <FunctionOutlined style={{ color: '#fa8c16', fontSize: 13 }} />,
+                                                isLeaf: true,
+                                            })),
+                                        },
+                                        {
+                                            key: `${pfx}:cat:queries`,
+                                            title: catTitle('查询', 0),
+                                            icon: <VscPulse style={{ color: '#13c2c2', fontSize: 14 }} />,
+                                            isLeaf: true,
+                                        },
+                                    ];
+                                }
+                                return schemaNode;
+                            });
+                        }
+                        return dbNode;
+                    });
+                }
+            }
+            return node;
+        };
+
+        // Build nodes with auto-grouping by connectionType
+        const buildNodes = (assetList: Asset[], parentId: string = ''): DataNode[] => {
+            const groups = assetList.filter(a => a.type === 'group');
+            const hosts = assetList.filter(a => a.type === 'host');
+
+            // Group hosts by connectionType
+            const typeMap = new Map<string, Asset[]>();
+            for (const h of hosts) {
+                const t = h.connectionType || 'ssh';
+                if (!typeMap.has(t)) typeMap.set(t, []);
+                typeMap.get(t)!.push(h);
+            }
+
+            const result: DataNode[] = [];
+
+            // User-defined groups first (recursive)
+            for (const g of groups) {
+                result.push({
+                    key: g.id,
+                    title: g.name,
+                    icon: getIcon(g),
+                    isLeaf: false,
+                    children: g.children?.length ? buildNodes(g.children, g.id) : [],
+                });
+            }
+
+            // Type separators + hosts at SAME level (no extra nesting)
+            for (const [type, items] of typeMap.entries()) {
+                const sepKey = `vg:${parentId}:${type}`;
+                // Separator label — same depth as the connections below it
+                result.push({
+                    key: sepKey,
+                    title: (
+                        <span style={{ color: '#aaa', fontSize: 11, letterSpacing: 0.3, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            {typeLabel[type] || type}
+                            <span style={{ color: '#ccc', fontSize: 10 }}>{items.length}</span>
+                        </span>
+                    ),
+                    icon: connectionIcons[type],
+                    isLeaf: true,
+                    selectable: false,
+                });
+                // Connections follow at the same level
+                for (const a of items) {
+                    result.push(buildHostNode(a));
+                }
+            }
+
+            return result;
+        };
+
         return buildNodes(assets);
     }, [assets, pgDatabases, pgSchemas, pgObjects]);
 
@@ -389,6 +476,9 @@ const AssetTree: React.FC = () => {
     const handleExpand = useCallback(async (keys: React.Key[], info: any) => {
         setExpandedKeys(keys as string[]);
         const key = info.node.key as string;
+
+        // Skip virtual type-group nodes
+        if (key.startsWith('vg:')) return;
 
         // Check if expanding a PG asset — don't auto-connect, user must double-click
         const asset = findAsset(assets, key);
@@ -669,18 +759,14 @@ const AssetTree: React.FC = () => {
                                 draggable={{
                                     icon: false,
                                     nodeDraggable: (node: any) => {
-                                        // Only allow dragging real asset nodes (not PG virtual nodes)
                                         const key = String(node.key);
-                                        return !key.startsWith('pg:');
+                                        return !key.startsWith('pg:') && !key.startsWith('vg:');
                                     },
                                 }}
                                 allowDrop={({ dropNode, dropPosition }: any) => {
                                     const key = String(dropNode.key);
-                                    // Disallow drop on PG virtual nodes
-                                    if (key.startsWith('pg:')) return false;
-                                    // dropPosition: -1=before, 0=inside, 1=after
+                                    if (key.startsWith('pg:') || key.startsWith('vg:')) return false;
                                     if (dropPosition === 0) {
-                                        // Only allow dropping INTO group (folder) nodes
                                         const target = findAsset(assets, key);
                                         return target?.type === 'group';
                                     }
@@ -690,8 +776,7 @@ const AssetTree: React.FC = () => {
                                     const dragKey = String(info.dragNode.key);
                                     const dropKey = String(info.node.key);
                                     const dropAsset = findAsset(assets, dropKey);
-                                    // Don't move onto PG virtual nodes
-                                    if (dropKey.startsWith('pg:')) return;
+                                    if (dropKey.startsWith('pg:') || dropKey.startsWith('vg:')) return;
 
                                     // Determine new parent
                                     let newParentId = '';
@@ -723,10 +808,14 @@ const AssetTree: React.FC = () => {
                                 expandedKeys={expandedKeys}
                                 onExpand={handleExpand}
                                 onSelect={(keys) => {
-                                    selectAsset(keys.length > 0 ? keys[0] as string : null);
+                                    const k = keys.length > 0 ? keys[0] as string : null;
+                                    if (k && k.startsWith('vg:')) return;
+                                    selectAsset(k);
                                 }}
                                 onRightClick={({ node }) => {
-                                    selectAsset(node.key as string);
+                                    const k = String(node.key);
+                                    if (k.startsWith('vg:')) return;
+                                    selectAsset(k);
                                 }}
                                 onDoubleClick={handleDoubleClick}
                             />
