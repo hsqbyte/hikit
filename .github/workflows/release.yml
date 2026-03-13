@@ -37,7 +37,12 @@ jobs:
       - name: Build go-music-dl
         run: |
           CGO_ENABLED=0 GOOS=darwin GOARCH=${{ matrix.arch }} \
-            go install -trimpath -ldflags="-s -w" github.com/guohuiyuan/go-music-dl@latest
+            go install -trimpath -ldflags="-s -w" github.com/guohuiyuan/go-music-dl/cmd/music-dl@latest
+          # Rename to go-music-dl
+          GOPATH=$(go env GOPATH)
+          for p in "${GOPATH}/bin/darwin_${{ matrix.arch }}/music-dl" "${GOPATH}/bin/music-dl"; do
+            [ -f "$p" ] && mv "$p" "$(dirname "$p")/go-music-dl" && break
+          done
 
       - name: Build
         run: |
@@ -87,7 +92,11 @@ jobs:
       - name: Build go-music-dl
         run: |
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-            go install -trimpath -ldflags="-s -w" github.com/guohuiyuan/go-music-dl@latest
+            go install -trimpath -ldflags="-s -w" github.com/guohuiyuan/go-music-dl/cmd/music-dl@latest
+          GOPATH=$(go env GOPATH)
+          for p in "${GOPATH}/bin/linux_amd64/music-dl" "${GOPATH}/bin/music-dl"; do
+            [ -f "$p" ] && mv "$p" "$(dirname "$p")/go-music-dl" && break
+          done
 
       - name: Build
         run: |
@@ -146,7 +155,11 @@ jobs:
       - name: Build go-music-dl
         run: |
           CGO_ENABLED=0 GOOS=linux GOARCH=arm64 \
-            go install -trimpath -ldflags="-s -w" github.com/guohuiyuan/go-music-dl@latest
+            go install -trimpath -ldflags="-s -w" github.com/guohuiyuan/go-music-dl/cmd/music-dl@latest
+          GOPATH=$(go env GOPATH)
+          for p in "${GOPATH}/bin/linux_arm64/music-dl" "${GOPATH}/bin/music-dl"; do
+            [ -f "$p" ] && mv "$p" "$(dirname "$p")/go-music-dl" && break
+          done
 
       - name: Build
         run: |
@@ -187,7 +200,10 @@ jobs:
       - name: Build go-music-dl
         run: |
           $env:CGO_ENABLED="0"; $env:GOOS="windows"; $env:GOARCH="amd64"
-          go install -trimpath -ldflags="-s -w" github.com/guohuiyuan/go-music-dl@latest
+          go install -trimpath -ldflags="-s -w" github.com/guohuiyuan/go-music-dl/cmd/music-dl@latest
+          $gopath = go env GOPATH
+          $src = Join-Path $gopath "bin\music-dl.exe"
+          if (Test-Path $src) { Rename-Item $src "go-music-dl.exe" }
 
       - name: Build
         run: |

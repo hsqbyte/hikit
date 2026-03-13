@@ -14,7 +14,7 @@ APP_NAME="HiKit"
 # 去掉 -dirty 后缀，保持版本号干净
 VERSION="${VERSION:-$(git describe --tags --always 2>/dev/null | sed 's/-dirty//' || echo 'dev')}"
 DIST="dist"
-MUSIC_DL_REPO="github.com/guohuiyuan/go-music-dl"
+MUSIC_DL_REPO="github.com/guohuiyuan/go-music-dl/cmd/music-dl"
 MUSIC_DL_BUILD="${DIST}/.music-dl-cache"
 
 mkdir -p "$DIST" "$MUSIC_DL_BUILD"
@@ -56,13 +56,15 @@ bundle_music_dl() {
         || GOOS="$target_os" GOARCH="$target_arch" CGO_ENABLED=0 \
             go install -trimpath -ldflags="-s -w" "${MUSIC_DL_REPO}@latest" 2>/dev/null
 
-        # go install puts binary in GOPATH/bin/GOOS_GOARCH/
+        # go install puts binary named 'music-dl' in GOPATH/bin/GOOS_GOARCH/
         if [[ ! -f "$cache_bin" ]]; then
             local gopath
             gopath=$(go env GOPATH)
-            local installed="${gopath}/bin/${target_os}_${target_arch}/${bin_name}"
-            # For native arch, go install puts it in GOPATH/bin/ directly
-            [[ ! -f "$installed" ]] && installed="${gopath}/bin/${bin_name}"
+            # Try cross-compile path first, then native path
+            local src_name="music-dl"
+            [[ "$target_os" == "windows" ]] && src_name="music-dl.exe"
+            local installed="${gopath}/bin/${target_os}_${target_arch}/${src_name}"
+            [[ ! -f "$installed" ]] && installed="${gopath}/bin/${src_name}"
             if [[ -f "$installed" ]]; then
                 cp "$installed" "$cache_bin"
             else
