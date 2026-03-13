@@ -34,10 +34,11 @@ type Session struct {
 // It is registered in main.go via Bind and all exported methods become
 // available to the frontend automatically.
 type PGService struct {
-	sessions map[string]*Session
-	mu       sync.RWMutex
-	counter  int
-	ctx      context.Context
+	sessions        map[string]*Session
+	mu              sync.RWMutex
+	counter         int
+	ctx             context.Context
+	pendingSQLContent string // cached file content for import
 }
 
 // Startup is called by Wails on app start
@@ -242,26 +243,103 @@ func (s *PGService) ImportSQL(sessionID string, sqlContent string) (*QueryResult
 	return sess.ImportSQL(sqlContent)
 }
 
-// OpenSQLFile opens a native file dialog for .sql files and returns the content
-func (s *PGService) OpenSQLFile() (string, error) {
-	filePath, err := wailsRuntime.OpenFileDialog(s.ctx, wailsRuntime.OpenDialogOptions{
-		Title: "选择 SQL 文件",
-		Filters: []wailsRuntime.FileFilter{
-			{DisplayName: "SQL Files", Pattern: "*.sql;*.txt"},
-			{DisplayName: "All Files", Pattern: "*"},
-		},
+// OpenSQLFile opens a native file dialog, reads the file, stores content
+// in memory, and emits "pg:file-selected" with metadata only (not full content).
+func (s *PGService) OpenSQLFile() {
+	go func() {
+		filePath, err := wailsRuntime.OpenFileDialog(s.ctx, wailsRuntime.OpenDialogOptions{
+			Title: "选择 SQL 文件",
+			Filters: []wailsRuntime.FileFilter{
+				{DisplayName: "SQL Files", Pattern: "*.sql;*.txt"},
+				{DisplayName: "All Files", Pattern: "*"},
+			},
+		})
+		if err != nil {
+			wailsRuntime.EventsEmit(s.ctx, "pg:file-selected", map[string]interface{}{
+				"error": err.Error(),
+			})
+			return
+		}
+		if filePath == "" {
+			wailsRuntime.EventsEmit(s.ctx, "pg:file-selected", map[string]interface{}{
+				"cancelled": true,
+			})
+			return
+		}
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			wailsRuntime.EventsEmit(s.ctx, "pg:file-selected", map[string]interface{}{
+				"error": fmt.Sprintf("读取文件失败: %v", err),
+			})
+			return
+		}
+		// Store content in memory
+		s.pendingSQLContent = string(data)
+
+		// Send only metadata + preview (first 2000 chars)
+		preview := s.pendingSQLContent
+		if len(preview) > 2000 {
+			preview = preview[:2000] + "\n... (truncated)"
+		}
+		wailsRuntime.EventsEmit(s.ctx, "pg:file-selected", map[string]interface{}{
+			"filename": filePath,
+			"size":     len(data),
+			"preview":  preview,
+		})
+	}()
+}
+
+// ImportSQLFromFile imports the previously loaded SQL file with progress.
+func (s *PGService) ImportSQLFromFile(sessionID string) error {
+	if s.pendingSQLContent == "" {
+		return fmt.Errorf("没有待导入的 SQL 文件")
+	}
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return err
+	}
+
+	stmts := splitSQL(s.pendingSQLContent)
+	total := len(stmts)
+	if total == 0 {
+		return fmt.Errorf("没有可执行的 SQL 语句")
+	}
+
+	wailsRuntime.EventsEmit(s.ctx, "pg:import-progress", map[string]interface{}{
+		"type": "start", "total": total,
 	})
-	if err != nil {
-		return "", err
+
+	for i, stmt := range stmts {
+		truncated := stmt
+		if len(truncated) > 120 {
+			truncated = truncated[:120] + "..."
+		}
+		_, execErr := sess.DB.Exec(stmt)
+		if execErr != nil {
+			wailsRuntime.EventsEmit(s.ctx, "pg:import-progress", map[string]interface{}{
+				"type":    "error",
+				"index":   i + 1,
+				"total":   total,
+				"sql":     truncated,
+				"message": execErr.Error(),
+			})
+		} else {
+			wailsRuntime.EventsEmit(s.ctx, "pg:import-progress", map[string]interface{}{
+				"type":  "ok",
+				"index": i + 1,
+				"total": total,
+				"sql":   truncated,
+			})
+		}
 	}
-	if filePath == "" {
-		return "", nil // user cancelled
-	}
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return "", fmt.Errorf("读取文件失败: %w", err)
-	}
-	return string(data), nil
+
+	wailsRuntime.EventsEmit(s.ctx, "pg:import-progress", map[string]interface{}{
+		"type": "done", "total": total,
+	})
+
+	// Clear cached content
+	s.pendingSQLContent = ""
+	return nil
 }
 
 // ImportSQLWithProgress splits SQL into statements, executes each one,

@@ -32,7 +32,7 @@ import {
     ListTables, ListViews, ListFunctions,
     ListMaterializedViews, SwitchDatabase,
     CreateDatabase, DropDatabase, ImportSQL, ExportSQL,
-    OpenSQLFile, ImportSQLWithProgress,
+    OpenSQLFile, ImportSQLWithProgress, ImportSQLFromFile,
 } from '../../../wailsjs/go/pg/PGService';
 import { EventsOn } from '../../../wailsjs/runtime/runtime';
 import { Move as MoveAsset } from '../../../wailsjs/go/asset/AssetService';
@@ -178,6 +178,11 @@ const AssetTree: React.FC = () => {
     const [importSQLProgress, setImportSQLProgress] = useState(0);
     const [importSQLTotal, setImportSQLTotal] = useState(0);
     const importLogRef = useRef<HTMLDivElement>(null);
+    // File mode: content stored on Go side
+    const [importSQLFileMode, setImportSQLFileMode] = useState(false);
+    const [importSQLFileName, setImportSQLFileName] = useState('');
+    const [importSQLFileSize, setImportSQLFileSize] = useState(0);
+    const [importSQLFilePreview, setImportSQLFilePreview] = useState('');
 
     // PG Export SQL modal
     const [exportSQLModalOpen, setExportSQLModalOpen] = useState(false);
@@ -816,28 +821,36 @@ const AssetTree: React.FC = () => {
         });
     }, [pgSessions]);
 
-    const handleFileSelect = useCallback(async () => {
-        try {
-            const content = await OpenSQLFile();
-            if (content) {
-                setImportSQLContent(content);
+    const handleFileSelect = useCallback(() => {
+        const cancel = EventsOn('pg:file-selected', (data: any) => {
+            cancel();
+            if (data.error) {
+                message.error('选择文件失败: ' + data.error);
+            } else if (data.cancelled) {
+                // do nothing
+            } else if (data.filename) {
+                setImportSQLFileMode(true);
+                setImportSQLFileName(data.filename);
+                setImportSQLFileSize(data.size || 0);
+                setImportSQLFilePreview(data.preview || '');
+                setImportSQLContent(''); // clear paste content
+                message.success('已加载文件');
             }
-        } catch (err: any) {
-            message.error('选择文件失败: ' + (err?.message || err));
-        }
+        });
+        OpenSQLFile();
     }, []);
 
     const handlePgImportSQL = useCallback(async () => {
-        if (!importSQLContent.trim() || !importSQLAssetId) return;
         const sid = pgSessions[importSQLAssetId];
         if (!sid) return;
+        if (!importSQLFileMode && !importSQLContent.trim()) return;
+
         setImportSQLRunning(true);
         setImportSQLPhase('running');
         setImportSQLLogs([]);
         setImportSQLProgress(0);
         setImportSQLTotal(0);
 
-        // Listen for progress events
         const cancel = EventsOn('pg:import-progress', (data: any) => {
             if (data.type === 'start') {
                 setImportSQLTotal(data.total);
@@ -851,7 +864,6 @@ const AssetTree: React.FC = () => {
             } else if (data.type === 'done') {
                 setImportSQLPhase('done');
             }
-            // Auto-scroll log
             setTimeout(() => {
                 importLogRef.current?.scrollTo({ top: importLogRef.current.scrollHeight });
             }, 50);
@@ -862,7 +874,13 @@ const AssetTree: React.FC = () => {
                 await SwitchDatabase(sid, importSQLDb);
                 setPgCurrentDB(prev => ({ ...prev, [importSQLAssetId]: importSQLDb }));
             }
-            await ImportSQLWithProgress(sid, importSQLContent);
+            if (importSQLFileMode) {
+                // Use Go-side cached content
+                await ImportSQLFromFile(sid);
+            } else {
+                // Use pasted content
+                await ImportSQLWithProgress(sid, importSQLContent);
+            }
         } catch (err: any) {
             setImportSQLLogs(prev => [...prev, { type: 'error', message: '执行异常: ' + (err?.message || err) }]);
             setImportSQLPhase('done');
@@ -870,7 +888,7 @@ const AssetTree: React.FC = () => {
             setImportSQLRunning(false);
             cancel();
         }
-    }, [importSQLContent, importSQLAssetId, importSQLDb, pgSessions]);
+    }, [importSQLContent, importSQLAssetId, importSQLDb, pgSessions, importSQLFileMode]);
 
     const handleImportSQLClose = useCallback(() => {
         setImportSQLModalOpen(false);
@@ -879,6 +897,10 @@ const AssetTree: React.FC = () => {
         setImportSQLLogs([]);
         setImportSQLProgress(0);
         setImportSQLTotal(0);
+        setImportSQLFileMode(false);
+        setImportSQLFileName('');
+        setImportSQLFileSize(0);
+        setImportSQLFilePreview('');
     }, []);
 
     const handlePgExportSQL = useCallback(async () => {
@@ -1201,7 +1223,11 @@ const AssetTree: React.FC = () => {
                 footer={importSQLPhase === 'select' ? (
                     <>
                         <Button onClick={handleImportSQLClose}>取消</Button>
-                        <Button type="primary" disabled={!importSQLContent.trim()} onClick={handlePgImportSQL}>
+                        <Button
+                            type="primary"
+                            disabled={!importSQLFileMode && !importSQLContent.trim()}
+                            onClick={handlePgImportSQL}
+                        >
                             开始导入
                         </Button>
                     </>
@@ -1219,17 +1245,58 @@ const AssetTree: React.FC = () => {
                                 支持 .sql / .txt 文件
                             </span>
                         </div>
-                        <Input.TextArea
-                            rows={14}
-                            placeholder="粘贴 SQL 内容或点击上方按钮选择文件..."
-                            value={importSQLContent}
-                            onChange={e => setImportSQLContent(e.target.value)}
-                            style={{ fontFamily: 'Menlo, Monaco, Consolas, monospace', fontSize: 12 }}
-                        />
-                        {importSQLContent && (
-                            <div style={{ marginTop: 6, color: '#999', fontSize: 12 }}>
-                                共 {importSQLContent.length.toLocaleString()} 字符
-                            </div>
+                        {importSQLFileMode ? (
+                            <>
+                                <div style={{
+                                    padding: '10px 14px', background: '#f6ffed', border: '1px solid #b7eb8f',
+                                    borderRadius: 6, marginBottom: 8, fontSize: 12,
+                                }}>
+                                    <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                                        ✅ 已加载文件
+                                    </div>
+                                    <div style={{ color: '#666' }}>
+                                        📄 {importSQLFileName.split('/').pop()}
+                                    </div>
+                                    <div style={{ color: '#999' }}>
+                                        大小: {(importSQLFileSize / 1024 / 1024).toFixed(2)} MB
+                                    </div>
+                                </div>
+                                <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>预览（前 2000 字符）：</div>
+                                <pre style={{
+                                    maxHeight: 260, overflow: 'auto',
+                                    background: '#fafbfc', border: '1px solid #e8e8e8',
+                                    borderRadius: 6, padding: '8px 12px',
+                                    fontFamily: 'Menlo, Monaco, Consolas, monospace',
+                                    fontSize: 11, lineHeight: 1.5, margin: 0, whiteSpace: 'pre-wrap',
+                                }}>
+                                    {importSQLFilePreview}
+                                </pre>
+                                <div style={{ marginTop: 6 }}>
+                                    <Button size="small" onClick={() => {
+                                        setImportSQLFileMode(false);
+                                        setImportSQLFileName('');
+                                        setImportSQLFileSize(0);
+                                        setImportSQLFilePreview('');
+                                    }}>
+                                        切换为粘贴模式
+                                    </Button>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <Input.TextArea
+                                    rows={14}
+                                    placeholder="粘贴 SQL 内容或点击上方按钮选择文件..."
+                                    value={importSQLContent}
+                                    onChange={e => setImportSQLContent(e.target.value)}
+                                    style={{ fontFamily: 'Menlo, Monaco, Consolas, monospace', fontSize: 12 }}
+                                />
+                                {importSQLContent && (
+                                    <div style={{ marginTop: 6, color: '#999', fontSize: 12 }}>
+                                        共 {importSQLContent.length.toLocaleString()} 字符
+                                    </div>
+                                )}
+                            </>
                         )}
                     </>
                 )}
