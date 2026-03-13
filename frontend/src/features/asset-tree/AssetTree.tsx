@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { Tree, Dropdown, Tooltip, Modal, Input, message, Button } from 'antd';
+import { Tree, Dropdown, Tooltip, Modal, Input, message, Button, Radio } from 'antd';
 import type { MenuProps } from 'antd';
 import {
     FolderOutlined,
@@ -171,6 +171,13 @@ const AssetTree: React.FC = () => {
     const [importSQLAssetId, setImportSQLAssetId] = useState('');
     const [importSQLDb, setImportSQLDb] = useState('');
     const [importSQLRunning, setImportSQLRunning] = useState(false);
+
+    // PG Export SQL modal
+    const [exportSQLModalOpen, setExportSQLModalOpen] = useState(false);
+    const [exportSQLAssetId, setExportSQLAssetId] = useState('');
+    const [exportSQLDb, setExportSQLDb] = useState('');
+    const [exportSQLMode, setExportSQLMode] = useState<'all' | 'struct' | 'data'>('all');
+    const [exportSQLRunning, setExportSQLRunning] = useState(false);
 
     // PG context menu
     const [pgContextMenu, setPgContextMenu] = useState<{ x: number; y: number; key: string } | null>(null);
@@ -844,32 +851,34 @@ const AssetTree: React.FC = () => {
         input.click();
     }, []);
 
-    const handlePgExportSQL = useCallback(async (assetId: string, dbName: string, mode: 'all' | 'struct' | 'data') => {
-        const sid = pgSessions[assetId];
+    const handlePgExportSQL = useCallback(async () => {
+        const sid = pgSessions[exportSQLAssetId];
         if (!sid) return;
+        setExportSQLRunning(true);
         try {
             message.loading({ content: '正在导出...', key: 'export' });
-            // Switch to target db
-            if (pgCurrentDB[assetId] !== dbName) {
-                await SwitchDatabase(sid, dbName);
-                setPgCurrentDB(prev => ({ ...prev, [assetId]: dbName }));
+            if (pgCurrentDB[exportSQLAssetId] !== exportSQLDb) {
+                await SwitchDatabase(sid, exportSQLDb);
+                setPgCurrentDB(prev => ({ ...prev, [exportSQLAssetId]: exportSQLDb }));
             }
-            const dataOnly = mode === 'data';
-            const structOnly = mode === 'struct';
+            const dataOnly = exportSQLMode === 'data';
+            const structOnly = exportSQLMode === 'struct';
             const sql = await ExportSQL(sid, 'public', dataOnly, structOnly);
-            // Download as file
             const blob = new Blob([sql], { type: 'text/sql;charset=utf-8' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `${dbName}_${mode === 'all' ? 'full' : mode}.sql`;
+            a.download = `${exportSQLDb}_${exportSQLMode === 'all' ? 'full' : exportSQLMode}.sql`;
             a.click();
             URL.revokeObjectURL(url);
             message.success({ content: '导出完成', key: 'export' });
+            setExportSQLModalOpen(false);
         } catch (err: any) {
             message.error({ content: '导出失败: ' + (err?.message || err), key: 'export' });
+        } finally {
+            setExportSQLRunning(false);
         }
-    }, [pgSessions, pgCurrentDB]);
+    }, [pgSessions, pgCurrentDB, exportSQLAssetId, exportSQLDb, exportSQLMode]);
 
     return (
         <div className="asset-tree">
@@ -1087,29 +1096,15 @@ const AssetTree: React.FC = () => {
                                         <CodeOutlined style={{ marginRight: 6 }} />导入 SQL
                                     </div>
                                 );
-                                items.push(<div key="divider-export" className="pg-context-divider" />);
                                 items.push(
-                                    <div key="export-all" className="pg-context-item" onClick={() => {
+                                    <div key="export-sql" className="pg-context-item" onClick={() => {
                                         setPgContextMenu(null);
-                                        handlePgExportSQL(assetId, dbName, 'all');
+                                        setExportSQLAssetId(assetId);
+                                        setExportSQLDb(dbName);
+                                        setExportSQLMode('all');
+                                        setExportSQLModalOpen(true);
                                     }}>
-                                        <CodeOutlined style={{ marginRight: 6 }} />导出 SQL（结构+数据）
-                                    </div>
-                                );
-                                items.push(
-                                    <div key="export-struct" className="pg-context-item" onClick={() => {
-                                        setPgContextMenu(null);
-                                        handlePgExportSQL(assetId, dbName, 'struct');
-                                    }}>
-                                        <CodeOutlined style={{ marginRight: 6 }} />导出 SQL（仅结构）
-                                    </div>
-                                );
-                                items.push(
-                                    <div key="export-data" className="pg-context-item" onClick={() => {
-                                        setPgContextMenu(null);
-                                        handlePgExportSQL(assetId, dbName, 'data');
-                                    }}>
-                                        <CodeOutlined style={{ marginRight: 6 }} />导出 SQL（仅数据）
+                                        <CodeOutlined style={{ marginRight: 6 }} />导出 SQL
                                     </div>
                                 );
                                 items.push(<div key="divider" className="pg-context-divider" />);
@@ -1169,6 +1164,29 @@ const AssetTree: React.FC = () => {
                     onChange={e => setImportSQLContent(e.target.value)}
                     style={{ fontFamily: 'monospace', fontSize: 12 }}
                 />
+            </Modal>
+
+            {/* Export SQL Modal */}
+            <Modal
+                title={`导出 SQL — ${exportSQLDb}`}
+                open={exportSQLModalOpen}
+                onOk={handlePgExportSQL}
+                onCancel={() => setExportSQLModalOpen(false)}
+                okText="导出" cancelText="取消" width={400}
+                confirmLoading={exportSQLRunning}
+            >
+                <div style={{ padding: '12px 0' }}>
+                    <div style={{ marginBottom: 12, color: '#666', fontSize: 13 }}>请选择导出内容：</div>
+                    <Radio.Group
+                        value={exportSQLMode}
+                        onChange={e => setExportSQLMode(e.target.value)}
+                        style={{ display: 'flex', flexDirection: 'column', gap: 10 }}
+                    >
+                        <Radio value="all">结构 + 数据（完整备份）</Radio>
+                        <Radio value="struct">仅结构（CREATE TABLE / VIEW）</Radio>
+                        <Radio value="data">仅数据（INSERT 语句）</Radio>
+                    </Radio.Group>
+                </div>
             </Modal>
         </div>
     );
