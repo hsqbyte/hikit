@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { Tree, Dropdown, Tooltip, Modal, Input, message, Button, Radio } from 'antd';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import { Tree, Dropdown, Tooltip, Modal, Input, message, Button, Radio, Progress } from 'antd';
 import type { MenuProps } from 'antd';
 import {
     FolderOutlined,
@@ -32,7 +32,9 @@ import {
     ListTables, ListViews, ListFunctions,
     ListMaterializedViews, SwitchDatabase,
     CreateDatabase, DropDatabase, ImportSQL, ExportSQL,
+    OpenSQLFile, ImportSQLWithProgress,
 } from '../../../wailsjs/go/pg/PGService';
+import { EventsOn } from '../../../wailsjs/runtime/runtime';
 import { Move as MoveAsset } from '../../../wailsjs/go/asset/AssetService';
 import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime';
 import ConnectionEditor from '../../components/ConnectionEditor/ConnectionEditor';
@@ -171,6 +173,11 @@ const AssetTree: React.FC = () => {
     const [importSQLAssetId, setImportSQLAssetId] = useState('');
     const [importSQLDb, setImportSQLDb] = useState('');
     const [importSQLRunning, setImportSQLRunning] = useState(false);
+    const [importSQLPhase, setImportSQLPhase] = useState<'select' | 'running' | 'done'>('select');
+    const [importSQLLogs, setImportSQLLogs] = useState<{ type: string; index?: number; total?: number; sql?: string; message?: string }[]>([]);
+    const [importSQLProgress, setImportSQLProgress] = useState(0);
+    const [importSQLTotal, setImportSQLTotal] = useState(0);
+    const importLogRef = useRef<HTMLDivElement>(null);
 
     // PG Export SQL modal
     const [exportSQLModalOpen, setExportSQLModalOpen] = useState(false);
@@ -809,46 +816,69 @@ const AssetTree: React.FC = () => {
         });
     }, [pgSessions]);
 
+    const handleFileSelect = useCallback(async () => {
+        try {
+            const content = await OpenSQLFile();
+            if (content) {
+                setImportSQLContent(content);
+            }
+        } catch (err: any) {
+            message.error('选择文件失败: ' + (err?.message || err));
+        }
+    }, []);
+
     const handlePgImportSQL = useCallback(async () => {
         if (!importSQLContent.trim() || !importSQLAssetId) return;
         const sid = pgSessions[importSQLAssetId];
         if (!sid) return;
         setImportSQLRunning(true);
+        setImportSQLPhase('running');
+        setImportSQLLogs([]);
+        setImportSQLProgress(0);
+        setImportSQLTotal(0);
+
+        // Listen for progress events
+        const cancel = EventsOn('pg:import-progress', (data: any) => {
+            if (data.type === 'start') {
+                setImportSQLTotal(data.total);
+                setImportSQLLogs(prev => [...prev, { type: 'info', message: `开始执行，共 ${data.total} 条语句` }]);
+            } else if (data.type === 'ok') {
+                setImportSQLProgress(data.index);
+                setImportSQLLogs(prev => [...prev, { type: 'ok', index: data.index, total: data.total, sql: data.sql }]);
+            } else if (data.type === 'error') {
+                setImportSQLProgress(data.index);
+                setImportSQLLogs(prev => [...prev, { type: 'error', index: data.index, total: data.total, sql: data.sql, message: data.message }]);
+            } else if (data.type === 'done') {
+                setImportSQLPhase('done');
+            }
+            // Auto-scroll log
+            setTimeout(() => {
+                importLogRef.current?.scrollTo({ top: importLogRef.current.scrollHeight });
+            }, 50);
+        });
+
         try {
-            // Switch to the target database first
             if (importSQLDb) {
                 await SwitchDatabase(sid, importSQLDb);
                 setPgCurrentDB(prev => ({ ...prev, [importSQLAssetId]: importSQLDb }));
             }
-            const result = await ImportSQL(sid, importSQLContent);
-            if (result?.error) {
-                message.error('导入失败: ' + result.error);
-            } else {
-                message.success(`SQL 导入成功${result?.affected ? `，影响 ${result.affected} 行` : ''}`);
-                setImportSQLModalOpen(false);
-                setImportSQLContent('');
-            }
+            await ImportSQLWithProgress(sid, importSQLContent);
         } catch (err: any) {
-            message.error('导入失败: ' + (err?.message || err));
+            setImportSQLLogs(prev => [...prev, { type: 'error', message: '执行异常: ' + (err?.message || err) }]);
+            setImportSQLPhase('done');
         } finally {
             setImportSQLRunning(false);
+            cancel();
         }
     }, [importSQLContent, importSQLAssetId, importSQLDb, pgSessions]);
 
-    const handleFileSelect = useCallback(() => {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.sql,.txt';
-        input.onchange = (e: any) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                setImportSQLContent(ev.target?.result as string || '');
-            };
-            reader.readAsText(file);
-        };
-        input.click();
+    const handleImportSQLClose = useCallback(() => {
+        setImportSQLModalOpen(false);
+        setImportSQLContent('');
+        setImportSQLPhase('select');
+        setImportSQLLogs([]);
+        setImportSQLProgress(0);
+        setImportSQLTotal(0);
     }, []);
 
     const handlePgExportSQL = useCallback(async () => {
@@ -1164,26 +1194,83 @@ const AssetTree: React.FC = () => {
             <Modal
                 title={`导入 SQL — ${importSQLDb}`}
                 open={importSQLModalOpen}
-                onOk={handlePgImportSQL}
-                onCancel={() => { setImportSQLModalOpen(false); setImportSQLContent(''); }}
-                okText="执行" cancelText="取消" width={640}
-                confirmLoading={importSQLRunning}
+                onCancel={importSQLPhase === 'running' ? undefined : handleImportSQLClose}
+                closable={importSQLPhase !== 'running'}
+                maskClosable={false}
+                width={700}
+                footer={importSQLPhase === 'select' ? (
+                    <>
+                        <Button onClick={handleImportSQLClose}>取消</Button>
+                        <Button type="primary" disabled={!importSQLContent.trim()} onClick={handlePgImportSQL}>
+                            开始导入
+                        </Button>
+                    </>
+                ) : importSQLPhase === 'done' ? (
+                    <Button type="primary" onClick={handleImportSQLClose}>关闭</Button>
+                ) : null}
             >
-                <div style={{ marginBottom: 8 }}>
-                    <Button size="small" onClick={handleFileSelect} icon={<CodeOutlined />}>
-                        选择 SQL 文件
-                    </Button>
-                    <span style={{ marginLeft: 8, color: '#999', fontSize: 12 }}>
-                        支持 .sql / .txt 文件
-                    </span>
-                </div>
-                <Input.TextArea
-                    rows={12}
-                    placeholder="粘贴 SQL 内容或选择文件..."
-                    value={importSQLContent}
-                    onChange={e => setImportSQLContent(e.target.value)}
-                    style={{ fontFamily: 'monospace', fontSize: 12 }}
-                />
+                {importSQLPhase === 'select' && (
+                    <>
+                        <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Button onClick={handleFileSelect} icon={<CodeOutlined />}>
+                                选择 SQL 文件
+                            </Button>
+                            <span style={{ color: '#999', fontSize: 12 }}>
+                                支持 .sql / .txt 文件
+                            </span>
+                        </div>
+                        <Input.TextArea
+                            rows={14}
+                            placeholder="粘贴 SQL 内容或点击上方按钮选择文件..."
+                            value={importSQLContent}
+                            onChange={e => setImportSQLContent(e.target.value)}
+                            style={{ fontFamily: 'Menlo, Monaco, Consolas, monospace', fontSize: 12 }}
+                        />
+                        {importSQLContent && (
+                            <div style={{ marginTop: 6, color: '#999', fontSize: 12 }}>
+                                共 {importSQLContent.length.toLocaleString()} 字符
+                            </div>
+                        )}
+                    </>
+                )}
+                {(importSQLPhase === 'running' || importSQLPhase === 'done') && (
+                    <>
+                        <div style={{ marginBottom: 8 }}>
+                            <Progress
+                                percent={importSQLTotal > 0 ? Math.round((importSQLProgress / importSQLTotal) * 100) : 0}
+                                status={importSQLPhase === 'done' ? 'success' : 'active'}
+                                size="small"
+                            />
+                            <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
+                                {importSQLPhase === 'running'
+                                    ? `正在执行 ${importSQLProgress} / ${importSQLTotal} ...`
+                                    : `执行完成 ${importSQLProgress} / ${importSQLTotal}`
+                                }
+                            </div>
+                        </div>
+                        <div
+                            ref={importLogRef}
+                            style={{
+                                height: 360, overflow: 'auto',
+                                background: '#1e1e1e', borderRadius: 6, padding: '8px 12px',
+                                fontFamily: 'Menlo, Monaco, Consolas, monospace', fontSize: 11, lineHeight: 1.7,
+                            }}
+                        >
+                            {importSQLLogs.map((log, i) => (
+                                <div key={i} style={{ color: log.type === 'error' ? '#ff6b6b' : log.type === 'ok' ? '#51cf66' : '#adb5bd' }}>
+                                    {log.type === 'info' && `ℹ️  ${log.message}`}
+                                    {log.type === 'ok' && `✅ [${log.index}/${log.total}] ${log.sql}`}
+                                    {log.type === 'error' && (
+                                        <>
+                                            <span>❌ [{log.index}/{log.total}] {log.sql}</span>
+                                            <div style={{ color: '#ff8787', paddingLeft: 20 }}>→ {log.message}</div>
+                                        </>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </>
+                )}
             </Modal>
 
             {/* Export SQL Modal */}

@@ -1,11 +1,15 @@
 package pg
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
+	"os"
+	"strings"
 	"sync"
 
 	_ "github.com/lib/pq"
+	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // ConnConfig holds PostgreSQL connection parameters
@@ -33,6 +37,12 @@ type PGService struct {
 	sessions map[string]*Session
 	mu       sync.RWMutex
 	counter  int
+	ctx      context.Context
+}
+
+// Startup is called by Wails on app start
+func (s *PGService) Startup(ctx context.Context) {
+	s.ctx = ctx
 }
 
 // NewPGService creates a new PGService instance
@@ -230,6 +240,186 @@ func (s *PGService) ImportSQL(sessionID string, sqlContent string) (*QueryResult
 		return nil, err
 	}
 	return sess.ImportSQL(sqlContent)
+}
+
+// OpenSQLFile opens a native file dialog for .sql files and returns the content
+func (s *PGService) OpenSQLFile() (string, error) {
+	filePath, err := wailsRuntime.OpenFileDialog(s.ctx, wailsRuntime.OpenDialogOptions{
+		Title: "选择 SQL 文件",
+		Filters: []wailsRuntime.FileFilter{
+			{DisplayName: "SQL Files", Pattern: "*.sql;*.txt"},
+			{DisplayName: "All Files", Pattern: "*"},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	if filePath == "" {
+		return "", nil // user cancelled
+	}
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return "", fmt.Errorf("读取文件失败: %w", err)
+	}
+	return string(data), nil
+}
+
+// ImportSQLWithProgress splits SQL into statements, executes each one,
+// and emits "pg:import-progress" events with log messages.
+// Returns total executed count and any error.
+func (s *PGService) ImportSQLWithProgress(sessionID string, sqlContent string) error {
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return err
+	}
+
+	stmts := splitSQL(sqlContent)
+	total := len(stmts)
+	if total == 0 {
+		return fmt.Errorf("没有可执行的 SQL 语句")
+	}
+
+	wailsRuntime.EventsEmit(s.ctx, "pg:import-progress", map[string]interface{}{
+		"type": "start", "total": total,
+	})
+
+	for i, stmt := range stmts {
+		truncated := stmt
+		if len(truncated) > 120 {
+			truncated = truncated[:120] + "..."
+		}
+
+		_, execErr := sess.DB.Exec(stmt)
+		if execErr != nil {
+			wailsRuntime.EventsEmit(s.ctx, "pg:import-progress", map[string]interface{}{
+				"type":    "error",
+				"index":   i + 1,
+				"total":   total,
+				"sql":     truncated,
+				"message": execErr.Error(),
+			})
+			// Continue executing remaining statements
+		} else {
+			wailsRuntime.EventsEmit(s.ctx, "pg:import-progress", map[string]interface{}{
+				"type":  "ok",
+				"index": i + 1,
+				"total": total,
+				"sql":   truncated,
+			})
+		}
+	}
+
+	wailsRuntime.EventsEmit(s.ctx, "pg:import-progress", map[string]interface{}{
+		"type": "done", "total": total,
+	})
+
+	return nil
+}
+
+// splitSQL splits a SQL script into individual statements by semicolons,
+// respecting string literals and dollar-quoted strings.
+func splitSQL(content string) []string {
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return nil
+	}
+
+	var stmts []string
+	var current strings.Builder
+	inSingleQuote := false
+	inDollarQuote := false
+	dollarTag := ""
+	i := 0
+
+	for i < len(content) {
+		ch := content[i]
+
+		// Handle single-quoted strings
+		if !inDollarQuote && ch == '\'' {
+			inSingleQuote = !inSingleQuote
+			current.WriteByte(ch)
+			i++
+			continue
+		}
+
+		if inSingleQuote {
+			current.WriteByte(ch)
+			i++
+			continue
+		}
+
+		// Handle dollar-quoted strings ($$...$$)
+		if ch == '$' && !inDollarQuote {
+			// Try to find dollar-quote tag
+			j := i + 1
+			for j < len(content) && (content[j] == '_' || (content[j] >= 'a' && content[j] <= 'z') || (content[j] >= 'A' && content[j] <= 'Z') || (content[j] >= '0' && content[j] <= '9')) {
+				j++
+			}
+			if j < len(content) && content[j] == '$' {
+				dollarTag = content[i : j+1]
+				inDollarQuote = true
+				current.WriteString(dollarTag)
+				i = j + 1
+				continue
+			}
+		}
+
+		if inDollarQuote {
+			// Check if we hit the closing dollar tag
+			if ch == '$' && i+len(dollarTag) <= len(content) && content[i:i+len(dollarTag)] == dollarTag {
+				current.WriteString(dollarTag)
+				i += len(dollarTag)
+				inDollarQuote = false
+				continue
+			}
+			current.WriteByte(ch)
+			i++
+			continue
+		}
+
+		// Handle line comments
+		if ch == '-' && i+1 < len(content) && content[i+1] == '-' {
+			for i < len(content) && content[i] != '\n' {
+				i++
+			}
+			continue
+		}
+
+		// Handle block comments
+		if ch == '/' && i+1 < len(content) && content[i+1] == '*' {
+			i += 2
+			for i+1 < len(content) {
+				if content[i] == '*' && content[i+1] == '/' {
+					i += 2
+					break
+				}
+				i++
+			}
+			continue
+		}
+
+		// Semicolon = statement separator
+		if ch == ';' {
+			s := strings.TrimSpace(current.String())
+			if s != "" {
+				stmts = append(stmts, s)
+			}
+			current.Reset()
+			i++
+			continue
+		}
+
+		current.WriteByte(ch)
+		i++
+	}
+
+	// Remaining content
+	s := strings.TrimSpace(current.String())
+	if s != "" {
+		stmts = append(stmts, s)
+	}
+
+	return stmts
 }
 
 // ExportSQL exports the structure and data of a schema as SQL statements

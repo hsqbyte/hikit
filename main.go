@@ -73,6 +73,7 @@ func main() {
 			chatService.Startup(ctx)
 			gitService.Startup(ctx)
 			screenshotService.Startup(ctx)
+			pgService.Startup(ctx)
 		},
 		OnShutdown: func(ctx context.Context) {
 			proxyService.Shutdown(ctx)
