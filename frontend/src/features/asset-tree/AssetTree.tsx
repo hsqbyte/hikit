@@ -974,8 +974,16 @@ const AssetTree: React.FC = () => {
                                 onRightClick={({ event, node }) => {
                                     const k = String(node.key);
                                     if (k.startsWith('vg:')) return;
-                                    // PG nodes: show PG-specific context menu
+                                    // PG virtual nodes (db, schema, etc.)
                                     if (k.startsWith('pg:')) {
+                                        event.preventDefault();
+                                        event.stopPropagation();
+                                        setPgContextMenu({ x: event.clientX, y: event.clientY, key: k });
+                                        return;
+                                    }
+                                    // PG asset host node with active session
+                                    const asset = findAsset(assets, k);
+                                    if (asset && asset.type === 'host' && asset.connectionType === 'postgresql' && pgSessions[k]) {
                                         event.preventDefault();
                                         event.stopPropagation();
                                         setPgContextMenu({ x: event.clientX, y: event.clientY, key: k });
@@ -1062,14 +1070,26 @@ const AssetTree: React.FC = () => {
                     >
                         {(() => {
                             const key = pgContextMenu.key;
-                            // PG asset root — show "新建数据库"
-                            const assetMatch = key.match(/^pg:(.+?)(?::db:(.+))?$/);
-                            if (!assetMatch) return null;
-                            const assetId = assetMatch[1]?.split(':db:')[0] || '';
-                            const dbMatch = key.match(/^pg:(.+?):db:([^:]+)$/);
-                            const dbName = dbMatch ? dbMatch[2] : '';
-                            const isDbNode = !!dbMatch && !key.includes(':s:');
-                            const isAssetRoot = !key.includes(':db:');
+                            // Parse key — could be raw asset ID or pg:{assetId}:db:{dbName}...
+                            let assetId = '';
+                            let dbName = '';
+                            let isDbNode = false;
+                            let isAssetRoot = false;
+
+                            if (key.startsWith('pg:')) {
+                                const pgAssetMatch = key.match(/^pg:(.+?)(?::db:|$)/);
+                                assetId = pgAssetMatch ? pgAssetMatch[1] : '';
+                                const dbMatch = key.match(/^pg:(.+?):db:([^:]+)$/);
+                                dbName = dbMatch ? dbMatch[2] : '';
+                                isDbNode = !!dbMatch && !key.includes(':s:');
+                                isAssetRoot = !key.includes(':db:');
+                            } else {
+                                // Raw asset ID — this is the PG connection root
+                                assetId = key;
+                                isAssetRoot = true;
+                            }
+
+                            if (!assetId) return null;
                             const items: React.ReactNode[] = [];
 
                             if (isAssetRoot) {
