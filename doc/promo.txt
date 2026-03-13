@@ -1,0 +1,29 @@
+标题：开源 | SSH + DB + 抓包 + REST Client + 工具箱 + 音乐 + 游戏机，一个桌面 App
+
+
+作为程序员，我每天的日常大概是这样的：
+打开终端连 SSH，切到数据库工具看数据，再打开 Postman 调接口，
+开个抓包工具分析流量，顺手还要记几条笔记……
+
+窗口一堆，切来切去，效率极低。
+
+于是我花了大概一年时间，做了 HiKit —— 一个把这些全塞进去的桌面工具箱。
+
+目前包含的模块：
+- SSH + SFTP：远程终端 & 文件管理，支持多标签并行操作
+- 数据库管理：Redis、MySQL、MariaDB、PostgreSQL、SQLite、SQL Server、ClickHouse、Oracle
+- REST Client：兼容 .http 文件格式，类 VS Code 体验
+- SSH 端口转发：本地/远程转发，一键打通内网
+- Web 代理：HTTP 抓包 + MITM 中间人篡改
+- 本地终端：内嵌 Shell，不用切窗口
+- 工具箱：JSON 格式化、JWT 解析、Hash、正则测试、Diff、UUID、Cron 解析、二维码生成，共 17 个
+- Git 管理：可视化管理本地仓库，提交/分支/日志
+- 待办事项 + 备忘录：轻量任务管理 & Markdown 笔记
+- 音乐播放器：在线搜索 + 歌词同步
+- 游戏模拟器：内置 FC / SFC / NEO GEO 经典游戏
+
+技术栈：Wails v2 + Go + React + TypeScript + Ant Design
+跨平台：macOS / Windows / Linux | 版本：v0.0.1 | 开源免费
+
+GitHub：https://github.com/hsqbyte/hikit
+欢迎 Star ⭐ 和提 Issue！

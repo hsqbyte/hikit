@@ -1,0 +1,242 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  # ── macOS (amd64 + arm64) ─────────────────────────────────
+  build-macos:
+    name: macOS ${{ matrix.arch }}
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            platform: darwin/amd64
+          - arch: arm64
+            platform: darwin/arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Build go-music-dl
+        run: |
+          CGO_ENABLED=0 GOOS=darwin GOARCH=${{ matrix.arch }} \
+            go install -trimpath -ldflags="-s -w" github.com/guohuiyuan/go-music-dl@latest
+
+      - name: Build
+        run: |
+          mkdir -p dist build/bin
+          wails build -platform ${{ matrix.platform }}
+          APP=$(ls -d build/bin/*.app 2>/dev/null | head -1 | xargs basename)
+          # Bundle go-music-dl into .app
+          GOPATH=$(go env GOPATH)
+          MDL="${GOPATH}/bin/darwin_${{ matrix.arch }}/go-music-dl"
+          [ ! -f "$MDL" ] && MDL="${GOPATH}/bin/go-music-dl"
+          if [ -f "$MDL" ]; then
+            cp "$MDL" "build/bin/${APP}/Contents/MacOS/go-music-dl"
+            chmod +x "build/bin/${APP}/Contents/MacOS/go-music-dl"
+            echo "✅ go-music-dl bundled into ${APP}"
+          fi
+          cd build/bin
+          zip -r "../../dist/HiKit-${{ github.ref_name }}-macos-${{ matrix.arch }}.zip" "$APP"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}
+          path: dist/*.zip
+
+  # ── Linux amd64 ───────────────────────────────────────────
+  build-linux-amd64:
+    name: Linux amd64
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.0-dev libgtk-3-dev
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Build go-music-dl
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+            go install -trimpath -ldflags="-s -w" github.com/guohuiyuan/go-music-dl@latest
+
+      - name: Build
+        run: |
+          mkdir -p dist build/bin
+          wails build -platform linux/amd64 -o HiKit-linux-amd64
+          # Bundle go-music-dl alongside binary
+          GOPATH=$(go env GOPATH)
+          MDL="${GOPATH}/bin/linux_amd64/go-music-dl"
+          [ ! -f "$MDL" ] && MDL="${GOPATH}/bin/go-music-dl"
+          [ -f "$MDL" ] && cp "$MDL" build/bin/go-music-dl && chmod +x build/bin/go-music-dl
+          cd build/bin
+          tar -czf "../../dist/HiKit-${{ github.ref_name }}-linux-amd64.tar.gz" HiKit-linux-amd64 go-music-dl 2>/dev/null || \
+          tar -czf "../../dist/HiKit-${{ github.ref_name }}-linux-amd64.tar.gz" HiKit-linux-amd64
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-amd64
+          path: dist/HiKit-*-linux-amd64*
+
+  # ── Linux arm64 (native runner) ───────────────────────────
+  build-linux-arm64:
+    name: Linux arm64
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          # Ubuntu 24.04: webkit2gtk-4.0 renamed to webkit2gtk-4.1
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev
+          # Create pkgconfig alias: webkit2gtk-4.0 -> 4.1
+          PKG_DIR=/usr/lib/aarch64-linux-gnu/pkgconfig
+          sudo cp "$PKG_DIR/webkit2gtk-4.1.pc" "$PKG_DIR/webkit2gtk-4.0.pc"
+          sudo sed -i 's/webkit2gtk-4.1/webkit2gtk-4.0/g' "$PKG_DIR/webkit2gtk-4.0.pc"
+          # Create .so symlink so linker can find -lwebkit2gtk-4.0
+          LIB_DIR=/usr/lib/aarch64-linux-gnu
+          sudo ln -sf "$LIB_DIR/libwebkit2gtk-4.1.so" "$LIB_DIR/libwebkit2gtk-4.0.so" 2>/dev/null || true
+          # Find and symlink any versioned .so files
+          for f in "$LIB_DIR"/libwebkit2gtk-4.1.so*; do
+            target="${f/webkit2gtk-4.1/webkit2gtk-4.0}"
+            sudo ln -sf "$f" "$target" 2>/dev/null || true
+          done
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Build go-music-dl
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 \
+            go install -trimpath -ldflags="-s -w" github.com/guohuiyuan/go-music-dl@latest
+
+      - name: Build
+        run: |
+          mkdir -p dist build/bin
+          wails build -platform linux/arm64 -o HiKit-linux-arm64
+          # Bundle go-music-dl alongside binary
+          GOPATH=$(go env GOPATH)
+          MDL="${GOPATH}/bin/linux_arm64/go-music-dl"
+          [ ! -f "$MDL" ] && MDL="${GOPATH}/bin/go-music-dl"
+          [ -f "$MDL" ] && cp "$MDL" build/bin/go-music-dl && chmod +x build/bin/go-music-dl
+          cd build/bin
+          tar -czf "../../dist/HiKit-${{ github.ref_name }}-linux-arm64.tar.gz" HiKit-linux-arm64 go-music-dl 2>/dev/null || \
+          tar -czf "../../dist/HiKit-${{ github.ref_name }}-linux-arm64.tar.gz" HiKit-linux-arm64
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-arm64
+          path: dist/HiKit-*-linux-arm64*
+
+  # ── Windows (amd64) ───────────────────────────────────────
+  build-windows:
+    name: Windows amd64
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Build go-music-dl
+        run: |
+          $env:CGO_ENABLED="0"; $env:GOOS="windows"; $env:GOARCH="amd64"
+          go install -trimpath -ldflags="-s -w" github.com/guohuiyuan/go-music-dl@latest
+
+      - name: Build
+        run: |
+          New-Item -ItemType Directory -Force -Path dist, build/bin
+          wails build -platform windows/amd64 -o HiKit-windows-amd64.exe
+          # Bundle go-music-dl alongside exe
+          $gopath = go env GOPATH
+          $mdl = Join-Path $gopath "bin\go-music-dl.exe"
+          if (Test-Path $mdl) {
+            Copy-Item $mdl build/bin/go-music-dl.exe
+            Write-Host "✅ go-music-dl.exe bundled"
+          }
+          Compress-Archive -Path build/bin/HiKit-windows-amd64.exe, build/bin/go-music-dl.exe -DestinationPath "dist/HiKit-${{ github.ref_name }}-windows-amd64.zip" -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-amd64
+          path: dist/HiKit-*-windows-amd64*
+
+  # ── 创建 Release ──────────────────────────────────────────
+  release:
+    name: Create Release
+    needs: [build-macos, build-linux-amd64, build-linux-arm64, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -lh dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "HiKit ${{ github.ref_name }}"
+          body: |
+            ## 🎉 HiKit ${{ github.ref_name }}
+
+            ### 下载
+
+            | 平台 | 架构 | 文件 |
+            |------|------|------|
+            | macOS | Intel (amd64) | HiKit-${{ github.ref_name }}-macos-amd64.zip |
+            | macOS | Apple Silicon (arm64) | HiKit-${{ github.ref_name }}-macos-arm64.zip |
+            | Linux | amd64 | HiKit-${{ github.ref_name }}-linux-amd64.tar.gz |
+            | Linux | arm64 | HiKit-${{ github.ref_name }}-linux-arm64.tar.gz |
+            | Windows | amd64 | HiKit-${{ github.ref_name }}-windows-amd64.zip |
+          files: dist/*
+          draft: false
+          prerelease: false

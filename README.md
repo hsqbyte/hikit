@@ -1,52 +1,162 @@
 # HiKit
 
-> 一款基于 Wails + React + Go 的全能开发工具箱
+> A full-featured developer toolbox built with **Wails + React + Go**
 
-## 功能模块
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)]()
+[![Built with Wails](https://img.shields.io/badge/Built%20with-Wails%20v2-red.svg)](https://wails.io)
+[![Go](https://img.shields.io/badge/Go-1.21+-00ADD8.svg)](https://golang.org)
+[![React](https://img.shields.io/badge/React-TypeScript-61DAFB.svg)](https://react.dev)
 
-- **SSH / SFTP** — 远程终端 & 文件管理
-- **PostgreSQL** — 数据库管理 & SQL 查询
-- **REST Client** — HTTP 接口调试（`.http` 文件格式）
-- **Web 代理** — HTTP/SOCKS 代理 + 抓包 + MITM 篡改
-- **本地终端** — 本地 Shell 终端
-- **待办事项** — 轻量级任务管理
-- **备忘录** — Markdown 笔记
-- **密码保险箱** — 安全凭证管理（规划中）
+English | [简体中文](doc/readme/README_zh.md) | [繁體中文](doc/readme/README_zh-TW.md) | [日本語](doc/readme/README_ja.md) | [한국어](doc/readme/README_ko.md) | [Español](doc/readme/README_es.md) | [Deutsch](doc/readme/README_de.md) | [Français](doc/readme/README_fr.md) | [Português](doc/readme/README_pt.md)
 
-## 预览
+---
+
+## Table of Contents
+
+- [Features](#features)
+- [Preview](#preview)
+- [Development](#development)
+- [Tech Stack](#tech-stack)
+
+---
+
+## Features
+
+| Module | Description |
+|--------|-------------|
+| 🖥️ **SSH / SFTP** | Remote terminal & file manager |
+| 🔀 **SSH Port Forward** | Local / remote SSH tunnel |
+| 🗄️ **Database** | Redis · MySQL · MariaDB · PostgreSQL · SQLite · SQL Server · ClickHouse · Oracle |
+| 🌐 **REST Client** | HTTP debugging with `.http` file support |
+| 🕵️ **Web Proxy** | HTTP/SOCKS proxy + packet capture + MITM tampering |
+| 💻 **Local Terminal** | Embedded local shell |
+| 🔧 **Toolbox** | JSON, JWT, Hash, Regex, Diff, UUID, Cron, QR Code... 17 tools |
+| 📋 **Todo** | Lightweight task management |
+| 📝 **Memo** | Markdown notes with live preview |
+| 📦 **Git Manager** | Visual local repository management |
+| 🎵 **Music Player** | Online search + lyrics sync |
+| 🎮 **Game Emulator** | FC / SFC / NEO GEO classic games |
+| 🔐 **Vault** | Secure credential manager *(planned)* |
+
+---
+
+## Preview
+
+### New Connection
+
+Supports SSH, Local Terminal, SSH Tunnel, Telnet, RDP, Docker, and databases including Redis, MySQL, MariaDB, PostgreSQL, SQLite, SQL Server, ClickHouse, Oracle.
+
+![New Connection](doc/screenshots/main.png)
+
+---
 
 ### SSH / SFTP
-![SSH 终端 & SFTP 文件管理](doc/screenshots/ssh_sftp.png)
 
-### PostgreSQL
-![PostgreSQL 数据库管理](doc/screenshots/postgresql.png)
-![SQL 查询结果](doc/screenshots/sql_query.png)
+Multi-tab remote terminal with integrated SFTP file management.
+
+![SSH Terminal & SFTP](doc/screenshots/ssh_sftp.png)
+
+---
+
+### SSH Port Forwarding
+
+Local & remote SSH tunneling, quickly expose internal network ports.
+
+![SSH Port Forwarding](doc/screenshots/ssh_proxy.png)
+
+---
+
+### Database Management
+
+Supports Redis, MySQL, MariaDB, PostgreSQL, SQLite, SQL Server, ClickHouse, Oracle — asset tree + SQL editor + query results.
+
+![Database Management](doc/screenshots/postgresql.png)
+![SQL Query Results](doc/screenshots/sql_query.png)
+
+---
 
 ### REST Client
-![REST Client 接口调试](doc/screenshots/rest_client.png)
 
-### Web 代理
-![Web 代理抓包](doc/screenshots/web_proxy.png)
+HTTP interface debugging tool compatible with `.http` file format.
 
-### 待办事项
-![待办事项](doc/screenshots/todo.png)
+![REST Client](doc/screenshots/rest_client.png)
 
-### 备忘录
-![备忘录 Markdown 编辑器](doc/screenshots/memo.png)
+---
 
-## 开发
+### Web Proxy
+
+HTTP/HTTPS packet capture with MITM traffic tampering support.
+
+![Web Proxy](doc/screenshots/web_proxy.png)
+
+---
+
+### Toolbox
+
+17 built-in developer tools: JSON formatter, encoding/decoding, Hash, JWT, Regex, Diff, UUID, Cron, QR Code generator and more.
+
+![Toolbox](doc/screenshots/tool.png)
+
+---
+
+### Git Manager
+
+Visual management of local Git repositories: changes, logs, branches.
+
+![Git Manager](doc/screenshots/git.png)
+
+---
+
+### Todo
+
+Lightweight task management to quickly track your work items.
+
+![Todo](doc/screenshots/todo.png)
+
+---
+
+### Memo
+
+Markdown editor with real-time preview.
+
+![Memo](doc/screenshots/memo.png)
+
+---
+
+### Music Player
+
+Online music search, lyrics sync, and offline playback.
+
+![Music Player](doc/screenshots/music.png)
+
+---
+
+### Game Emulator
+
+Built-in classic game emulator supporting FC, SFC, and NEO GEO platforms.
+
+![Game Emulator](doc/screenshots/game.png)
+
+---
+
+## Development
 
 ```bash
-# 开发模式
+# Dev mode
 wails dev
 
-# 构建
+# Build
 wails build
 ```
 
-## 技术栈
+---
 
-- **后端**: Go + Wails v2
-- **前端**: React + TypeScript + Ant Design
-- **数据库**: SQLite
-- **终端**: xterm.js
+## Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| **Backend** | Go + Wails v2 |
+| **Frontend** | React + TypeScript + Ant Design |
+| **Database** | SQLite |
+| **Terminal** | xterm.js |

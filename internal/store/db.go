@@ -69,6 +69,8 @@ func createTables() error {
 	for _, col := range []string{
 		"ALTER TABLE assets ADD COLUMN database TEXT DEFAULT ''",
 		"ALTER TABLE assets ADD COLUMN ssh_tunnel_id TEXT DEFAULT ''",
+		"ALTER TABLE assets ADD COLUMN color TEXT DEFAULT ''",
+		"ALTER TABLE assets ADD COLUMN env TEXT DEFAULT ''",
 		"ALTER TABLE todo_items ADD COLUMN due_date TEXT DEFAULT NULL",
 	} {
 		db.Exec(col) // ignore errors (column already exists)

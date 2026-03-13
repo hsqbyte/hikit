@@ -19,6 +19,7 @@ import (
 	proxypkg "github.com/hsqbyte/hikit/internal/proxy"
 	redispkg "github.com/hsqbyte/hikit/internal/redis"
 	restpkg "github.com/hsqbyte/hikit/internal/restclient"
+	screenshotpkg "github.com/hsqbyte/hikit/internal/screenshot"
 	rompkg "github.com/hsqbyte/hikit/internal/rom"
 	sshpkg "github.com/hsqbyte/hikit/internal/ssh"
 	"github.com/hsqbyte/hikit/internal/store"
@@ -50,6 +51,7 @@ func main() {
 	restService := restpkg.NewRestClientService()
 	gitService := gitpkg.NewGitService()
 	chatService := chatpkg.NewChatService()
+	screenshotService := screenshotpkg.NewScreenshotService()
 
 	// Create application with options
 	err := wails.Run(&options.App{
@@ -70,6 +72,7 @@ func main() {
 			musicService.Startup(ctx)
 			chatService.Startup(ctx)
 			gitService.Startup(ctx)
+			screenshotService.Startup(ctx)
 		},
 		OnShutdown: func(ctx context.Context) {
 			proxyService.Shutdown(ctx)
@@ -91,6 +94,7 @@ func main() {
 			restService,
 			gitService,
 			chatService,
+			screenshotService,
 		},
 	})
 

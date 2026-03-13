@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { ConfigProvider } from 'antd';
 import { ActivityBar, TabBar } from './components/Layout';
 import { AssetTree } from './features/asset-tree';
-import { WelcomePage } from './features/network-graph';
+
 import { SSHView, LocalTerminalView } from './features/terminal';
 import { PostgreSQLView, RedisView } from './features/database';
 import { PortForwardView, ProxyView, WebProxyView } from './features/proxy';
@@ -11,7 +11,7 @@ import { TodoView } from './features/todo';
 import { MemoView } from './features/memo';
 import { ToolboxPanel, ToolboxView } from './features/toolbox';
 import { GamePanel, EmulatorView } from './features/emulator';
-import { PomodoroPanel } from './features/pomodoro';
+
 import { MusicPanel, MusicView } from './features/music';
 import { GitPanel } from './features/git';
 import { ChatView } from './features/chat';
@@ -25,14 +25,10 @@ const App: React.FC = () => {
     const [sidebarVisible, setSidebarVisible] = useState(false);
     const isOnWelcome = !activeTab;
 
-    // Auto-hide sidebar on welcome page, auto-show when tab opens
+    // Auto-show sidebar on mount
     useEffect(() => {
-        if (isOnWelcome) {
-            setSidebarVisible(false);
-        } else {
-            setSidebarVisible(true);
-        }
-    }, [isOnWelcome]);
+        setSidebarVisible(true);
+    }, []);
 
     // Resizable sidebar
     const [sidebarWidth, setSidebarWidth] = useState(240);
@@ -97,7 +93,7 @@ const App: React.FC = () => {
     const parentGroup = activeTab ? findParentGroup(assets, activeTab.assetId) : undefined;
 
     const renderContent = () => {
-        if (!activeTab) return <WelcomePage />;
+        if (!activeTab) return null;
 
         if (activeTab.connectionType === 'ssh') {
             return (
@@ -253,17 +249,16 @@ const App: React.FC = () => {
                 />
 
                 {/* Sidebar wrapper */}
-                {sidebarVisible && !isOnWelcome && activityKey !== 'chat' && (
+                {sidebarVisible && activityKey !== 'chat' && (
                     <div className="app-sidebar-wrapper">
                         <div className="app-sidebar" style={{ width: sidebarWidth }}>
                             {activityKey === 'proxy' ? <ProxyView />
                                 : activityKey === 'forwards' ? <PortForwardView />
                                     : activityKey === 'toolbox' ? <ToolboxPanel />
                                         : activityKey === 'emulator' ? <GamePanel />
-                                            : activityKey === 'pomodoro' ? <PomodoroPanel />
-                                                : activityKey === 'music' ? <MusicPanel />
-                                                    : activityKey === 'git' ? <GitPanel />
-                                                        : <AssetTree />}
+                                            : activityKey === 'music' ? <MusicPanel />
+                                                : activityKey === 'git' ? <GitPanel />
+                                                    : <AssetTree />}
                         </div>
                         <div className="app-sidebar-resize" onMouseDown={handleResizeStart} />
                     </div>

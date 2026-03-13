@@ -23,6 +23,8 @@ type Asset struct {
 	PrivateKey     string  `json:"privateKey,omitempty"`
 	Database       string  `json:"database,omitempty"`
 	SshTunnelId    string  `json:"sshTunnelId,omitempty"`
+	Color          string  `json:"color,omitempty"`
+	Env            string  `json:"env,omitempty"`
 	SortOrder      int     `json:"sortOrder"`
 	CreatedAt      string  `json:"createdAt"`
 	UpdatedAt      string  `json:"updatedAt"`
@@ -37,7 +39,8 @@ func GetAll() ([]Asset, error) {
 		       COALESCE(connection_type, ''), COALESCE(host, ''), 
 		       port, COALESCE(username, ''), COALESCE(password, ''),
 		       COALESCE(private_key, ''), COALESCE(database, ''),
-		       COALESCE(ssh_tunnel_id, ''), sort_order, created_at, updated_at
+		       COALESCE(ssh_tunnel_id, ''), COALESCE(color, ''), COALESCE(env, ''),
+		       sort_order, created_at, updated_at
 		FROM assets 
 		ORDER BY sort_order, name
 	`)
@@ -52,6 +55,7 @@ func GetAll() ([]Asset, error) {
 		err := rows.Scan(&a.ID, &a.Name, &a.Type, &a.ParentID,
 			&a.ConnectionType, &a.Host, &a.Port, &a.Username,
 			&a.Password, &a.PrivateKey, &a.Database, &a.SshTunnelId,
+			&a.Color, &a.Env,
 			&a.SortOrder, &a.CreatedAt, &a.UpdatedAt)
 		if err != nil {
 			return nil, err
@@ -115,9 +119,9 @@ func Create(a Asset) (Asset, error) {
 	a.UpdatedAt = now
 
 	_, err := db.Exec(`
-		INSERT INTO assets (id, name, type, parent_id, connection_type, host, port, username, password, private_key, database, ssh_tunnel_id, sort_order, created_at, updated_at)
-		VALUES (?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, a.ID, a.Name, a.Type, a.ParentID, a.ConnectionType, a.Host, a.Port, a.Username, a.Password, a.PrivateKey, a.Database, a.SshTunnelId, a.SortOrder, a.CreatedAt, a.UpdatedAt)
+		INSERT INTO assets (id, name, type, parent_id, connection_type, host, port, username, password, private_key, database, ssh_tunnel_id, color, env, sort_order, created_at, updated_at)
+		VALUES (?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, a.ID, a.Name, a.Type, a.ParentID, a.ConnectionType, a.Host, a.Port, a.Username, a.Password, a.PrivateKey, a.Database, a.SshTunnelId, a.Color, a.Env, a.SortOrder, a.CreatedAt, a.UpdatedAt)
 
 	if err != nil {
 		return Asset{}, err
@@ -133,10 +137,10 @@ func Update(a Asset) error {
 	_, err := db.Exec(`
 		UPDATE assets SET name=?, type=?, parent_id=NULLIF(?, ''), connection_type=NULLIF(?, ''),
 		       host=NULLIF(?, ''), port=?, username=?, password=?, private_key=?,
-		       database=?, ssh_tunnel_id=?,
+		       database=?, ssh_tunnel_id=?, color=?, env=?,
 		       sort_order=?, updated_at=?
 		WHERE id=?
-	`, a.Name, a.Type, a.ParentID, a.ConnectionType, a.Host, a.Port, a.Username, a.Password, a.PrivateKey, a.Database, a.SshTunnelId, a.SortOrder, a.UpdatedAt, a.ID)
+	`, a.Name, a.Type, a.ParentID, a.ConnectionType, a.Host, a.Port, a.Username, a.Password, a.PrivateKey, a.Database, a.SshTunnelId, a.Color, a.Env, a.SortOrder, a.UpdatedAt, a.ID)
 	return err
 }
 
