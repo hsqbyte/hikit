@@ -15,6 +15,8 @@ import { GamePanel, EmulatorView } from './features/emulator';
 import { MusicPanel, MusicView } from './features/music';
 import { GitPanel } from './features/git';
 import { ChatView } from './features/chat';
+import { SettingsView } from './features/settings';
+import ErrorBoundary from './components/ErrorBoundary';
 import { useConnectionStore, Asset } from './stores/connectionStore';
 import './App.css';
 
@@ -249,7 +251,7 @@ const App: React.FC = () => {
                 />
 
                 {/* Sidebar wrapper */}
-                {sidebarVisible && activityKey !== 'chat' && (
+                {sidebarVisible && activityKey !== 'chat' && activityKey !== 'settings' && (
                     <div className="app-sidebar-wrapper">
                         <div className="app-sidebar" style={{ width: sidebarWidth }}>
                             {activityKey === 'proxy' ? <ProxyView />
@@ -266,13 +268,17 @@ const App: React.FC = () => {
 
                 {/* Main Content Area */}
                 <div className="app-main">
-                    {activityKey === 'chat' ? (
+                    {activityKey === 'settings' ? (
+                        <SettingsView />
+                    ) : activityKey === 'chat' ? (
                         <ChatView />
                     ) : (
                         <>
                             <TabBar />
                             <div className="app-content">
-                                {renderContent()}
+                                <ErrorBoundary>
+                                    {renderContent()}
+                                </ErrorBoundary>
                             </div>
                         </>
                     )}

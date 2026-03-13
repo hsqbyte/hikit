@@ -1,0 +1,421 @@
+package pg
+
+import (
+	"bufio"
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"os"
+	"os/exec"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/hsqbyte/hikit/internal/chat"
+	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
+)
+
+// GetSchemaContext returns a compact text description of all tables and columns
+// in a schema, suitable for sending as LLM context for Text-to-SQL.
+func (s *PGService) GetSchemaContext(sessionID, schema string) (string, error) {
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return "", err
+	}
+	return sess.GetSchemaContext(schema)
+}
+
+// GetSchemaContext builds schema context for LLM.
+// Includes table structure + sample data for better SQL generation.
+func (s *Session) GetSchemaContext(schema string) (string, error) {
+	tables, err := s.ListTables(schema)
+	if err != nil {
+		return "", err
+	}
+
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("-- Database: %s, Schema: %s, Tables: %d\n\n", s.Config.DBName, schema, len(tables)))
+
+	for _, tbl := range tables {
+		cols, err := s.GetColumns(schema, tbl.Name)
+		if err != nil {
+			log.Printf("[SQL-AI] skip table %s: %v", tbl.Name, err)
+			continue
+		}
+
+		// Table header comment
+		comment := ""
+		if tbl.Comment != "" {
+			comment = fmt.Sprintf(" -- %s", tbl.Comment)
+		}
+		b.WriteString(fmt.Sprintf("-- %s [%d rows]%s\n", tbl.Name, tbl.RowCount, comment))
+
+		// Compact column list: "col_name type [NOT NULL] [PK]"
+		pks, _ := s.GetPrimaryKeys(schema, tbl.Name)
+		pkSet := make(map[string]bool)
+		for _, pk := range pks {
+			pkSet[pk] = true
+		}
+
+		colNames := make([]string, 0, len(cols))
+		b.WriteString(fmt.Sprintf("CREATE TABLE \"%s\".\"%s\" (\n", schema, tbl.Name))
+		for i, c := range cols {
+			colNames = append(colNames, c.Name)
+			b.WriteString(fmt.Sprintf("  \"%s\" %s", c.Name, c.DataType))
+			if c.IsNullable == "NO" {
+				b.WriteString(" NOT NULL")
+			}
+			if pkSet[c.Name] {
+				b.WriteString(" PK")
+			}
+			if c.Comment != "" {
+				b.WriteString(fmt.Sprintf(" -- %s", c.Comment))
+			}
+			if i < len(cols)-1 {
+				b.WriteString(",")
+			}
+			b.WriteString("\n")
+		}
+		b.WriteString(");\n")
+
+		// Sample data (3 rows) for LLM to understand actual values
+		sampleRows := s.getSampleData(schema, tbl.Name, colNames, 3)
+		if len(sampleRows) > 0 {
+			b.WriteString("-- Sample data:\n")
+			for _, row := range sampleRows {
+				b.WriteString("--   ")
+				b.WriteString(row)
+				b.WriteString("\n")
+			}
+		}
+		b.WriteString("\n")
+	}
+
+	return b.String(), nil
+}
+
+// getSampleData fetches a few rows from a table and returns them as compact strings.
+func (s *Session) getSampleData(schema, table string, colNames []string, limit int) []string {
+	query := fmt.Sprintf("SELECT * FROM \"%s\".\"%s\" LIMIT %d", schema, table, limit)
+	rows, err := s.DB.Query(query)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	scanCols, _ := rows.Columns()
+	if len(scanCols) == 0 {
+		return nil
+	}
+
+	var result []string
+	for rows.Next() {
+		values := make([]interface{}, len(scanCols))
+		ptrs := make([]interface{}, len(scanCols))
+		for i := range values {
+			ptrs[i] = &values[i]
+		}
+		if err := rows.Scan(ptrs...); err != nil {
+			continue
+		}
+
+		parts := make([]string, 0, len(scanCols))
+		for i, col := range scanCols {
+			v := values[i]
+			var s string
+			if v == nil {
+				s = "NULL"
+			} else {
+				s = fmt.Sprintf("%v", v)
+				// Truncate long values
+				if len(s) > 50 {
+					s = s[:50] + "..."
+				}
+			}
+			parts = append(parts, fmt.Sprintf("%s=%s", col, s))
+		}
+		result = append(result, strings.Join(parts, ", "))
+	}
+	return result
+}
+
+// package-level cancel function for SQL assistant streaming
+var (
+	sqlAssistantCancel context.CancelFunc
+	sqlAssistantMu     sync.Mutex
+)
+
+// emitAIError is a helper to emit an error event to the frontend
+func (s *PGService) emitAIError(errMsg string) {
+	log.Printf("[SQL-AI] ERROR: %s", errMsg)
+	wailsRuntime.EventsEmit(s.ctx, "pg:ai-stream", map[string]interface{}{
+		"done": true, "error": errMsg,
+	})
+}
+
+// SQLAssistant handles a Text-to-SQL request:
+// 1. Gathers schema context from the database
+// 2. Sends it + user question to the LLM
+// 3. Streams the response back via "pg:ai-stream" events
+func (s *PGService) SQLAssistant(sessionID, schema, question string, history []map[string]string) {
+	go func() {
+		// Recover from any panics so the frontend doesn't hang forever
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("[SQL-AI] PANIC recovered: %v", r)
+				wailsRuntime.EventsEmit(s.ctx, "pg:ai-stream", map[string]interface{}{
+					"done": true, "error": fmt.Sprintf("内部错误: %v", r),
+				})
+			}
+		}()
+
+		log.Printf("[SQL-AI] Starting: session=%s schema=%s question=%s", sessionID, schema, question)
+
+		settings := chat.GetSettings()
+		if settings.APIKey == "" {
+			s.emitAIError("请先在「设置」中配置 API Key")
+			return
+		}
+
+		log.Printf("[SQL-AI] Fetching schema context...")
+		// Get schema context
+		schemaCtx, err := s.GetSchemaContext(sessionID, schema)
+		if err != nil {
+			s.emitAIError(fmt.Sprintf("获取表结构失败: %v", err))
+			return
+		}
+		log.Printf("[SQL-AI] Schema context: %d chars, sending to LLM...", len(schemaCtx))
+
+		// Build messages
+		messages := []map[string]string{
+			{
+				"role": "system",
+				"content": `你是一个 PostgreSQL 数据库专家。用户会提供数据库的表结构，然后向你提问。
+你需要根据表结构生成正确的 SQL 查询语句。
+
+规则：
+1. 只生成 PostgreSQL 兼容的 SQL
+2. 使用双引号引用标识符（表名、列名）
+3. 给出简洁的解释
+4. 如果用户的问题不明确，先生成最可能的 SQL，然后说明假设
+5. 用 markdown 格式回答，SQL 放在代码块中`,
+			},
+			{
+				"role": "user",
+				"content": fmt.Sprintf("以下是数据库的表结构：\n\n```sql\n%s```\n\n请记住这些表结构，我接下来会基于它们提问。", schemaCtx),
+			},
+			{
+				"role": "assistant",
+				"content": "好的，我已了解数据库的表结构。请问你想查询什么？",
+			},
+		}
+
+		// Append conversation history
+		for _, msg := range history {
+			messages = append(messages, msg)
+		}
+
+		// Append current question
+		messages = append(messages, map[string]string{
+			"role":    "user",
+			"content": question,
+		})
+
+		// Cancel any previous streaming
+		sqlAssistantMu.Lock()
+		if sqlAssistantCancel != nil {
+			sqlAssistantCancel()
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		sqlAssistantCancel = cancel
+		sqlAssistantMu.Unlock()
+
+		// Determine API type
+		apiType := settings.APIType // "codex" or "" (default = chat_completions)
+		log.Printf("[SQL-AI] API type: %q, model: %s", apiType, settings.Model)
+
+		// ==================== Codex CLI Mode ====================
+		if apiType == "codex" {
+			log.Printf("[SQL-AI] Using Codex CLI mode")
+
+			// Build the prompt
+			prompt := fmt.Sprintf("你是一个 PostgreSQL 数据库专家。以下是数据库的表结构和样本数据：\n\n%s\n\n用户问题：%s\n\n请生成正确的 PostgreSQL SQL 查询语句，用 markdown 格式回答，SQL 放在代码块中。", schemaCtx, question)
+
+			// Find codex binary
+			codexPath, err := exec.LookPath("codex")
+			if err != nil {
+				s.emitAIError("找不到 codex 命令，请先安装: npm install -g @openai/codex")
+				return
+			}
+
+			// Build command
+			args := []string{"--quiet", "--full-auto"}
+			model := settings.Model
+			if model != "" {
+				args = append(args, "-m", model)
+			}
+			args = append(args, prompt)
+
+			cmd := exec.CommandContext(ctx, codexPath, args...)
+
+			// Set env vars from settings
+			cmd.Env = append(os.Environ(),
+				"OPENAI_API_KEY="+settings.APIKey,
+			)
+			if settings.BaseURL != "" {
+				cmd.Env = append(cmd.Env, "OPENAI_BASE_URL="+settings.BaseURL)
+			}
+
+			// Get stdout pipe for streaming
+			stdout, err := cmd.StdoutPipe()
+			if err != nil {
+				s.emitAIError(fmt.Sprintf("创建管道失败: %v", err))
+				return
+			}
+			cmd.Stderr = cmd.Stdout // merge stderr
+
+			if err := cmd.Start(); err != nil {
+				s.emitAIError(fmt.Sprintf("启动 codex 失败: %v", err))
+				return
+			}
+
+			// Stream output
+			var fullContent strings.Builder
+			buf := make([]byte, 1024)
+			for {
+				n, readErr := stdout.Read(buf)
+				if n > 0 {
+					chunk := string(buf[:n])
+					fullContent.WriteString(chunk)
+					wailsRuntime.EventsEmit(s.ctx, "pg:ai-stream", map[string]interface{}{
+						"content": chunk, "done": false,
+					})
+				}
+				if readErr != nil {
+					break
+				}
+			}
+
+			cmd.Wait()
+			log.Printf("[SQL-AI] Codex completed, response: %d chars", fullContent.Len())
+
+			wailsRuntime.EventsEmit(s.ctx, "pg:ai-stream", map[string]interface{}{
+				"content": fullContent.String(), "done": true,
+			})
+			return
+		}
+
+		// ==================== Chat Completions API Mode (default) ====================
+		model := settings.Model
+		if model == "" {
+			model = "gpt-4o-mini"
+		}
+
+		reqBody := map[string]interface{}{
+			"model":    model,
+			"messages": messages,
+			"stream":   true,
+		}
+		bodyBytes, err := json.Marshal(reqBody)
+		if err != nil {
+			s.emitAIError(fmt.Sprintf("序列化请求失败: %v", err))
+			return
+		}
+
+		baseURL := strings.TrimRight(settings.BaseURL, "/")
+		apiURL := baseURL + "/chat/completions"
+		log.Printf("[SQL-AI] POST %s model=%s payload=%d bytes", apiURL, model, len(bodyBytes))
+
+		req, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(bodyBytes))
+		if err != nil {
+			s.emitAIError(fmt.Sprintf("创建请求失败: %v", err))
+			return
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+settings.APIKey)
+
+		client := &http.Client{Timeout: 5 * time.Minute}
+		resp, err := client.Do(req)
+		if err != nil {
+			s.emitAIError(fmt.Sprintf("请求失败: %v", err))
+			return
+		}
+		defer resp.Body.Close()
+
+		log.Printf("[SQL-AI] Response status: %d", resp.StatusCode)
+
+		if resp.StatusCode != 200 {
+			body, _ := io.ReadAll(resp.Body)
+			errMsg := string(body)
+			if len(errMsg) > 300 {
+				errMsg = errMsg[:300]
+			}
+			s.emitAIError(fmt.Sprintf("API 错误 (%d): %s", resp.StatusCode, errMsg))
+			return
+		}
+
+		// Parse SSE stream
+		scanner := bufio.NewScanner(resp.Body)
+		scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
+		var fullContent strings.Builder
+
+		for scanner.Scan() {
+			select {
+			case <-ctx.Done():
+				wailsRuntime.EventsEmit(s.ctx, "pg:ai-stream", map[string]interface{}{
+					"content": fullContent.String(), "done": true,
+				})
+				return
+			default:
+			}
+
+			line := scanner.Text()
+			if !strings.HasPrefix(line, "data: ") {
+				continue
+			}
+			data := strings.TrimPrefix(line, "data: ")
+			if data == "[DONE]" {
+				break
+			}
+
+			var chunk struct {
+				Choices []struct {
+					Delta struct {
+						Content string `json:"content"`
+					} `json:"delta"`
+				} `json:"choices"`
+			}
+			if err := json.Unmarshal([]byte(data), &chunk); err != nil {
+				continue
+			}
+
+			if len(chunk.Choices) > 0 && chunk.Choices[0].Delta.Content != "" {
+				token := chunk.Choices[0].Delta.Content
+				fullContent.WriteString(token)
+				wailsRuntime.EventsEmit(s.ctx, "pg:ai-stream", map[string]interface{}{
+					"content": token, "done": false,
+				})
+			}
+		}
+
+		log.Printf("[SQL-AI] Completed, response: %d chars", fullContent.Len())
+
+		wailsRuntime.EventsEmit(s.ctx, "pg:ai-stream", map[string]interface{}{
+			"content": fullContent.String(), "done": true,
+		})
+	}()
+}
+
+// StopSQLAssistant cancels the current SQL assistant streaming
+func (s *PGService) StopSQLAssistant() {
+	sqlAssistantMu.Lock()
+	defer sqlAssistantMu.Unlock()
+	if sqlAssistantCancel != nil {
+		sqlAssistantCancel()
+		sqlAssistantCancel = nil
+	}
+}

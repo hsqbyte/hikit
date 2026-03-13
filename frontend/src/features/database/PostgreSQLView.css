@@ -8,6 +8,74 @@
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
+/* When AI panel is open, use horizontal split layout */
+.pg-view-content.pg-view-horizontal {
+    flex-direction: row;
+}
+
+.pg-tablelist-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+/* AI Mode: Left chat panel */
+.pg-ai-panel-left {
+    width: 420px;
+    min-width: 340px;
+    flex-shrink: 0;
+    height: 100%;
+    overflow: hidden;
+    border-right: 1px solid #e8e8e8;
+}
+
+/* AI Mode: Right SQL panel */
+.pg-ai-sql-right {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* AI SQL placeholder (empty state in right panel) */
+.pg-ai-sql-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #999;
+    font-size: 13px;
+    text-align: center;
+    gap: 6px;
+}
+
+.pg-ai-sql-placeholder > div:first-child {
+    font-size: 32px;
+    margin-bottom: 4px;
+}
+
+/* AI Assistant Panel wrapper (for SQL tab) */
+.pg-ai-panel-wrapper {
+    width: 380px;
+    min-width: 320px;
+    flex-shrink: 0;
+    height: 100%;
+    overflow: hidden;
+}
+
+/* Active state for AI toolbar button */
+.pg-tl-action.active {
+    background: #e6f4ff;
+    color: #1677ff;
+    font-weight: 500;
+}
+
 /* ========== MexHub-style Toolbar ========== */
 .pg-toolbar {
     display: flex;
@@ -555,6 +623,18 @@
     white-space: nowrap;
 }
 
+/* Rubber band (lasso) selection */
+.pg-rubberband {
+    border: 1px dashed #1677ff;
+    background: rgba(22, 119, 255, 0.08);
+    pointer-events: none;
+    z-index: 100;
+}
+
+.pg-tablelist-icons {
+    user-select: none;
+}
+
 /* Selected rows in grid */
 .pg-tablelist-row-selected>td {
     background: #d9f7be !important;
@@ -596,6 +676,12 @@
     height: 1px;
     background: #e8e8e8;
     margin: 4px 0;
+}
+
+.pg-context-item.disabled {
+    color: #ccc;
+    cursor: not-allowed;
+    pointer-events: none;
 }
 
 /* ========== Cell Viewer Modal ========== */

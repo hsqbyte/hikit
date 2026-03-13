@@ -223,7 +223,7 @@ jobs:
           name: windows-amd64
           path: dist/HiKit-*-windows-amd64*
 
-  # ── 创建 Release ──────────────────────────────────────────
+  # ── 创建 Release（发布到公开仓库 hsqbyte/hikit） ────────────
   release:
     name: Create Release
     needs: [build-macos, build-linux-amd64, build-linux-arm64, build-windows]
@@ -237,9 +237,12 @@ jobs:
       - name: List artifacts
         run: ls -lh dist/
 
-      - name: Create GitHub Release
+      - name: Create GitHub Release on PUBLIC repo
         uses: softprops/action-gh-release@v2
         with:
+          repository: hsqbyte/hikit
+          token: ${{ secrets.PUBLIC_REPO_TOKEN }}
+          tag_name: ${{ github.ref_name }}
           name: "HiKit ${{ github.ref_name }}"
           body: |
             ## 🎉 HiKit ${{ github.ref_name }}
@@ -256,3 +259,4 @@ jobs:
           files: dist/*
           draft: false
           prerelease: false
+

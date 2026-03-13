@@ -652,3 +652,47 @@ func (s *PGService) GetTableDataWithFilter(sessionID string, schema string, tabl
 	}
 	return sess.GetTableDataWithFilter(schema, table, page, pageSize, orderBy, orderDir, filters)
 }
+
+// CopyTables copies one or more tables from a source session to a destination session.
+// It recreates the table structure and copies all data. Existing tables are dropped first (overwrite).
+func (s *PGService) CopyTables(srcSessionID string, dstSessionID string, srcSchema string, dstSchema string, tableNames []string) error {
+	srcSess, err := s.GetSession(srcSessionID)
+	if err != nil {
+		return fmt.Errorf("source session: %w", err)
+	}
+	dstSess, err := s.GetSession(dstSessionID)
+	if err != nil {
+		return fmt.Errorf("target session: %w", err)
+	}
+
+	total := len(tableNames)
+	wailsRuntime.EventsEmit(s.ctx, "pg:copy-progress", map[string]interface{}{
+		"type": "start", "total": total,
+	})
+
+	for i, tblName := range tableNames {
+		err := dstSess.CopyTable(srcSess, srcSchema, tblName, dstSchema)
+		if err != nil {
+			wailsRuntime.EventsEmit(s.ctx, "pg:copy-progress", map[string]interface{}{
+				"type":    "error",
+				"index":   i + 1,
+				"total":   total,
+				"table":   tblName,
+				"message": err.Error(),
+			})
+		} else {
+			wailsRuntime.EventsEmit(s.ctx, "pg:copy-progress", map[string]interface{}{
+				"type":  "ok",
+				"index": i + 1,
+				"total": total,
+				"table": tblName,
+			})
+		}
+	}
+
+	wailsRuntime.EventsEmit(s.ctx, "pg:copy-progress", map[string]interface{}{
+		"type": "done", "total": total,
+	})
+
+	return nil
+}

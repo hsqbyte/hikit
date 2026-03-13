@@ -347,9 +347,15 @@ const AssetTree: React.FC = () => {
             rest_client: '#722ed1', todo: '#52c41a', memo: '#faad14',
         };
 
+        // Tiny loading spinner for tree nodes
+        const nodeSpinner = (
+            <span className="at-node-spinner" />
+        );
+
         // Build a single host asset node — colored dot + name + optional env badge
         const buildHostNode = (a: Asset): DataNode => {
             const dotColor = a.color || typeColor[a.connectionType || 'ssh'] || '#999';
+            const isLoading = pgLoading[a.id];
             const node: DataNode = {
                 key: a.id,
                 title: (
@@ -366,6 +372,7 @@ const AssetTree: React.FC = () => {
                                 {a.env}
                             </span>
                         )}
+                        {isLoading && nodeSpinner}
                     </span>
                 ),
                 icon: (
@@ -384,10 +391,17 @@ const AssetTree: React.FC = () => {
                 if (dbs.length > 0) {
                     node.children = dbs.map(db => {
                         const dbKey = `pg:${a.id}:db:${db}`;
-                        const schemas = pgSchemas[`${a.id}:${db}`] || [];
+                        const schemaLoadKey = `${a.id}:${db}`;
+                        const dbIsLoading = pgLoading[schemaLoadKey];
+                        const schemas = pgSchemas[schemaLoadKey] || [];
                         const dbNode: DataNode = {
                             key: dbKey,
-                            title: db,
+                            title: (
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, width: '100%' }}>
+                                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{db}</span>
+                                    {dbIsLoading && nodeSpinner}
+                                </span>
+                            ),
                             icon: <TbDatabase style={{ ...iconStyle, color: '#52c41a' }} />,
                             isLeaf: false,
                         };
@@ -395,10 +409,16 @@ const AssetTree: React.FC = () => {
                             dbNode.children = schemas.map(schema => {
                                 const schemaKey = `pg:${a.id}:db:${db}:s:${schema}`;
                                 const objKey = `${a.id}:${db}:${schema}`;
+                                const schemaIsLoading = pgLoading[objKey];
                                 const objects = pgObjects[objKey];
                                 const schemaNode: DataNode = {
                                     key: schemaKey,
-                                    title: schema,
+                                    title: (
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, width: '100%' }}>
+                                            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{schema}</span>
+                                            {schemaIsLoading && nodeSpinner}
+                                        </span>
+                                    ),
                                     icon: <FolderOutlined style={{ color: '#1677ff' }} />,
                                     isLeaf: false,
                                 };
@@ -525,7 +545,7 @@ const AssetTree: React.FC = () => {
         };
 
         return buildNodes(assets);
-    }, [assets, pgSessions, pgDatabases, pgSchemas, pgObjects]);
+    }, [assets, pgSessions, pgDatabases, pgSchemas, pgObjects, pgLoading]);
 
 
     // Handle tree expand — trigger PG lazy loading

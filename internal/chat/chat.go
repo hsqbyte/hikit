@@ -34,6 +34,7 @@ type ChatSettings struct {
 	APIKey  string `json:"api_key"`
 	BaseURL string `json:"base_url"`
 	Model   string `json:"model"`
+	APIType string `json:"api_type"` // "chat_completions" (default) or "responses" (Codex)
 }
 
 // InitTables creates chat-related tables
@@ -81,6 +82,7 @@ func GetSettings() ChatSettings {
 	db.QueryRow(`SELECT value FROM chat_settings WHERE key = 'api_key'`).Scan(&s.APIKey)
 	db.QueryRow(`SELECT value FROM chat_settings WHERE key = 'base_url'`).Scan(&s.BaseURL)
 	db.QueryRow(`SELECT value FROM chat_settings WHERE key = 'model'`).Scan(&s.Model)
+	db.QueryRow(`SELECT value FROM chat_settings WHERE key = 'api_type'`).Scan(&s.APIType)
 	if s.BaseURL == "" {
 		s.BaseURL = "https://api.openai.com/v1"
 	}
@@ -100,6 +102,7 @@ func SaveSettings(s ChatSettings) error {
 		{"api_key", s.APIKey},
 		{"base_url", s.BaseURL},
 		{"model", s.Model},
+		{"api_type", s.APIType},
 	} {
 		if _, err := db.Exec(`INSERT OR REPLACE INTO chat_settings (key, value) VALUES (?, ?)`, kv.k, kv.v); err != nil {
 			return err

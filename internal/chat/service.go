@@ -33,6 +33,12 @@ func (s *ChatService) Startup(ctx context.Context) {
 func (s *ChatService) GetSettings() ChatSettings          { return GetSettings() }
 func (s *ChatService) SaveSettings(st ChatSettings) error { return SaveSettings(st) }
 
+// FetchModels fetches available models using explicit baseURL and apiKey (for testing / settings UI).
+func (s *ChatService) FetchModels(baseURL, apiKey string) ([]ModelInfo, error) {
+	return ListModels(baseURL, apiKey)
+}
+
+
 // ============================================================
 // Conversations
 // ============================================================

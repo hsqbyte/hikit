@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Modal, message } from 'antd';
-import { DeleteOutlined, SettingOutlined, SendOutlined, CopyOutlined, ClearOutlined, EditOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
+import { message } from 'antd';
+import { DeleteOutlined, SendOutlined, CopyOutlined, ClearOutlined, EditOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import {
-    GetSettings, SaveSettings,
+    GetSettings,
     ListConversations, CreateConversation, DeleteConversation,
     UpdateTitle, UpdateSystem, GetMessages, Send, Stop,
 } from '../../../wailsjs/go/chat/ChatService';
@@ -97,7 +97,6 @@ const ChatView: React.FC = () => {
     const [inputText, setInputText] = useState('');
     const [streaming, setStreaming] = useState(false);
     const [streamingContent, setStreamingContent] = useState('');
-    const [showSettings, setShowSettings] = useState(false);
     const [settings, setSettings] = useState<Settings>({ api_key: '', base_url: 'https://api.openai.com/v1', model: 'gpt-4o-mini' });
 
     // System prompt state
@@ -271,13 +270,6 @@ const ChatView: React.FC = () => {
 
     const handleStop = () => { Stop(); };
 
-    const handleSaveSettings = async () => {
-        try {
-            await SaveSettings(settings as any);
-            message.success('设置已保存');
-            setShowSettings(false);
-        } catch { message.error('保存失败'); }
-    };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -345,9 +337,7 @@ const ChatView: React.FC = () => {
                     )}
                 </div>
                 <div className="chat-sidebar-footer">
-                    <button className="chat-settings-btn" onClick={() => setShowSettings(true)}>
-                        <SettingOutlined /> API 设置
-                    </button>
+                    <span className="chat-settings-hint">⚙️ API 设置请前往左侧「设置」</span>
                 </div>
             </div>
 
@@ -363,7 +353,7 @@ const ChatView: React.FC = () => {
                         </button>
                         <div className="chat-empty-tips">
                             <div className="chat-tip">💡 Enter 发送, Shift+Enter 换行</div>
-                            <div className="chat-tip">⚙️ 先在左下角配置 API Key</div>
+                            <div className="chat-tip">⚙️ 先在左侧栏底部「设置」配置 API Key</div>
                             <div className="chat-tip">🧠 可设置系统提示词定制角色</div>
                         </div>
                     </div>
@@ -492,47 +482,7 @@ const ChatView: React.FC = () => {
                 )}
             </div>
 
-            {/* Settings Modal */}
-            <Modal
-                title="⚙️ API 设置"
-                open={showSettings}
-                onOk={handleSaveSettings}
-                onCancel={() => setShowSettings(false)}
-                okText="保存"
-                cancelText="取消"
-                width={440}
-            >
-                <div className="chat-settings-form">
-                    <div className="chat-settings-field">
-                        <label>API Key</label>
-                        <input
-                            type="password"
-                            value={settings.api_key}
-                            onChange={e => setSettings({ ...settings, api_key: e.target.value })}
-                            placeholder="sk-..."
-                        />
-                    </div>
-                    <div className="chat-settings-field">
-                        <label>Base URL</label>
-                        <input
-                            value={settings.base_url}
-                            onChange={e => setSettings({ ...settings, base_url: e.target.value })}
-                            placeholder="https://api.openai.com/v1"
-                        />
-                    </div>
-                    <div className="chat-settings-field">
-                        <label>模型</label>
-                        <input
-                            value={settings.model}
-                            onChange={e => setSettings({ ...settings, model: e.target.value })}
-                            placeholder="gpt-4o-mini"
-                        />
-                    </div>
-                    <div className="chat-settings-hint">
-                        💡 支持所有 OpenAI 兼容接口（DeepSeek、Ollama、Claude API 等），修改 Base URL 即可。
-                    </div>
-                </div>
-            </Modal>
+
         </div>
     );
 };

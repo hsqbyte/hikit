@@ -11,6 +11,7 @@ import (
 
 	assetpkg "github.com/hsqbyte/hikit/internal/asset"
 	chatpkg "github.com/hsqbyte/hikit/internal/chat"
+	codexpkg "github.com/hsqbyte/hikit/internal/codex"
 	gitpkg "github.com/hsqbyte/hikit/internal/git"
 	localpkg "github.com/hsqbyte/hikit/internal/local"
 	memopkg "github.com/hsqbyte/hikit/internal/memo"
@@ -52,6 +53,7 @@ func main() {
 	gitService := gitpkg.NewGitService()
 	chatService := chatpkg.NewChatService()
 	screenshotService := screenshotpkg.NewScreenshotService()
+	codexProxy := codexpkg.NewCodexProxy()
 
 	// Create application with options
 	err := wails.Run(&options.App{
@@ -74,11 +76,13 @@ func main() {
 			gitService.Startup(ctx)
 			screenshotService.Startup(ctx)
 			pgService.Startup(ctx)
+			codexProxy.Startup(ctx)
 		},
 		OnShutdown: func(ctx context.Context) {
 			proxyService.Shutdown(ctx)
 			sshService.Shutdown(ctx)
 			musicService.Shutdown(ctx)
+			codexProxy.Shutdown()
 		},
 		Bind: []interface{}{
 			app,
