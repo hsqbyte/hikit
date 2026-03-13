@@ -9,7 +9,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"os/exec"
 	"strings"
 	"sync"
@@ -147,7 +146,16 @@ func (s *Session) getSampleData(schema, table string, colNames []string, limit i
 var (
 	sqlAssistantCancel context.CancelFunc
 	sqlAssistantMu     sync.Mutex
+
+	// Schema context cache per session (5-min TTL)
+	schemaCache   = map[string]schemaCacheEntry{}
+	schemaCacheMu sync.Mutex
 )
+
+type schemaCacheEntry struct {
+	context   string
+	fetchedAt time.Time
+}
 
 // emitAIError is a helper to emit an error event to the frontend
 func (s *PGService) emitAIError(errMsg string) {
@@ -181,12 +189,27 @@ func (s *PGService) SQLAssistant(sessionID, schema, question string, history []m
 			return
 		}
 
-		log.Printf("[SQL-AI] Fetching schema context...")
-		// Get schema context
-		schemaCtx, err := s.GetSchemaContext(sessionID, schema)
-		if err != nil {
-			s.emitAIError(fmt.Sprintf("获取表结构失败: %v", err))
-			return
+		// Get schema context (with cache, 5-min TTL)
+		cacheKey := sessionID + ":" + schema
+		schemaCacheMu.Lock()
+		cached, hasCached := schemaCache[cacheKey]
+		schemaCacheMu.Unlock()
+
+		var schemaCtx string
+		if hasCached && time.Since(cached.fetchedAt) < 5*time.Minute {
+			schemaCtx = cached.context
+			log.Printf("[SQL-AI] Schema context from cache (%d chars)", len(schemaCtx))
+		} else {
+			log.Printf("[SQL-AI] Fetching schema context...")
+			var err error
+			schemaCtx, err = s.GetSchemaContext(sessionID, schema)
+			if err != nil {
+				s.emitAIError(fmt.Sprintf("获取表结构失败: %v", err))
+				return
+			}
+			schemaCacheMu.Lock()
+			schemaCache[cacheKey] = schemaCacheEntry{context: schemaCtx, fetchedAt: time.Now()}
+			schemaCacheMu.Unlock()
 		}
 		log.Printf("[SQL-AI] Schema context: %d chars, sending to LLM...", len(schemaCtx))
 
@@ -240,7 +263,8 @@ func (s *PGService) SQLAssistant(sessionID, schema, question string, history []m
 
 		// ==================== Codex CLI Mode ====================
 		if apiType == "codex" {
-			log.Printf("[SQL-AI] Using Codex CLI mode")
+			codexCfg := chat.GetCodexConfig()
+			log.Printf("[SQL-AI] Using Codex CLI mode (codex model: %s, effort: %s)", codexCfg.Model, codexCfg.ReasoningEffort)
 
 			// Build the prompt
 			prompt := fmt.Sprintf("你是一个 PostgreSQL 数据库专家。以下是数据库的表结构和样本数据：\n\n%s\n\n用户问题：%s\n\n请生成正确的 PostgreSQL SQL 查询语句，用 markdown 格式回答，SQL 放在代码块中。", schemaCtx, question)
@@ -252,23 +276,15 @@ func (s *PGService) SQLAssistant(sessionID, schema, question string, history []m
 				return
 			}
 
-			// Build command
-			args := []string{"--quiet", "--full-auto"}
-			model := settings.Model
-			if model != "" {
-				args = append(args, "-m", model)
-			}
+			// Build command: codex exec --json for structured output
+			// Don't pass -m, let codex use its own config.toml model
+			args := []string{"exec", "--full-auto", "--skip-git-repo-check", "--ephemeral", "--json"}
 			args = append(args, prompt)
 
 			cmd := exec.CommandContext(ctx, codexPath, args...)
 
-			// Set env vars from settings
-			cmd.Env = append(os.Environ(),
-				"OPENAI_API_KEY="+settings.APIKey,
-			)
-			if settings.BaseURL != "" {
-				cmd.Env = append(cmd.Env, "OPENAI_BASE_URL="+settings.BaseURL)
-			}
+			// Let codex use its own auth (from `codex login` + ~/.codex/config.toml)
+			// Don't override OPENAI_API_KEY or OPENAI_BASE_URL
 
 			// Get stdout pipe for streaming
 			stdout, err := cmd.StdoutPipe()
@@ -276,35 +292,74 @@ func (s *PGService) SQLAssistant(sessionID, schema, question string, history []m
 				s.emitAIError(fmt.Sprintf("创建管道失败: %v", err))
 				return
 			}
-			cmd.Stderr = cmd.Stdout // merge stderr
 
 			if err := cmd.Start(); err != nil {
 				s.emitAIError(fmt.Sprintf("启动 codex 失败: %v", err))
 				return
 			}
 
-			// Stream output
+			// Parse JSONL events from codex
+			scanner := bufio.NewScanner(stdout)
+			scanner.Buffer(make([]byte, 1024*1024), 1024*1024) // 1MB buffer for large schema contexts
 			var fullContent strings.Builder
-			buf := make([]byte, 1024)
-			for {
-				n, readErr := stdout.Read(buf)
-				if n > 0 {
-					chunk := string(buf[:n])
-					fullContent.WriteString(chunk)
-					wailsRuntime.EventsEmit(s.ctx, "pg:ai-stream", map[string]interface{}{
-						"content": chunk, "done": false,
-					})
+
+			for scanner.Scan() {
+				line := scanner.Text()
+				if line == "" {
+					continue
 				}
-				if readErr != nil {
-					break
+
+				var event map[string]interface{}
+				if err := json.Unmarshal([]byte(line), &event); err != nil {
+					log.Printf("[SQL-AI] Codex JSONL parse error: %v, line: %.100s", err, line)
+					continue
+				}
+
+				eventType, _ := event["type"].(string)
+
+				switch eventType {
+				case "agent_message_delta":
+					// Streaming message delta — the actual answer
+					if delta, ok := event["delta"].(string); ok && delta != "" {
+						fullContent.WriteString(delta)
+						wailsRuntime.EventsEmit(s.ctx, "pg:ai-stream", map[string]interface{}{
+							"content": delta, "done": false,
+						})
+					}
+				case "agent_reasoning_delta":
+					// Internal thinking — stream to frontend with reasoning flag
+					if delta, ok := event["delta"].(string); ok && delta != "" {
+						wailsRuntime.EventsEmit(s.ctx, "pg:ai-stream", map[string]interface{}{
+							"content": delta, "done": false, "reasoning": true,
+						})
+					}
+				case "item.completed":
+					// Final completed item — only show agent_message, skip reasoning
+					if item, ok := event["item"].(map[string]interface{}); ok {
+						itemType, _ := item["type"].(string)
+						text, _ := item["text"].(string)
+						if itemType == "reasoning" {
+							// reasoning already streamed via deltas, just log summary
+							log.Printf("[SQL-AI] Codex reasoning done: %d chars", len(text))
+						} else if itemType == "agent_message" && text != "" {
+							// Only emit if we haven't streamed this via deltas
+							if fullContent.Len() == 0 {
+								fullContent.WriteString(text)
+								wailsRuntime.EventsEmit(s.ctx, "pg:ai-stream", map[string]interface{}{
+									"content": text, "done": false,
+								})
+							}
+						}
+					}
 				}
 			}
 
 			cmd.Wait()
 			log.Printf("[SQL-AI] Codex completed, response: %d chars", fullContent.Len())
 
+			// Send done signal
 			wailsRuntime.EventsEmit(s.ctx, "pg:ai-stream", map[string]interface{}{
-				"content": fullContent.String(), "done": true,
+				"content": "", "done": true,
 			})
 			return
 		}

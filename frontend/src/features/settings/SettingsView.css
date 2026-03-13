@@ -370,3 +370,43 @@
 .spin {
     animation: spin 1s linear infinite;
 }
+
+/* ===== Codex Config ===== */
+.settings-codex-info {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.settings-codex-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: #f6f8ff;
+    border: 1px solid #e8eef9;
+    border-radius: 8px;
+}
+
+.settings-codex-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: #666;
+}
+
+.settings-codex-value {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1a1a2e;
+    font-family: 'Menlo', 'SF Mono', monospace;
+}
+
+.settings-codex-empty {
+    padding: 16px;
+    text-align: center;
+    color: #a0a3b1;
+    font-size: 12px;
+    background: #fafbfc;
+    border-radius: 8px;
+    border: 1px dashed #dde0e5;
+}

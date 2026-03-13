@@ -16,6 +16,7 @@ interface SQLAssistantPanelProps {
 interface ChatMsg {
     role: 'user' | 'assistant';
     content: string;
+    reasoning?: string;
 }
 
 /** Render markdown to HTML with code-block copy + insert buttons */
@@ -56,7 +57,9 @@ const SQLAssistantPanel: React.FC<SQLAssistantPanelProps> = ({
     const [input, setInput] = useState('');
     const [streaming, setStreaming] = useState(false);
     const [streamContent, setStreamContent] = useState('');
+    const [reasoningContent, setReasoningContent] = useState('');
     const streamRef = useRef('');
+    const reasoningRef = useRef('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -64,18 +67,26 @@ const SQLAssistantPanel: React.FC<SQLAssistantPanelProps> = ({
     useEffect(() => {
         const handler = (data: any) => {
             if (data.done) {
-                // CRITICAL: capture ref value BEFORE clearing,
-                // because setMessages updater runs asynchronously
                 const finalContent = streamRef.current;
+                const finalReasoning = reasoningRef.current;
                 streamRef.current = '';
+                reasoningRef.current = '';
                 setStreamContent('');
+                setReasoningContent('');
                 setStreaming(false);
                 if (data.error) {
                     message.error(data.error);
                     setMessages(prev => [...prev, { role: 'assistant', content: `❌ ${data.error}` }]);
-                } else if (finalContent) {
-                    setMessages(prev => [...prev, { role: 'assistant', content: finalContent }]);
+                } else if (finalContent || finalReasoning) {
+                    setMessages(prev => [...prev, {
+                        role: 'assistant',
+                        content: finalContent,
+                        reasoning: finalReasoning || undefined,
+                    }]);
                 }
+            } else if (data.reasoning) {
+                reasoningRef.current += data.content;
+                setReasoningContent(reasoningRef.current);
             } else {
                 streamRef.current += data.content;
                 setStreamContent(streamRef.current);
@@ -187,6 +198,12 @@ const SQLAssistantPanel: React.FC<SQLAssistantPanelProps> = ({
                         <div className="sqla-msg-content">
                             {msg.role === 'assistant' ? (
                                 <>
+                                    {msg.reasoning && (
+                                        <details className="sqla-reasoning">
+                                            <summary>💭 思考过程</summary>
+                                            <div className="sqla-reasoning-body">{msg.reasoning}</div>
+                                        </details>
+                                    )}
                                     <div dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} />
                                     {onInsertSQL && extractSQL(msg.content).length > 0 && (
                                         <div className="sqla-msg-insert-actions">
@@ -209,17 +226,25 @@ const SQLAssistantPanel: React.FC<SQLAssistantPanelProps> = ({
                     </div>
                 ))}
 
-                {streaming && streamContent && (
+                {streaming && (streamContent || reasoningContent) && (
                     <div className="sqla-message assistant">
                         <div className="sqla-msg-avatar"><TbRobot /></div>
                         <div className="sqla-msg-content">
-                            <div dangerouslySetInnerHTML={{ __html: renderMarkdown(streamContent) }} />
+                            {reasoningContent && (
+                                <div className="sqla-reasoning-live">
+                                    <div className="sqla-reasoning-label">💭 思考中...</div>
+                                    <div className="sqla-reasoning-text">{reasoningContent}</div>
+                                </div>
+                            )}
+                            {streamContent && (
+                                <div dangerouslySetInnerHTML={{ __html: renderMarkdown(streamContent) }} />
+                            )}
                             <span className="sqla-cursor" />
                         </div>
                     </div>
                 )}
 
-                {streaming && !streamContent && (
+                {streaming && !streamContent && !reasoningContent && (
                     <div className="sqla-message assistant">
                         <div className="sqla-msg-avatar"><TbRobot /></div>
                         <div className="sqla-msg-content">

@@ -149,6 +149,8 @@
 .sqla-msg-content {
     flex: 1;
     min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
     font-size: 13px;
     line-height: 1.6;
     color: #333;
@@ -175,6 +177,7 @@
     overflow: hidden;
     border: 1px solid #e0e0e0;
     background: #1e1e1e;
+    max-width: 100%;
 }
 
 .sqla-code-header {
@@ -224,7 +227,8 @@
     font-size: 12px;
     color: #d4d4d4;
     line-height: 1.5;
-    white-space: pre;
+    white-space: pre-wrap;
+    word-wrap: break-word;
 }
 
 .sqla-inline-code {
@@ -431,4 +435,69 @@
 .sqla-msg-content th {
     background: #fafafa;
     font-weight: 600;
+}
+
+/* ===== Reasoning (thinking) ===== */
+/* Live streaming thinking block */
+.sqla-reasoning-live {
+    margin-bottom: 10px;
+    padding: 10px 12px;
+    background: #f8f6ff;
+    border: 1px solid #e8e0ff;
+    border-radius: 8px;
+    border-left: 3px solid #8b5cf6;
+}
+
+.sqla-reasoning-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #8b5cf6;
+    margin-bottom: 6px;
+}
+
+.sqla-reasoning-text {
+    font-size: 12px;
+    color: #666;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+/* Saved reasoning in <details> */
+.sqla-reasoning {
+    margin-bottom: 10px;
+    padding: 0;
+    border: 1px solid #e8e0ff;
+    border-radius: 8px;
+    border-left: 3px solid #8b5cf6;
+    overflow: hidden;
+}
+
+.sqla-reasoning summary {
+    padding: 8px 12px;
+    background: #f8f6ff;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    color: #8b5cf6;
+    user-select: none;
+}
+
+.sqla-reasoning summary:hover {
+    background: #f0ecff;
+}
+
+.sqla-reasoning[open] summary {
+    border-bottom: 1px solid #e8e0ff;
+}
+
+.sqla-reasoning-body {
+    padding: 8px 12px;
+    font-size: 12px;
+    color: #666;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    max-height: 200px;
+    overflow-y: auto;
 }

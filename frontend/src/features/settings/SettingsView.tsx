@@ -3,9 +3,15 @@ import { message } from 'antd';
 import { VscSave, VscRefresh, VscCheck, VscWarning, VscLoading } from 'react-icons/vsc';
 import { TbKey, TbWorld, TbRobot, TbTerminal2, TbBrain } from 'react-icons/tb';
 import {
-    GetSettings, SaveSettings, FetchModels,
+    GetSettings, SaveSettings, FetchModels, GetCodexConfig,
 } from '../../../wailsjs/go/chat/ChatService';
 import './SettingsView.css';
+
+interface CodexConfigInfo {
+    model: string;
+    model_provider: string;
+    reasoning_effort: string;
+}
 
 interface Settings {
     api_key: string;
@@ -26,6 +32,7 @@ const SettingsView: React.FC = () => {
     const [modelError, setModelError] = useState('');
     const [saved, setSaved] = useState(false);
     const [dirty, setDirty] = useState(false);
+    const [codexConfig, setCodexConfig] = useState<CodexConfigInfo | null>(null);
 
     useEffect(() => {
         GetSettings().then(s => {
@@ -75,6 +82,10 @@ const SettingsView: React.FC = () => {
         setSettings(prev => ({ ...prev, [field]: value }));
         setDirty(true);
         setSaved(false);
+        // Auto-load codex config when switching to codex mode
+        if (field === 'api_type' && value === 'codex') {
+            GetCodexConfig().then((cfg: CodexConfigInfo) => setCodexConfig(cfg)).catch(() => {});
+        }
     };
 
     const handleSave = async () => {
@@ -148,20 +159,76 @@ const SettingsView: React.FC = () => {
                     {isCodex && (
                         <div className="settings-codex-tip">
                             <TbTerminal2 />
-                            <span>需先安装：<code>npm install -g @openai/codex</code></span>
+                            <span>需先安装：<code>npm install -g @openai/codex</code>，然后运行 <code>codex login</code></span>
                         </div>
                     )}
                 </div>
 
-                {/* Connection Section */}
+                {/* Codex Config */}
+                {isCodex && (
+                    <div className="settings-section">
+                        <div className="settings-section-header">
+                            <div className="settings-section-icon"><TbTerminal2 /></div>
+                            <div>
+                                <div className="settings-section-title">Codex 配置</div>
+                                <div className="settings-section-desc">~/.codex/config.toml</div>
+                            </div>
+                        </div>
+
+                        {codexConfig ? (
+                            <div className="settings-fields">
+                                <div className="settings-field">
+                                    <label>模型</label>
+                                    <input
+                                        className="settings-input"
+                                        value={codexConfig.model}
+                                        onChange={e => setCodexConfig({ ...codexConfig, model: e.target.value })}
+                                        placeholder="gpt-5.2-codex"
+                                    />
+                                </div>
+                                <div className="settings-field">
+                                    <label>推理强度</label>
+                                    <select
+                                        className="settings-select"
+                                        value={codexConfig.reasoning_effort || 'high'}
+                                        onChange={e => setCodexConfig({ ...codexConfig, reasoning_effort: e.target.value })}
+                                    >
+                                        <option value="low">Low — 轻量推理</option>
+                                        <option value="medium">Medium — 平衡</option>
+                                        <option value="high">High — 深度推理</option>
+                                        <option value="xhigh">Extra High — 最强推理</option>
+                                    </select>
+                                </div>
+                                <button
+                                    className="settings-save-btn active"
+                                    style={{ alignSelf: 'flex-end' }}
+                                    onClick={async () => {
+                                        try {
+                                            const { SaveCodexConfig } = await import('../../../wailsjs/go/chat/ChatService');
+                                            await SaveCodexConfig(codexConfig as any);
+                                            message.success('Codex 配置已保存');
+                                        } catch { message.error('保存失败'); }
+                                    }}
+                                >
+                                    <VscSave /> 保存 Codex 配置
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="settings-codex-empty">
+                                加载中...
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Connection Section - only for API mode */}
+                {!isCodex && (
                 <div className="settings-section">
                     <div className="settings-section-header">
                         <div className="settings-section-icon"><TbKey /></div>
                         <div>
                             <div className="settings-section-title">连接配置</div>
-                            <div className="settings-section-desc">
-                                {isCodex ? 'Codex 使用的 API 凭证' : 'API 服务地址和密钥'}
-                            </div>
+                            <div className="settings-section-desc">API 服务地址和密钥</div>
                         </div>
                     </div>
 
@@ -174,9 +241,7 @@ const SettingsView: React.FC = () => {
                                 onChange={e => handleChange('base_url', e.target.value)}
                                 placeholder="https://api.openai.com/v1"
                             />
-                            <span className="settings-hint">
-                                {isCodex ? '传给 codex 的 OPENAI_BASE_URL 环境变量' : 'API 端点地址'}
-                            </span>
+                            <span className="settings-hint">API 端点地址</span>
                         </div>
 
                         <div className="settings-field">
@@ -191,32 +256,30 @@ const SettingsView: React.FC = () => {
                         </div>
                     </div>
                 </div>
+                )}
 
-                {/* Model Section */}
+                {/* Model Section - only for API mode */}
+                {!isCodex && (
                 <div className="settings-section">
                     <div className="settings-section-header">
                         <div className="settings-section-icon"><TbRobot /></div>
                         <div>
                             <div className="settings-section-title">模型选择</div>
-                            <div className="settings-section-desc">
-                                {isCodex ? 'Codex 使用的模型' : '点击「获取」加载可用模型列表'}
-                            </div>
+                            <div className="settings-section-desc">点击「获取」加载可用模型列表</div>
                         </div>
-                        {!isCodex && (
-                            <button
-                                className="settings-fetch-btn"
-                                onClick={() => fetchModels()}
-                                disabled={loadingModels}
-                            >
-                                {loadingModels ? <VscLoading className="spin" /> : <VscRefresh />}
-                                {loadingModels ? '加载中' : '获取模型'}
-                            </button>
-                        )}
+                        <button
+                            className="settings-fetch-btn"
+                            onClick={() => fetchModels()}
+                            disabled={loadingModels}
+                        >
+                            {loadingModels ? <VscLoading className="spin" /> : <VscRefresh />}
+                            {loadingModels ? '加载中' : '获取模型'}
+                        </button>
                     </div>
 
                     <div className="settings-fields">
                         <div className="settings-field">
-                            {models.length > 0 && !isCodex ? (
+                            {models.length > 0 ? (
                                 <select
                                     className="settings-select"
                                     value={settings.model}
@@ -233,7 +296,7 @@ const SettingsView: React.FC = () => {
                                     className="settings-input"
                                     value={settings.model}
                                     onChange={e => handleChange('model', e.target.value)}
-                                    placeholder={isCodex ? 'codex-mini-latest' : 'gpt-4o-mini'}
+                                    placeholder="gpt-4o-mini"
                                 />
                             )}
                             {modelError && (
@@ -241,12 +304,13 @@ const SettingsView: React.FC = () => {
                                     <VscWarning /> {modelError}
                                 </div>
                             )}
-                            {models.length > 0 && !isCodex && (
+                            {models.length > 0 && (
                                 <span className="settings-hint">已加载 {models.length} 个可用模型</span>
                             )}
                         </div>
                     </div>
                 </div>
+                )}
             </div>
         </div>
     );

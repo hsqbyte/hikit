@@ -202,25 +202,12 @@ func (p *CodexProxy) handleResponses(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[Codex Proxy] Request: model=%s stream=%v", req.Model, req.Stream != nil && *req.Stream)
-
-	// Convert to Chat Completions request
-	ccReq, err := p.convertRequest(req, r)
-	if err != nil {
-		http.Error(w, "Conversion error: "+err.Error(), 400)
-		return
-	}
+	log.Printf("[Codex Proxy] Request: model=%s stream=%v input_size=%d", req.Model, req.Stream != nil && *req.Stream, len(body))
 
 	// Get API settings
 	settings := chat.GetSettings()
 	baseURL := strings.TrimRight(settings.BaseURL, "/")
 	apiKey := settings.APIKey
-
-	// Allow override from request Authorization header
-	authHeader := r.Header.Get("Authorization")
-	if authHeader != "" && strings.HasPrefix(authHeader, "Bearer ") {
-		apiKey = strings.TrimPrefix(authHeader, "Bearer ")
-	}
 
 	if apiKey == "" {
 		http.Error(w, "No API key configured", 401)
@@ -229,12 +216,61 @@ func (p *CodexProxy) handleResponses(w http.ResponseWriter, r *http.Request) {
 
 	isStream := req.Stream != nil && *req.Stream
 
-	// Forward to upstream
+	// Check if upstream likely supports Responses API natively
+	// (OpenAI and compatible providers with codex/gpt/o-series models)
+	nativeResponsesAPI := strings.Contains(baseURL, "openai.com") ||
+		strings.HasPrefix(req.Model, "codex") ||
+		strings.HasPrefix(req.Model, "gpt") ||
+		strings.HasPrefix(req.Model, "o1") ||
+		strings.HasPrefix(req.Model, "o3") ||
+		strings.HasPrefix(req.Model, "o4")
+
+	if nativeResponsesAPI {
+		// Pass through directly to /v1/responses (no translation)
+		apiURL := baseURL + "/responses"
+		log.Printf("[Codex Proxy] Passthrough to %s (native Responses API)", apiURL)
+
+		upReq, err := http.NewRequest("POST", apiURL, bytes.NewReader(body))
+		if err != nil {
+			http.Error(w, "Failed to create upstream request", 500)
+			return
+		}
+		upReq.Header.Set("Content-Type", "application/json")
+		upReq.Header.Set("Authorization", "Bearer "+apiKey)
+
+		client := &http.Client{Timeout: 10 * time.Minute}
+		upResp, err := client.Do(upReq)
+		if err != nil {
+			log.Printf("[Codex Proxy] Passthrough failed: %v", err)
+			http.Error(w, "Upstream error: "+err.Error(), 502)
+			return
+		}
+		defer upResp.Body.Close()
+
+		// Copy all response headers and body
+		for k, vv := range upResp.Header {
+			for _, v := range vv {
+				w.Header().Add(k, v)
+			}
+		}
+		w.WriteHeader(upResp.StatusCode)
+		io.Copy(w, upResp.Body)
+		return
+	}
+
+	// ---- Translate Responses API → Chat Completions for non-OpenAI providers ----
+	ccReq, err := p.convertRequest(req, r)
+	if err != nil {
+		log.Printf("[Codex Proxy] Conversion error: %v", err)
+		http.Error(w, "Conversion error: "+err.Error(), 400)
+		return
+	}
+
 	ccReq.Stream = isStream
 	ccBody, _ := json.Marshal(ccReq)
 	apiURL := baseURL + "/chat/completions"
 
-	log.Printf("[Codex Proxy] Forwarding to %s (stream=%v, messages=%d)", apiURL, isStream, len(ccReq.Messages))
+	log.Printf("[Codex Proxy] Translating → %s (stream=%v, messages=%d, body=%d bytes)", apiURL, isStream, len(ccReq.Messages), len(ccBody))
 
 	upReq, err := http.NewRequest("POST", apiURL, bytes.NewReader(ccBody))
 	if err != nil {
@@ -247,10 +283,13 @@ func (p *CodexProxy) handleResponses(w http.ResponseWriter, r *http.Request) {
 	client := &http.Client{Timeout: 10 * time.Minute}
 	upResp, err := client.Do(upReq)
 	if err != nil {
+		log.Printf("[Codex Proxy] Upstream request failed: %v", err)
 		http.Error(w, "Upstream error: "+err.Error(), 502)
 		return
 	}
 	defer upResp.Body.Close()
+
+	log.Printf("[Codex Proxy] Upstream response: %d", upResp.StatusCode)
 
 	if upResp.StatusCode != 200 {
 		respBody, _ := io.ReadAll(upResp.Body)
