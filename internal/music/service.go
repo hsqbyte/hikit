@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 )
 
 const MusicDLPort = "19528"
@@ -19,17 +20,55 @@ type MusicService struct {
 
 func NewMusicService() *MusicService { return &MusicService{} }
 
+// findMusicDL searches for go-music-dl binary in multiple locations.
+// Priority: app bundle (macOS .app) > same dir as executable > ~/go/bin/ (dev fallback)
+func findMusicDL() string {
+	exe, err := os.Executable()
+	if err == nil {
+		exeDir := filepath.Dir(exe)
+
+		// 1. Same directory as executable (e.g. Contents/MacOS/go-music-dl)
+		candidate := filepath.Join(exeDir, "go-music-dl")
+		if runtime.GOOS == "windows" {
+			candidate += ".exe"
+		}
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+
+		// 2. macOS .app Resources directory (Contents/Resources/go-music-dl)
+		if runtime.GOOS == "darwin" {
+			candidate = filepath.Join(exeDir, "..", "Resources", "go-music-dl")
+			if _, err := os.Stat(candidate); err == nil {
+				return candidate
+			}
+		}
+	}
+
+	// 3. Fallback: ~/go/bin/ (development environment)
+	home, _ := os.UserHomeDir()
+	candidate := filepath.Join(home, "go", "bin", "go-music-dl")
+	if runtime.GOOS == "windows" {
+		candidate += ".exe"
+	}
+	if _, err := os.Stat(candidate); err == nil {
+		return candidate
+	}
+
+	return ""
+}
+
 func (s *MusicService) Startup(ctx context.Context) {
 	s.ctx = ctx
 
 	// Start go-music-dl web service
 	go func() {
-		home, _ := os.UserHomeDir()
-		musicDLPath := filepath.Join(home, "go", "bin", "go-music-dl")
-		if _, err := os.Stat(musicDLPath); err != nil {
-			log.Printf("go-music-dl not found at %s, music feature disabled", musicDLPath)
+		musicDLPath := findMusicDL()
+		if musicDLPath == "" {
+			log.Println("go-music-dl not found, music feature disabled")
 			return
 		}
+		log.Printf("Found go-music-dl at %s", musicDLPath)
 		s.musicCmd = exec.Command(musicDLPath, "web", "--port", MusicDLPort, "--no-browser")
 		s.musicCmd.Stdout = os.Stdout
 		s.musicCmd.Stderr = os.Stderr
