@@ -1063,7 +1063,7 @@ const AssetTree: React.FC = () => {
                             const isAssetRoot = !key.includes(':db:');
                             const items: React.ReactNode[] = [];
 
-                            if (isAssetRoot || isDbNode) {
+                            if (isAssetRoot) {
                                 items.push(
                                     <div key="create-db" className="pg-context-item" onClick={() => {
                                         setPgContextMenu(null);
