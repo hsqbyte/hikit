@@ -599,6 +599,15 @@ func (s *PGService) DropTable(sessionID string, schema string, table string) err
 	return sess.DropTable(schema, table)
 }
 
+// RenameTable renames a table
+func (s *PGService) RenameTable(sessionID string, schema string, oldName string, newName string) error {
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return err
+	}
+	return sess.RenameTable(schema, oldName, newName)
+}
+
 // GetPrimaryKeys returns primary key column names for a table
 func (s *PGService) GetPrimaryKeys(sessionID string, schema string, table string) ([]string, error) {
 	sess, err := s.GetSession(sessionID)

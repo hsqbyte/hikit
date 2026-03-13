@@ -772,6 +772,13 @@ func (s *Session) DropTable(schema, table string) error {
 	return err
 }
 
+// RenameTable renames a table within the same schema
+func (s *Session) RenameTable(schema, oldName, newName string) error {
+	_, err := s.DB.Exec(fmt.Sprintf("ALTER TABLE %s.%s RENAME TO %s",
+		quoteIdent(schema), quoteIdent(oldName), quoteIdent(newName)))
+	return err
+}
+
 // executeRawQuery executes a query that returns rows
 func (s *Session) executeRawQuery(sqlText string) (*QueryResult, error) {
 	rows, err := s.DB.Query(sqlText)

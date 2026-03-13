@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Table, Input, Button, Spin, Pagination, message, Tooltip, Modal, Dropdown, Checkbox } from 'antd';
 import { CopyOutlined, ExpandOutlined, FormatPainterOutlined, EyeOutlined, RightOutlined, DownOutlined, ApartmentOutlined } from '@ant-design/icons';
 import {
@@ -14,6 +14,7 @@ import {
     GetTableData, ExecuteQuery, GetTableDDL,
     GetPrimaryKeys, InsertRow, UpdateRow, DeleteRows,
     GetTableDataWithFilter, SwitchDatabase, ListTables, DropTable,
+    RenameTable,
 } from '../../../wailsjs/go/pg/PGService';
 import { useConnectionStore } from '../../stores/connectionStore';
 import './PostgreSQLView.css';
@@ -519,6 +520,26 @@ const PostgreSQLView: React.FC<PostgreSQLViewProps> = ({
             });
         };
 
+        // — Rename table —
+        const [renameModalOpen, setRenameModalOpen] = useState(false);
+        const [renameOldName, setRenameOldName] = useState('');
+        const [renameNewName, setRenameNewName] = useState('');
+
+        const handleRenameTable = async () => {
+            if (!renameNewName.trim() || renameNewName === renameOldName) {
+                setRenameModalOpen(false);
+                return;
+            }
+            try {
+                await RenameTable(sessionID, schema, renameOldName, renameNewName.trim());
+                message.success(`表 ${renameOldName} 已重命名为 ${renameNewName.trim()}`);
+                setRenameModalOpen(false);
+                loadTableList();
+            } catch (err: any) {
+                message.error('重命名失败: ' + (err?.message || err));
+            }
+        };
+
         const handleViewDDL = async (tblName: string) => {
             try {
                 const ddl = await GetTableDDL(sessionID, schema, tblName);
@@ -652,11 +673,34 @@ const PostgreSQLView: React.FC<PostgreSQLViewProps> = ({
                         onClick={() => setContextMenu(null)}
                     >
                         <div className="pg-context-item" onClick={() => handleOpenTableFromList(contextMenu.tableName)}>打开</div>
+                        <div className="pg-context-item" onClick={() => {
+                            setRenameOldName(contextMenu.tableName);
+                            setRenameNewName(contextMenu.tableName);
+                            setRenameModalOpen(true);
+                            setContextMenu(null);
+                        }}>重命名</div>
                         <div className="pg-context-item" onClick={() => handleViewDDL(contextMenu.tableName)}>查看 DDL</div>
                         <div className="pg-context-divider" />
                         <div className="pg-context-item danger" onClick={handleDropSelectedTables}>删除</div>
                     </div>
                 )}
+
+                {/* Rename table modal */}
+                <Modal
+                    title={`重命名表 — ${renameOldName}`}
+                    open={renameModalOpen}
+                    onOk={handleRenameTable}
+                    onCancel={() => setRenameModalOpen(false)}
+                    okText="确认" cancelText="取消" width={400}
+                >
+                    <Input
+                        placeholder="新表名"
+                        value={renameNewName}
+                        onChange={e => setRenameNewName(e.target.value)}
+                        onPressEnter={handleRenameTable}
+                        autoFocus
+                    />
+                </Modal>
             </div>
         );
     }
