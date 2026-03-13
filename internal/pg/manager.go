@@ -232,6 +232,15 @@ func (s *PGService) ImportSQL(sessionID string, sqlContent string) (*QueryResult
 	return sess.ImportSQL(sqlContent)
 }
 
+// ExportSQL exports the structure and data of a schema as SQL statements
+func (s *PGService) ExportSQL(sessionID string, schema string, dataOnly bool, structOnly bool) (string, error) {
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return "", err
+	}
+	return sess.ExportSQL(schema, dataOnly, structOnly)
+}
+
 // ListSchemas returns all schemas in the current database
 func (s *PGService) ListSchemas(sessionID string) ([]string, error) {
 	sess, err := s.GetSession(sessionID)

@@ -31,7 +31,7 @@ import {
     ConnectByAsset, ConnectByAssetViaSSH, ListDatabases, ListSchemas,
     ListTables, ListViews, ListFunctions,
     ListMaterializedViews, SwitchDatabase,
-    CreateDatabase, DropDatabase, ImportSQL,
+    CreateDatabase, DropDatabase, ImportSQL, ExportSQL,
 } from '../../../wailsjs/go/pg/PGService';
 import { Move as MoveAsset } from '../../../wailsjs/go/asset/AssetService';
 import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime';
@@ -844,6 +844,33 @@ const AssetTree: React.FC = () => {
         input.click();
     }, []);
 
+    const handlePgExportSQL = useCallback(async (assetId: string, dbName: string, mode: 'all' | 'struct' | 'data') => {
+        const sid = pgSessions[assetId];
+        if (!sid) return;
+        try {
+            message.loading({ content: '正在导出...', key: 'export' });
+            // Switch to target db
+            if (pgCurrentDB[assetId] !== dbName) {
+                await SwitchDatabase(sid, dbName);
+                setPgCurrentDB(prev => ({ ...prev, [assetId]: dbName }));
+            }
+            const dataOnly = mode === 'data';
+            const structOnly = mode === 'struct';
+            const sql = await ExportSQL(sid, 'public', dataOnly, structOnly);
+            // Download as file
+            const blob = new Blob([sql], { type: 'text/sql;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${dbName}_${mode === 'all' ? 'full' : mode}.sql`;
+            a.click();
+            URL.revokeObjectURL(url);
+            message.success({ content: '导出完成', key: 'export' });
+        } catch (err: any) {
+            message.error({ content: '导出失败: ' + (err?.message || err), key: 'export' });
+        }
+    }, [pgSessions, pgCurrentDB]);
+
     return (
         <div className="asset-tree">
             <div className="asset-tree-header">
@@ -1058,6 +1085,31 @@ const AssetTree: React.FC = () => {
                                         setImportSQLModalOpen(true);
                                     }}>
                                         <CodeOutlined style={{ marginRight: 6 }} />导入 SQL
+                                    </div>
+                                );
+                                items.push(<div key="divider-export" className="pg-context-divider" />);
+                                items.push(
+                                    <div key="export-all" className="pg-context-item" onClick={() => {
+                                        setPgContextMenu(null);
+                                        handlePgExportSQL(assetId, dbName, 'all');
+                                    }}>
+                                        <CodeOutlined style={{ marginRight: 6 }} />导出 SQL（结构+数据）
+                                    </div>
+                                );
+                                items.push(
+                                    <div key="export-struct" className="pg-context-item" onClick={() => {
+                                        setPgContextMenu(null);
+                                        handlePgExportSQL(assetId, dbName, 'struct');
+                                    }}>
+                                        <CodeOutlined style={{ marginRight: 6 }} />导出 SQL（仅结构）
+                                    </div>
+                                );
+                                items.push(
+                                    <div key="export-data" className="pg-context-item" onClick={() => {
+                                        setPgContextMenu(null);
+                                        handlePgExportSQL(assetId, dbName, 'data');
+                                    }}>
+                                        <CodeOutlined style={{ marginRight: 6 }} />导出 SQL（仅数据）
                                     </div>
                                 );
                                 items.push(<div key="divider" className="pg-context-divider" />);

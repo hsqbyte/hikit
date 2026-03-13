@@ -3,6 +3,7 @@ package pg
 import (
 	"fmt"
 	"strings"
+	"time"
 )
 
 // TableInfo describes a table in a schema
@@ -97,6 +98,170 @@ func (s *Session) ImportSQL(sqlContent string) (*QueryResult, error) {
 		Rows:     [][]interface{}{{"SQL 导入完成"}},
 		Affected: affected,
 	}, nil
+}
+
+// ExportSQL exports the structure and data of all tables in a schema as SQL statements
+func (s *Session) ExportSQL(schema string, dataOnly bool, structOnly bool) (string, error) {
+	var b strings.Builder
+
+	// Header
+	b.WriteString("-- ============================================\n")
+	b.WriteString(fmt.Sprintf("-- Database export: schema %s\n", quoteIdent(schema)))
+	b.WriteString(fmt.Sprintf("-- Generated at: %s\n", time.Now().Format(time.RFC3339)))
+	b.WriteString("-- ============================================\n\n")
+
+	// Get all tables
+	tables, err := s.ListTables(schema)
+	if err != nil {
+		return "", fmt.Errorf("list tables: %w", err)
+	}
+
+	for _, tbl := range tables {
+		if tbl.Type == "VIEW" {
+			continue // skip views, handle separately if needed
+		}
+
+		// ── DDL ──
+		if !dataOnly {
+			b.WriteString(fmt.Sprintf("-- Table: %s.%s\n", schema, tbl.Name))
+			b.WriteString(fmt.Sprintf("DROP TABLE IF EXISTS %s.%s CASCADE;\n", quoteIdent(schema), quoteIdent(tbl.Name)))
+
+			// Get full DDL via pg_get_tabledef or rebuild from columns + constraints
+			cols, err := s.GetColumns(schema, tbl.Name)
+			if err != nil {
+				return "", fmt.Errorf("get columns for %s: %w", tbl.Name, err)
+			}
+
+			b.WriteString(fmt.Sprintf("CREATE TABLE %s.%s (\n", quoteIdent(schema), quoteIdent(tbl.Name)))
+			for i, c := range cols {
+				b.WriteString(fmt.Sprintf("    %s %s", quoteIdent(c.Name), c.DataType))
+				if c.IsNullable == "NO" {
+					b.WriteString(" NOT NULL")
+				}
+				if c.DefaultValue != "" {
+					b.WriteString(fmt.Sprintf(" DEFAULT %s", c.DefaultValue))
+				}
+				if i < len(cols)-1 {
+					b.WriteString(",")
+				}
+				b.WriteString("\n")
+			}
+
+			// Primary key constraint
+			pks, _ := s.GetPrimaryKeys(schema, tbl.Name)
+			if len(pks) > 0 {
+				quotedPKs := make([]string, len(pks))
+				for i, pk := range pks {
+					quotedPKs[i] = quoteIdent(pk)
+				}
+				// Need to add comma after last column
+				// Remove trailing newline, add comma
+				current := b.String()
+				if strings.HasSuffix(current, "\n") {
+					b.Reset()
+					b.WriteString(current[:len(current)-1])
+					b.WriteString(",\n")
+				}
+				b.WriteString(fmt.Sprintf("    PRIMARY KEY (%s)\n", strings.Join(quotedPKs, ", ")))
+			}
+
+			b.WriteString(");\n\n")
+		}
+
+		// ── DATA ──
+		if !structOnly {
+			rows, err := s.DB.Query(fmt.Sprintf("SELECT * FROM %s.%s", quoteIdent(schema), quoteIdent(tbl.Name)))
+			if err != nil {
+				b.WriteString(fmt.Sprintf("-- ERROR exporting data for %s: %s\n\n", tbl.Name, err.Error()))
+				continue
+			}
+
+			colNames, _ := rows.Columns()
+			if len(colNames) == 0 {
+				rows.Close()
+				continue
+			}
+
+			quotedCols := make([]string, len(colNames))
+			for i, cn := range colNames {
+				quotedCols[i] = quoteIdent(cn)
+			}
+			insertPrefix := fmt.Sprintf("INSERT INTO %s.%s (%s) VALUES",
+				quoteIdent(schema), quoteIdent(tbl.Name), strings.Join(quotedCols, ", "))
+
+			rowCount := 0
+			for rows.Next() {
+				values := make([]interface{}, len(colNames))
+				ptrs := make([]interface{}, len(colNames))
+				for i := range values {
+					ptrs[i] = &values[i]
+				}
+				if err := rows.Scan(ptrs...); err != nil {
+					continue
+				}
+
+				vals := make([]string, len(colNames))
+				for i, v := range values {
+					vals[i] = sqlValue(v)
+				}
+
+				b.WriteString(fmt.Sprintf("%s (%s);\n", insertPrefix, strings.Join(vals, ", ")))
+				rowCount++
+			}
+			rows.Close()
+
+			if rowCount > 0 {
+				b.WriteString(fmt.Sprintf("-- %d rows exported for %s\n\n", rowCount, tbl.Name))
+			}
+		}
+	}
+
+	// Export views
+	if !dataOnly {
+		viewRows, err := s.DB.Query(`
+			SELECT table_name, view_definition
+			FROM information_schema.views
+			WHERE table_schema = $1
+			ORDER BY table_name
+		`, schema)
+		if err == nil {
+			defer viewRows.Close()
+			for viewRows.Next() {
+				var vName, vDef string
+				if err := viewRows.Scan(&vName, &vDef); err != nil {
+					continue
+				}
+				b.WriteString(fmt.Sprintf("-- View: %s.%s\n", schema, vName))
+				b.WriteString(fmt.Sprintf("CREATE OR REPLACE VIEW %s.%s AS\n%s;\n\n",
+					quoteIdent(schema), quoteIdent(vName), strings.TrimRight(vDef, ";\n ")))
+			}
+		}
+	}
+
+	return b.String(), nil
+}
+
+// sqlValue converts a Go value to a SQL literal string
+func sqlValue(v interface{}) string {
+	if v == nil {
+		return "NULL"
+	}
+	switch val := v.(type) {
+	case []byte:
+		s := string(val)
+		return "'" + strings.ReplaceAll(s, "'", "''") + "'"
+	case string:
+		return "'" + strings.ReplaceAll(val, "'", "''") + "'"
+	case time.Time:
+		return "'" + val.Format("2006-01-02 15:04:05.999999-07:00") + "'"
+	case bool:
+		if val {
+			return "TRUE"
+		}
+		return "FALSE"
+	default:
+		return fmt.Sprintf("%v", val)
+	}
 }
 
 // ListSchemas returns all schemas in the current database
