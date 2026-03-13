@@ -55,6 +55,50 @@ func (s *Session) ListDatabases() ([]string, error) {
 	return dbs, nil
 }
 
+// CreateDatabase creates a new database
+func (s *Session) CreateDatabase(dbName string) error {
+	if dbName == "" {
+		return fmt.Errorf("database name is empty")
+	}
+	// CREATE DATABASE cannot run inside a transaction, use simple Exec
+	_, err := s.DB.Exec(fmt.Sprintf("CREATE DATABASE %s", quoteIdent(dbName)))
+	return err
+}
+
+// DropDatabase drops a database
+func (s *Session) DropDatabase(dbName string) error {
+	if dbName == "" {
+		return fmt.Errorf("database name is empty")
+	}
+	// Force disconnect other sessions first
+	_, _ = s.DB.Exec(fmt.Sprintf(
+		"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '%s' AND pid <> pg_backend_pid()",
+		strings.ReplaceAll(dbName, "'", "''"),
+	))
+	_, err := s.DB.Exec(fmt.Sprintf("DROP DATABASE %s", quoteIdent(dbName)))
+	return err
+}
+
+// ImportSQL executes a SQL script (multiple statements)
+func (s *Session) ImportSQL(sqlContent string) (*QueryResult, error) {
+	sqlContent = strings.TrimSpace(sqlContent)
+	if sqlContent == "" {
+		return nil, fmt.Errorf("empty SQL content")
+	}
+
+	// Execute the entire script
+	res, err := s.DB.Exec(sqlContent)
+	if err != nil {
+		return &QueryResult{Error: err.Error()}, nil
+	}
+	affected, _ := res.RowsAffected()
+	return &QueryResult{
+		Columns:  []string{"result"},
+		Rows:     [][]interface{}{{"SQL 导入完成"}},
+		Affected: affected,
+	}, nil
+}
+
 // ListSchemas returns all schemas in the current database
 func (s *Session) ListSchemas() ([]string, error) {
 	rows, err := s.DB.Query(`

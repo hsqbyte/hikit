@@ -205,6 +205,33 @@ func (s *PGService) ListDatabases(sessionID string) ([]string, error) {
 	return sess.ListDatabases()
 }
 
+// CreateDatabase creates a new database on the server
+func (s *PGService) CreateDatabase(sessionID string, dbName string) error {
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return err
+	}
+	return sess.CreateDatabase(dbName)
+}
+
+// DropDatabase drops a database from the server
+func (s *PGService) DropDatabase(sessionID string, dbName string) error {
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return err
+	}
+	return sess.DropDatabase(dbName)
+}
+
+// ImportSQL executes a SQL script on the current database
+func (s *PGService) ImportSQL(sessionID string, sqlContent string) (*QueryResult, error) {
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return sess.ImportSQL(sqlContent)
+}
+
 // ListSchemas returns all schemas in the current database
 func (s *PGService) ListSchemas(sessionID string) ([]string, error) {
 	sess, err := s.GetSession(sessionID)

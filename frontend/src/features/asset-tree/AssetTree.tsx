@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { Tree, Dropdown, Tooltip, Modal, Input, message } from 'antd';
+import { Tree, Dropdown, Tooltip, Modal, Input, message, Button } from 'antd';
 import type { MenuProps } from 'antd';
 import {
     FolderOutlined,
@@ -15,6 +15,7 @@ import {
     GlobalOutlined,
     CheckSquareOutlined,
     FileTextOutlined,
+    CodeOutlined,
 } from '@ant-design/icons';
 import {
     SiMysql, SiPostgresql, SiRedis, SiDocker,
@@ -30,6 +31,7 @@ import {
     ConnectByAsset, ConnectByAssetViaSSH, ListDatabases, ListSchemas,
     ListTables, ListViews, ListFunctions,
     ListMaterializedViews, SwitchDatabase,
+    CreateDatabase, DropDatabase, ImportSQL,
 } from '../../../wailsjs/go/pg/PGService';
 import { Move as MoveAsset } from '../../../wailsjs/go/asset/AssetService';
 import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime';
@@ -157,6 +159,21 @@ const AssetTree: React.FC = () => {
     const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
     const [pgLoading, setPgLoading] = useState<Record<string, boolean>>({});
     const [initialExpanded, setInitialExpanded] = useState(false);
+
+    // PG Create Database modal
+    const [createDBModalOpen, setCreateDBModalOpen] = useState(false);
+    const [createDBName, setCreateDBName] = useState('');
+    const [createDBAssetId, setCreateDBAssetId] = useState('');
+
+    // PG Import SQL modal
+    const [importSQLModalOpen, setImportSQLModalOpen] = useState(false);
+    const [importSQLContent, setImportSQLContent] = useState('');
+    const [importSQLAssetId, setImportSQLAssetId] = useState('');
+    const [importSQLDb, setImportSQLDb] = useState('');
+    const [importSQLRunning, setImportSQLRunning] = useState(false);
+
+    // PG context menu
+    const [pgContextMenu, setPgContextMenu] = useState<{ x: number; y: number; key: string } | null>(null);
 
     useEffect(() => { loadAssets(); }, []);
 
@@ -741,6 +758,92 @@ const AssetTree: React.FC = () => {
         { key: 'delete', label: '删除', icon: <DeleteOutlined />, danger: true, disabled: !selectedAssetId, onClick: handleDelete },
     ];
 
+    // PG context menu handlers
+    const handlePgCreateDB = useCallback(async () => {
+        if (!createDBName.trim() || !createDBAssetId) return;
+        const sid = pgSessions[createDBAssetId];
+        if (!sid) return;
+        try {
+            await CreateDatabase(sid, createDBName.trim());
+            message.success(`数据库 "${createDBName.trim()}" 创建成功`);
+            setCreateDBModalOpen(false);
+            setCreateDBName('');
+            // Refresh databases
+            const dbs = await ListDatabases(sid);
+            setPgDatabases(prev => ({ ...prev, [createDBAssetId]: dbs || [] }));
+        } catch (err: any) {
+            message.error('创建数据库失败: ' + (err?.message || err));
+        }
+    }, [createDBName, createDBAssetId, pgSessions]);
+
+    const handlePgDropDB = useCallback(async (assetId: string, dbName: string) => {
+        const sid = pgSessions[assetId];
+        if (!sid) return;
+        Modal.confirm({
+            title: '删除数据库',
+            content: `确定要删除数据库 "${dbName}" 吗？此操作不可恢复！`,
+            okText: '删除', okType: 'danger', cancelText: '取消',
+            onOk: async () => {
+                try {
+                    await DropDatabase(sid, dbName);
+                    message.success(`数据库 "${dbName}" 已删除`);
+                    const dbs = await ListDatabases(sid);
+                    setPgDatabases(prev => ({ ...prev, [assetId]: dbs || [] }));
+                    // Clean up schema/object cache for this db
+                    setPgSchemas(prev => {
+                        const next = { ...prev };
+                        delete next[`${assetId}:${dbName}`];
+                        return next;
+                    });
+                } catch (err: any) {
+                    message.error('删除数据库失败: ' + (err?.message || err));
+                }
+            },
+        });
+    }, [pgSessions]);
+
+    const handlePgImportSQL = useCallback(async () => {
+        if (!importSQLContent.trim() || !importSQLAssetId) return;
+        const sid = pgSessions[importSQLAssetId];
+        if (!sid) return;
+        setImportSQLRunning(true);
+        try {
+            // Switch to the target database first
+            if (importSQLDb) {
+                await SwitchDatabase(sid, importSQLDb);
+                setPgCurrentDB(prev => ({ ...prev, [importSQLAssetId]: importSQLDb }));
+            }
+            const result = await ImportSQL(sid, importSQLContent);
+            if (result?.error) {
+                message.error('导入失败: ' + result.error);
+            } else {
+                message.success(`SQL 导入成功${result?.affected ? `，影响 ${result.affected} 行` : ''}`);
+                setImportSQLModalOpen(false);
+                setImportSQLContent('');
+            }
+        } catch (err: any) {
+            message.error('导入失败: ' + (err?.message || err));
+        } finally {
+            setImportSQLRunning(false);
+        }
+    }, [importSQLContent, importSQLAssetId, importSQLDb, pgSessions]);
+
+    const handleFileSelect = useCallback(() => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.sql,.txt';
+        input.onchange = (e: any) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                setImportSQLContent(ev.target?.result as string || '');
+            };
+            reader.readAsText(file);
+        };
+        input.click();
+    }, []);
+
     return (
         <div className="asset-tree">
             <div className="asset-tree-header">
@@ -832,9 +935,16 @@ const AssetTree: React.FC = () => {
                                     if (k && k.startsWith('vg:')) return;
                                     selectAsset(k);
                                 }}
-                                onRightClick={({ node }) => {
+                                onRightClick={({ event, node }) => {
                                     const k = String(node.key);
                                     if (k.startsWith('vg:')) return;
+                                    // PG nodes: show PG-specific context menu
+                                    if (k.startsWith('pg:')) {
+                                        event.preventDefault();
+                                        event.stopPropagation();
+                                        setPgContextMenu({ x: event.clientX, y: event.clientY, key: k });
+                                        return;
+                                    }
                                     selectAsset(k);
                                 }}
                                 onDoubleClick={handleDoubleClick}
@@ -900,6 +1010,113 @@ const AssetTree: React.FC = () => {
                         </div>
                     ))}
                 </div>
+            </Modal>
+
+            {/* PG node context menu overlay */}
+            {pgContextMenu && (
+                <div
+                    style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 }}
+                    onClick={() => setPgContextMenu(null)}
+                    onContextMenu={(e) => { e.preventDefault(); setPgContextMenu(null); }}
+                >
+                    <div
+                        className="pg-context-menu"
+                        style={{ left: pgContextMenu.x, top: pgContextMenu.y }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {(() => {
+                            const key = pgContextMenu.key;
+                            // PG asset root — show "新建数据库"
+                            const assetMatch = key.match(/^pg:(.+?)(?::db:(.+))?$/);
+                            if (!assetMatch) return null;
+                            const assetId = assetMatch[1]?.split(':db:')[0] || '';
+                            const dbMatch = key.match(/^pg:(.+?):db:([^:]+)$/);
+                            const dbName = dbMatch ? dbMatch[2] : '';
+                            const isDbNode = !!dbMatch && !key.includes(':s:');
+                            const isAssetRoot = !key.includes(':db:');
+                            const items: React.ReactNode[] = [];
+
+                            if (isAssetRoot || isDbNode) {
+                                items.push(
+                                    <div key="create-db" className="pg-context-item" onClick={() => {
+                                        setPgContextMenu(null);
+                                        setCreateDBAssetId(assetId);
+                                        setCreateDBName('');
+                                        setCreateDBModalOpen(true);
+                                    }}>
+                                        <PlusOutlined style={{ marginRight: 6 }} />新建数据库
+                                    </div>
+                                );
+                            }
+                            if (isDbNode && dbName) {
+                                items.push(
+                                    <div key="import-sql" className="pg-context-item" onClick={() => {
+                                        setPgContextMenu(null);
+                                        setImportSQLAssetId(assetId);
+                                        setImportSQLDb(dbName);
+                                        setImportSQLContent('');
+                                        setImportSQLModalOpen(true);
+                                    }}>
+                                        <CodeOutlined style={{ marginRight: 6 }} />导入 SQL
+                                    </div>
+                                );
+                                items.push(<div key="divider" className="pg-context-divider" />);
+                                items.push(
+                                    <div key="drop-db" className="pg-context-item danger" onClick={() => {
+                                        setPgContextMenu(null);
+                                        handlePgDropDB(assetId, dbName);
+                                    }}>
+                                        <DeleteOutlined style={{ marginRight: 6 }} />删除数据库
+                                    </div>
+                                );
+                            }
+                            return items;
+                        })()}
+                    </div>
+                </div>
+            )}
+
+            {/* Create Database Modal */}
+            <Modal
+                title="新建数据库"
+                open={createDBModalOpen}
+                onOk={handlePgCreateDB}
+                onCancel={() => { setCreateDBModalOpen(false); setCreateDBName(''); }}
+                okText="创建" cancelText="取消" width={400}
+            >
+                <Input
+                    placeholder="数据库名称"
+                    value={createDBName}
+                    onChange={e => setCreateDBName(e.target.value)}
+                    onPressEnter={handlePgCreateDB}
+                    autoFocus
+                />
+            </Modal>
+
+            {/* Import SQL Modal */}
+            <Modal
+                title={`导入 SQL — ${importSQLDb}`}
+                open={importSQLModalOpen}
+                onOk={handlePgImportSQL}
+                onCancel={() => { setImportSQLModalOpen(false); setImportSQLContent(''); }}
+                okText="执行" cancelText="取消" width={640}
+                confirmLoading={importSQLRunning}
+            >
+                <div style={{ marginBottom: 8 }}>
+                    <Button size="small" onClick={handleFileSelect} icon={<CodeOutlined />}>
+                        选择 SQL 文件
+                    </Button>
+                    <span style={{ marginLeft: 8, color: '#999', fontSize: 12 }}>
+                        支持 .sql / .txt 文件
+                    </span>
+                </div>
+                <Input.TextArea
+                    rows={12}
+                    placeholder="粘贴 SQL 内容或选择文件..."
+                    value={importSQLContent}
+                    onChange={e => setImportSQLContent(e.target.value)}
+                    style={{ fontFamily: 'monospace', fontSize: 12 }}
+                />
             </Modal>
         </div>
     );
