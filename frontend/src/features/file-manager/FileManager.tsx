@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import Editor from '@monaco-editor/react';
 import { EventsOn, EventsOff } from '../../../wailsjs/runtime/runtime';
-import { Input, Table, Button, Tooltip, Modal, Dropdown, message, List, Spin } from 'antd';
+import { Input, Table, Button, Tooltip, Modal, Dropdown, message, List, Spin, Progress } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { MenuProps } from 'antd';
 import {
@@ -21,6 +22,12 @@ import {
     FileSearchOutlined,
     ScissorOutlined,
     SnippetsOutlined,
+    CloseOutlined,
+    CheckCircleOutlined,
+    CloseCircleOutlined,
+    MinusCircleOutlined,
+    LoadingOutlined,
+    DownOutlined,
 } from '@ant-design/icons';
 import {
     VscFolder, VscFile, VscFileCode, VscFileZip,
@@ -36,6 +43,7 @@ import {
     SFTPGetHomePath,
     SFTPUploadFile,
     SFTPDownloadFile,
+    SFTPDownloadFolder,
     SFTPRename,
     SFTPReadFile,
     SFTPWriteFile,
@@ -44,8 +52,34 @@ import {
     SFTPSearch,
     SFTPCopy,
     SFTPMove,
+    SFTPStartUpload,
+    SFTPCancelUpload,
+    SFTPCancelDownload,
 } from '../../../wailsjs/go/ssh/SSHService';
 import './FileManager.css';
+
+// Map file extensions to Monaco language IDs
+function getMonacoLanguage(filePath: string): string {
+    const ext = filePath.split('.').pop()?.toLowerCase() || '';
+    const map: Record<string, string> = {
+        js: 'javascript', jsx: 'javascript', ts: 'typescript', tsx: 'typescript',
+        py: 'python', go: 'go', rs: 'rust', rb: 'ruby', java: 'java',
+        c: 'c', cpp: 'cpp', h: 'c', hpp: 'cpp', cs: 'csharp',
+        json: 'json', yaml: 'yaml', yml: 'yaml', toml: 'ini',
+        xml: 'xml', html: 'html', htm: 'html', css: 'css', scss: 'scss', less: 'less',
+        md: 'markdown', sql: 'sql', sh: 'shell', bash: 'shell', zsh: 'shell',
+        dockerfile: 'dockerfile', makefile: 'makefile',
+        php: 'php', swift: 'swift', kt: 'kotlin', scala: 'scala',
+        lua: 'lua', r: 'r', pl: 'perl', conf: 'ini', ini: 'ini', cfg: 'ini',
+        env: 'shell', gitignore: 'plaintext', log: 'plaintext', txt: 'plaintext',
+    };
+    // Check filename-based matches
+    const name = filePath.split('/').pop()?.toLowerCase() || '';
+    if (name === 'dockerfile') return 'dockerfile';
+    if (name === 'makefile' || name === 'gnumakefile') return 'makefile';
+    if (name.startsWith('.env')) return 'shell';
+    return map[ext] || 'plaintext';
+}
 
 interface FileItem {
     key: string;
@@ -117,6 +151,13 @@ function getFileIcon(name: string, isDir: boolean) {
     return <VscFile style={{ ...fis, color: '#722ed1' }} />;
 }
 
+function formatSize(bytes: number): string {
+    if (bytes >= 1024 * 1024 * 1024) return (bytes / (1024 * 1024 * 1024)).toFixed(1) + 'GB';
+    if (bytes >= 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + 'MB';
+    if (bytes >= 1024) return (bytes / 1024).toFixed(1) + 'KB';
+    return bytes + 'B';
+}
+
 interface FileManagerProps {
     sessionId: string | null;
     connected: boolean;
@@ -156,6 +197,94 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
     // Right-click context menu state
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number; record: FileItem } | null>(null);
 
+    // Transfer queue state (supports upload + download)
+    interface UploadFileItem {
+        id: number;
+        name: string;
+        localPath: string;
+        remotePath: string;
+        targetPath: string;
+        isDir: boolean;
+        status: 'pending' | 'uploading' | 'done' | 'failed' | 'cancelled';
+        percent: number;
+        transferred: number;
+        total: number;
+        direction: 'upload' | 'download';
+        currentFile?: string;   // current sub-file being downloaded (folder only)
+        filesDone?: number;     // files completed (folder only)
+        filesTotal?: number;    // total files in folder
+        parentId?: number;      // parent folder item id (for child files)
+    }
+    const [uploadFiles, setUploadFiles] = useState<UploadFileItem[]>([]);
+    const [uploadVisible, setUploadVisible] = useState(false);
+    const [uploadCollapsed, setUploadCollapsed] = useState(false);
+    const uploadCancelRef = useRef(false);
+    const uploadProcessingRef = useRef(false);
+    const uploadIdCounter = useRef(0);
+    const uploadQueueRef = useRef<UploadFileItem[]>([]);
+
+    const loadFilesRef = useRef<() => void>(() => {});
+    const cancelCurrentOnlyRef = useRef(false);
+
+    // Queue processor: runs one file at a time, picks up newly appended items
+    const processQueue = useCallback(async () => {
+        if (uploadProcessingRef.current || !sessionId) return;
+        uploadProcessingRef.current = true;
+        uploadCancelRef.current = false;
+
+        await SFTPStartUpload();
+
+        while (true) {
+            // Find next pending item
+            const nextIdx = uploadQueueRef.current.findIndex(f => f.status === 'pending');
+            if (nextIdx === -1) break;
+
+            if (uploadCancelRef.current) {
+                // Cancel-all: mark all remaining pending as cancelled
+                uploadQueueRef.current = uploadQueueRef.current.map(f =>
+                    f.status === 'pending' ? { ...f, status: 'cancelled' as const } : f
+                );
+                setUploadFiles([...uploadQueueRef.current]);
+                break;
+            }
+
+            const item = uploadQueueRef.current[nextIdx];
+            uploadQueueRef.current[nextIdx] = { ...item, status: 'uploading', percent: 0 };
+            setUploadFiles([...uploadQueueRef.current]);
+
+            try {
+                await SFTPUploadFromPath(sessionId, item.localPath, item.remotePath);
+                uploadQueueRef.current[nextIdx] = { ...uploadQueueRef.current[nextIdx], status: 'done', percent: 100 };
+                setUploadFiles([...uploadQueueRef.current]);
+            } catch (err: any) {
+                const isCancelled = err?.message?.includes('cancelled');
+                uploadQueueRef.current[nextIdx] = {
+                    ...uploadQueueRef.current[nextIdx],
+                    status: isCancelled ? 'cancelled' : 'failed',
+                };
+                setUploadFiles([...uploadQueueRef.current]);
+
+                if (isCancelled) {
+                    if (cancelCurrentOnlyRef.current) {
+                        // Single-file cancel: reset flag, get new context, continue
+                        cancelCurrentOnlyRef.current = false;
+                        await SFTPStartUpload();
+                        continue;
+                    }
+                    // Cancel-all: mark remaining pending and stop
+                    uploadQueueRef.current = uploadQueueRef.current.map(f =>
+                        f.status === 'pending' ? { ...f, status: 'cancelled' as const } : f
+                    );
+                    setUploadFiles([...uploadQueueRef.current]);
+                    break;
+                }
+            }
+        }
+
+        uploadProcessingRef.current = false;
+        loadFilesRef.current();
+    }, [sessionId]);
+
     // Load files when connected or path changes
     const loadFiles = useCallback(async () => {
         if (!sessionId || !connected) return;
@@ -184,6 +313,7 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
         }
     }, [sessionId, connected, currentPath]);
 
+    useEffect(() => { loadFilesRef.current = loadFiles; }, [loadFiles]);
     useEffect(() => { loadFiles(); }, [loadFiles]);
 
     // Get home path on connect
@@ -223,7 +353,6 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
             navigateTo(newPath);
             return;
         }
-        // Open file viewer for files < 5MB
         if (record.sizeBytes && record.sizeBytes > 5 * 1024 * 1024) {
             message.warning('文件太大，无法在线查看（> 5MB）');
             return;
@@ -259,39 +388,164 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
         }
     };
 
-    // Drag-and-drop upload via Wails native file drop
+    // Drag-and-drop: append to queue
     const currentPathRef = useRef(currentPath);
     useEffect(() => { currentPathRef.current = currentPath; }, [currentPath]);
 
     useEffect(() => {
         if (!sessionId || !connected) return;
 
-        const handleFileDrop = async (paths: string[]) => {
+        const handleFileDrop = (_x: number, _y: number, paths: string[]) => {
             if (!paths || paths.length === 0) return;
             setIsDragging(false);
-            const hide = message.loading(`正在上传 ${paths.length} 个文件...`, 0);
-            let success = 0;
-            let failed = 0;
-            for (const localPath of paths) {
-                const fileName = localPath.split('/').pop() || localPath.split('\\').pop() || 'file';
-                const remotePath = currentPathRef.current === '/' ? `/${fileName}` : `${currentPathRef.current}/${fileName}`;
-                try {
-                    await SFTPUploadFromPath(sessionId, localPath, remotePath);
-                    success++;
-                } catch (err: any) {
-                    console.error('Upload error:', err);
-                    failed++;
-                }
-            }
-            hide();
-            if (success > 0) message.success(`成功上传 ${success} 个文件`);
-            if (failed > 0) message.error(`${failed} 个文件上传失败`);
-            loadFiles();
+
+            const newItems: UploadFileItem[] = paths.map(p => {
+                const name = p.split('/').pop() || p.split('\\').pop() || 'file';
+                const remotePath = currentPathRef.current === '/' ? `/${name}` : `${currentPathRef.current}/${name}`;
+                return {
+                    id: ++uploadIdCounter.current,
+                    name,
+                    localPath: p,
+                    remotePath,
+                    targetPath: remotePath,
+                    isDir: false,
+                    status: 'pending' as const,
+                    percent: 0, transferred: 0, total: 0,
+                    direction: 'upload' as const,
+                };
+            });
+
+            uploadQueueRef.current = [...uploadQueueRef.current, ...newItems];
+            setUploadFiles([...uploadQueueRef.current]);
+            setUploadVisible(true);
+
+            processQueue();
         };
 
         EventsOn('wails:file-drop', handleFileDrop);
         return () => { EventsOff('wails:file-drop'); };
-    }, [sessionId, connected, loadFiles]);
+    }, [sessionId, connected, processQueue]);
+
+    // Listen for upload progress events from backend
+    useEffect(() => {
+        const handleProgress = (data: any) => {
+            if (!data) return;
+            const idx = uploadQueueRef.current.findIndex(f => f.status === 'uploading' && f.name === data.fileName && f.direction === 'upload');
+            if (idx !== -1) {
+                uploadQueueRef.current[idx] = {
+                    ...uploadQueueRef.current[idx],
+                    percent: data.percent || 0,
+                    transferred: data.transferred || 0,
+                    total: data.total || 0,
+                    currentFile: data.currentFile || '',
+                    filesDone: data.filesDone || 0,
+                    filesTotal: data.filesTotal || 0,
+                };
+                setUploadFiles([...uploadQueueRef.current]);
+            }
+        };
+        const handleDownloadProgress = (data: any) => {
+            if (!data) return;
+            let idx = uploadQueueRef.current.findIndex(f => f.status === 'uploading' && f.name === data.fileName && f.direction === 'download');
+            // Auto-create item on first progress event (after user confirmed dialog)
+            // But don't create if an item with this name already exists (e.g. cancelled/done/failed)
+            if (idx === -1 && data.fileName) {
+                const existingIdx = uploadQueueRef.current.findIndex(f => f.name === data.fileName && f.direction === 'download');
+                if (existingIdx !== -1) return; // Already exists, ignore late events
+                const newItem: UploadFileItem = {
+                    id: ++uploadIdCounter.current,
+                    name: data.fileName,
+                    localPath: '',
+                    remotePath: '',
+                    targetPath: '',
+                    isDir: !!(data.filesTotal),
+                    status: 'uploading',
+                    percent: 0, transferred: 0, total: 0,
+                    direction: 'download',
+                    filesDone: 0,
+                    filesTotal: 0,
+                };
+                uploadQueueRef.current = [...uploadQueueRef.current, newItem];
+                idx = uploadQueueRef.current.length - 1;
+                setUploadVisible(true);
+            }
+            if (idx !== -1) {
+                uploadQueueRef.current[idx] = {
+                    ...uploadQueueRef.current[idx],
+                    percent: data.percent || 0,
+                    transferred: data.transferred || 0,
+                    total: data.total || 0,
+                    currentFile: data.currentFile || '',
+                    filesDone: data.filesDone || 0,
+                    filesTotal: data.filesTotal || 0,
+                };
+                if (data.percent >= 100) {
+                    uploadQueueRef.current[idx] = { ...uploadQueueRef.current[idx], status: 'done' };
+                    // Show warning if files/dirs were skipped
+                    const skipped = (data.skippedFiles || 0) + (data.skippedDirs || 0);
+                    if (skipped > 0) {
+                        message.warning(`下载完成，但跳过了 ${data.skippedDirs || 0} 个无权限目录和 ${data.skippedFiles || 0} 个文件`);
+                    }
+                }
+                setUploadFiles([...uploadQueueRef.current]);
+            }
+        };
+        EventsOn('sftp:upload-progress', handleProgress);
+        EventsOn('sftp:download-progress', handleDownloadProgress);
+        return () => {
+            EventsOff('sftp:upload-progress');
+            EventsOff('sftp:download-progress');
+        };
+    }, []);
+
+    // Cancel all uploads
+    const handleCancelUpload = async () => {
+        uploadCancelRef.current = true;
+        cancelCurrentOnlyRef.current = false;
+        await SFTPCancelUpload();
+    };
+
+    // Cancel single file
+    const handleCancelFile = async (fileId: number) => {
+        const idx = uploadQueueRef.current.findIndex(f => f.id === fileId);
+        if (idx === -1) return;
+        const file = uploadQueueRef.current[idx];
+
+        if (file.status === 'pending') {
+            uploadQueueRef.current[idx] = { ...file, status: 'cancelled' };
+            setUploadFiles([...uploadQueueRef.current]);
+        } else if (file.status === 'uploading') {
+            if (file.direction === 'download') {
+                // Cancel download - mark as cancelled and call backend cancel
+                uploadQueueRef.current[idx] = { ...file, status: 'cancelled' };
+                setUploadFiles([...uploadQueueRef.current]);
+                await SFTPCancelDownload();
+            } else {
+                // Cancel upload
+                cancelCurrentOnlyRef.current = true;
+                await SFTPCancelUpload();
+            }
+        }
+    };
+
+    const handleRemoveFile = (fileId: number) => {
+        uploadQueueRef.current = uploadQueueRef.current.filter(f => f.id !== fileId);
+        setUploadFiles([...uploadQueueRef.current]);
+        if (uploadQueueRef.current.length === 0) {
+            setUploadVisible(false);
+        }
+    };
+
+    const handleClearUploadList = () => {
+        const hasActive = uploadQueueRef.current.some(f => f.status === 'uploading' || f.status === 'pending');
+        if (hasActive) {
+            uploadQueueRef.current = uploadQueueRef.current.filter(f => f.status === 'uploading' || f.status === 'pending');
+        } else {
+            uploadQueueRef.current = [];
+            setUploadVisible(false);
+        }
+        setUploadFiles([...uploadQueueRef.current]);
+    };
 
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault();
@@ -308,6 +562,7 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
         e.stopPropagation();
+        setIsDragging(false);
         // Actual file handling is done via Wails EventsOn('wails:file-drop')
     };
 
@@ -426,14 +681,55 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
     };
 
     const handleDownload = async (record: FileItem) => {
-        if (!sessionId || record.isDir) return;
+        if (!sessionId) return;
+        const fullPath = currentPath === '/' ? `/${record.name}` : `${currentPath}/${record.name}`;
+
+        if (!record.isDir) {
+            // Single file download - item auto-created by progress handler
+            try {
+                await SFTPDownloadFile(sessionId, fullPath);
+                const dlIdx = uploadQueueRef.current.findIndex(f => f.name === record.name && f.direction === 'download');
+                if (dlIdx !== -1 && uploadQueueRef.current[dlIdx].status !== 'done') {
+                    uploadQueueRef.current[dlIdx] = { ...uploadQueueRef.current[dlIdx], status: 'done', percent: 100 };
+                    setUploadFiles([...uploadQueueRef.current]);
+                }
+            } catch (err: any) {
+                if (err?.message?.includes('canceled') || err?.message === '') return;
+                const dlIdx = uploadQueueRef.current.findIndex(f => f.name === record.name && f.direction === 'download');
+                if (dlIdx !== -1) {
+                    uploadQueueRef.current[dlIdx] = { ...uploadQueueRef.current[dlIdx], status: 'failed' };
+                    setUploadFiles([...uploadQueueRef.current]);
+                }
+                message.error('下载失败: ' + (err?.message || String(err)));
+            }
+            return;
+        }
+
+        // Folder download: item is auto-created by progress handler on first event
         try {
-            const fullPath = currentPath === '/' ? `/${record.name}` : `${currentPath}/${record.name}`;
-            await SFTPDownloadFile(sessionId, fullPath);
-            message.success('下载成功');
+            await SFTPDownloadFolder(sessionId, fullPath);
+            // Backend sends 100% event, ensure done
+            const fIdx = uploadQueueRef.current.findIndex(f => f.name === record.name && f.direction === 'download' && f.isDir);
+            if (fIdx !== -1 && uploadQueueRef.current[fIdx].status !== 'done') {
+                uploadQueueRef.current[fIdx] = { ...uploadQueueRef.current[fIdx], status: 'done', percent: 100 };
+                setUploadFiles([...uploadQueueRef.current]);
+            }
         } catch (err: any) {
-            if (err?.message?.includes('canceled') || err?.message === '') return;
-            message.error('下载失败: ' + (err?.message || String(err)));
+            if (err?.message?.includes('canceled') || err?.message === '') {
+                return; // User cancelled dialog, no item was created
+            }
+            const fIdx = uploadQueueRef.current.findIndex(f => f.name === record.name && f.direction === 'download' && f.isDir);
+            if (fIdx !== -1) {
+                if (err?.message?.includes('cancelled')) {
+                    uploadQueueRef.current[fIdx] = { ...uploadQueueRef.current[fIdx], status: 'cancelled' };
+                } else {
+                    uploadQueueRef.current[fIdx] = { ...uploadQueueRef.current[fIdx], status: 'failed' };
+                }
+                setUploadFiles([...uploadQueueRef.current]);
+            }
+            if (!err?.message?.includes('cancelled')) {
+                message.error('下载失败: ' + (err?.message || String(err)));
+            }
         }
     };
 
@@ -521,9 +817,8 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
         },
         {
             key: 'download',
-            label: '下载',
+            label: record.isDir ? '下载文件夹' : '下载',
             icon: <DownloadOutlined />,
-            disabled: record.isDir,
             onClick: () => handleDownload(record),
         },
         { type: 'divider' },
@@ -715,7 +1010,7 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
                     size="small"
                     pagination={false}
                     loading={loading}
-                    scroll={{ x: 560, y: 'calc(100vh - 200px)' }}
+                    scroll={{ x: 560 }}
                     rowClassName={(record) => record.isDir ? 'folder-row' : 'file-row'}
                     onRow={(record) => ({
                         onDoubleClick: () => handleDoubleClick(record),
@@ -726,6 +1021,107 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
                     })}
                 />
             </div>
+
+            {/* Upload Progress Panel - inline bottom */}
+            {uploadVisible && uploadFiles.length > 0 && (
+                <div className={`fm-upload-panel ${uploadCollapsed ? 'fm-upload-panel-collapsed' : ''}`}>
+                    <div className="fm-upload-panel-header" onClick={() => setUploadCollapsed(c => !c)}>
+                        <span className="fm-upload-panel-title">
+                            <DownOutlined className={`fm-upload-chevron ${uploadCollapsed ? 'collapsed' : ''}`} />
+                            传输 ({uploadFiles.filter(f => f.status === 'done').length}/{uploadFiles.length})
+                        </span>
+                        <div className="fm-upload-panel-actions" onClick={e => e.stopPropagation()}>
+                            {!uploadFiles.some(f => f.status === 'uploading' || f.status === 'pending') && (
+                                <Tooltip title="清空列表">
+                                    <Button
+                                        type="text"
+                                        size="small"
+                                        icon={<DeleteOutlined />}
+                                        onClick={handleClearUploadList}
+                                        className="fm-upload-cancel-btn"
+                                    >清空</Button>
+                                </Tooltip>
+                            )}
+                            <Button
+                                type="text"
+                                size="small"
+                                icon={<CloseOutlined />}
+                                onClick={() => setUploadVisible(false)}
+                                className="fm-upload-close-btn"
+                            />
+                        </div>
+                    </div>
+                    {!uploadCollapsed && (
+                        <div className="fm-upload-panel-list">
+                            {uploadFiles.map((file) => (
+                                <div key={file.id} className={`fm-upload-item fm-upload-item-${file.status}`}>
+                                    <div className="fm-upload-item-icon">
+                                        {file.status === 'done' && <CheckCircleOutlined style={{ color: '#52c41a' }} />}
+                                        {file.status === 'failed' && <CloseCircleOutlined style={{ color: '#ff4d4f' }} />}
+                                        {file.status === 'cancelled' && <MinusCircleOutlined style={{ color: '#999' }} />}
+                                        {file.status === 'uploading' && <LoadingOutlined style={{ color: '#1677ff' }} />}
+                                        {file.status === 'pending' && <UploadOutlined style={{ color: '#bbb' }} />}
+                                    </div>
+                                    <div className="fm-upload-item-info">
+                                        <div className="fm-upload-item-name" title={file.name}>
+                                            <span className={`fm-transfer-dir ${file.direction}`}>{file.direction === 'upload' ? '↑' : '↓'}</span>
+                                            {file.isDir && <VscFolder style={{ color: '#e8a838', marginRight: 4, verticalAlign: 'middle', fontSize: 14 }} />}
+                                            {file.name}
+                                        </div>
+                                        <div className="fm-upload-item-path" title={file.currentFile || file.targetPath}>
+                                            {file.currentFile || file.targetPath}
+                                        </div>
+                                        {file.status === 'uploading' && (
+                                            <>
+                                                {file.percent >= 0 && file.total > 0 && (
+                                                    <Progress
+                                                        percent={file.percent}
+                                                        size="small"
+                                                        showInfo={false}
+                                                        strokeColor={{ '0%': '#1677ff', '100%': '#52c41a' }}
+                                                        style={{ margin: '2px 0 0' }}
+                                                    />
+                                                )}
+                                                <div className="fm-upload-item-size">
+                                                    {formatSize(file.transferred)}{file.total > 0 ? ` / ${formatSize(file.total)}` : ''}
+                                                </div>
+                                            </>
+                                        )}
+                                        {file.status === 'done' && <div className="fm-upload-item-status done">{file.isDir && file.filesDone ? `已完成 (${file.filesDone} 文件)` : '已完成'}</div>}
+                                        {file.status === 'failed' && <div className="fm-upload-item-status failed">失败</div>}
+                                        {file.status === 'cancelled' && <div className="fm-upload-item-status cancelled">已取消</div>}
+                                        {file.status === 'pending' && <div className="fm-upload-item-status pending">等待中</div>}
+                                    </div>
+                                    <div className="fm-upload-item-action">
+                                        {(file.status === 'pending' || file.status === 'uploading') && (
+                                            <Tooltip title="取消">
+                                                <Button
+                                                    type="text"
+                                                    size="small"
+                                                    icon={<CloseOutlined />}
+                                                    className="fm-upload-item-cancel"
+                                                    onClick={() => handleCancelFile(file.id)}
+                                                />
+                                            </Tooltip>
+                                        )}
+                                        {(file.status === 'done' || file.status === 'failed' || file.status === 'cancelled') && (
+                                            <Tooltip title="移除">
+                                                <Button
+                                                    type="text"
+                                                    size="small"
+                                                    icon={<CloseOutlined />}
+                                                    className="fm-upload-item-remove"
+                                                    onClick={() => handleRemoveFile(file.id)}
+                                                />
+                                            </Tooltip>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* Right-click Context Menu */}
             {contextMenu && (
@@ -794,15 +1190,34 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
             >
                 {viewerLoading ? (
                     <div style={{ padding: 40, textAlign: 'center', color: '#888' }}>加载中...</div>
-                ) : viewerEditing ? (
-                    <textarea
-                        className="fm-viewer-textarea"
-                        value={viewerContent}
-                        onChange={(e) => { setViewerContent(e.target.value); setViewerModified(true); }}
-                        spellCheck={false}
-                    />
                 ) : (
-                    <pre className="fm-viewer-pre">{viewerContent}</pre>
+                    <div style={{ height: '65vh', border: '1px solid #e8e8e8', borderRadius: 4, overflow: 'hidden' }}>
+                        <Editor
+                            height="100%"
+                            language={getMonacoLanguage(viewerPath)}
+                            value={viewerContent}
+                            theme="vs-dark"
+                            onChange={(value) => {
+                                if (viewerEditing && value !== undefined) {
+                                    setViewerContent(value);
+                                    setViewerModified(true);
+                                }
+                            }}
+                            options={{
+                                readOnly: !viewerEditing,
+                                minimap: { enabled: false },
+                                fontSize: 13,
+                                lineNumbers: 'on',
+                                scrollBeyondLastLine: false,
+                                wordWrap: 'on',
+                                automaticLayout: true,
+                                renderWhitespace: 'selection',
+                                tabSize: 4,
+                                folding: true,
+                                bracketPairColorization: { enabled: true },
+                            }}
+                        />
+                    </div>
                 )}
             </Modal>
 

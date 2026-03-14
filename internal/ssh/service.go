@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 
 	wr "github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -144,6 +146,44 @@ func (s *SSHService) SSHOpenShell(existingSessionID string) (string, error) {
 	return mgr.OpenNewShell(existingSessionID)
 }
 
+// SSHGetServerInfo returns basic server information
+func (s *SSHService) SSHGetServerInfo(sessionID string) (map[string]string, error) {
+	mgr := s.ensureManager()
+	if mgr == nil {
+		return nil, fmt.Errorf("SSH manager not initialized")
+	}
+
+	// Run a combined command to get all info at once (one SSH round-trip)
+	cmd := `echo "HOSTNAME=$(hostname 2>/dev/null)" && ` +
+		`echo "OS=$(cat /etc/os-release 2>/dev/null | grep '^PRETTY_NAME=' | cut -d'"' -f2 || uname -s)" && ` +
+		`echo "KERNEL=$(uname -r 2>/dev/null)" && ` +
+		`echo "ARCH=$(uname -m 2>/dev/null)" && ` +
+		`echo "CPU=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null) cores / $(grep 'model name' /proc/cpuinfo 2>/dev/null | head -1 | cut -d: -f2 | xargs || sysctl -n machdep.cpu.brand_string 2>/dev/null)" && ` +
+		`echo "MEMORY=$(free -h 2>/dev/null | awk '/^Mem:/{print $3"/"$2}' || echo 'N/A')" && ` +
+		`echo "DISK=$(df -h / 2>/dev/null | awk 'NR==2{print $3"/"$2" ("$5" used)"}')" && ` +
+		`echo "UPTIME=$(uptime -p 2>/dev/null || uptime 2>/dev/null | sed 's/.*up /up /' | sed 's/,.*//')" && ` +
+		`echo "LOAD=$(cat /proc/loadavg 2>/dev/null | awk '{print $1, $2, $3}' || uptime 2>/dev/null | sed 's/.*load average: //')" && ` +
+		`echo "IP=$(hostname -I 2>/dev/null | awk '{print $1}' || ifconfig 2>/dev/null | grep 'inet ' | grep -v 127.0.0.1 | awk '{print $2}' | head -1)"`
+
+	output, err := mgr.RunCommand(sessionID, cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]string)
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if idx := strings.IndexByte(line, '='); idx > 0 {
+			key := line[:idx]
+			value := line[idx+1:]
+			if value != "" {
+				result[key] = value
+			}
+		}
+	}
+	return result, nil
+}
+
 // ============================================================
 // SFTP Methods
 // ============================================================
@@ -206,7 +246,7 @@ func (s *SSHService) SFTPUploadFile(sessionID string, remotePath string) error {
 
 	fileName := filepath.Base(localPath)
 	fullRemotePath := remotePath + "/" + fileName
-	return mgr.UploadFile(sessionID, localPath, fullRemotePath)
+	return mgr.UploadPath(sessionID, localPath, fullRemotePath)
 }
 
 func (s *SSHService) SFTPDownloadFile(sessionID string, remotePath string) error {
@@ -228,12 +268,71 @@ func (s *SSHService) SFTPDownloadFile(sessionID string, remotePath string) error
 		return nil
 	}
 
-	data, err := mgr.ReadFile(sessionID, remotePath)
-	if err != nil {
-		return fmt.Errorf("failed to read remote file: %w", err)
+	dlID := fmt.Sprintf("file:%s:%d", remotePath, time.Now().UnixNano())
+	cancelCtx := mgr.NewDownloadContext(dlID)
+	defer mgr.FinishDownload(dlID)
+	return mgr.DownloadFileWithProgress(sessionID, remotePath, savePath, cancelCtx)
+}
+
+func (s *SSHService) SFTPDownloadFolder(sessionID string, remotePath string) error {
+	mgr := s.ensureManager()
+	if mgr == nil {
+		return fmt.Errorf("SSH manager not initialized")
 	}
 
-	return os.WriteFile(savePath, data, 0644)
+	folderName := filepath.Base(remotePath)
+
+	saveDir, err := wr.OpenDirectoryDialog(s.ctx, wr.OpenDialogOptions{
+		Title: "选择保存位置",
+	})
+	if err != nil {
+		return fmt.Errorf("failed to open directory dialog: %w", err)
+	}
+	if saveDir == "" {
+		return nil
+	}
+
+	localPath := filepath.Join(saveDir, folderName)
+	dlID := fmt.Sprintf("folder:%s:%d", remotePath, time.Now().UnixNano())
+	cancelCtx := mgr.NewDownloadContext(dlID)
+	defer mgr.FinishDownload(dlID)
+	return mgr.DownloadFolder(sessionID, remotePath, localPath, cancelCtx)
+}
+
+func (s *SSHService) SFTPDownloadToPath(sessionID string, remotePath string, localPath string) error {
+	mgr := s.ensureManager()
+	if mgr == nil {
+		return fmt.Errorf("SSH manager not initialized")
+	}
+	dlID := fmt.Sprintf("file:%s:%d", remotePath, time.Now().UnixNano())
+	cancelCtx := mgr.NewDownloadContext(dlID)
+	defer mgr.FinishDownload(dlID)
+	parentDir := filepath.Dir(localPath)
+	if err := os.MkdirAll(parentDir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+	return mgr.DownloadFileWithProgress(sessionID, remotePath, localPath, cancelCtx)
+}
+
+func (s *SSHService) SFTPStartUpload() {
+	mgr := s.ensureManager()
+	if mgr != nil {
+		mgr.StartUploadSession()
+	}
+}
+
+func (s *SSHService) SFTPCancelUpload() {
+	mgr := s.ensureManager()
+	if mgr != nil {
+		mgr.CancelUpload()
+	}
+}
+
+func (s *SSHService) SFTPCancelDownload() {
+	mgr := s.ensureManager()
+	if mgr != nil {
+		mgr.CancelDownload()
+	}
 }
 
 func (s *SSHService) SFTPReadFile(sessionID string, remotePath string) (string, error) {
@@ -261,9 +360,8 @@ func (s *SSHService) SFTPUploadFromPath(sessionID string, localPath string, remo
 	if mgr == nil {
 		return fmt.Errorf("SSH manager not initialized")
 	}
-	fileName := filepath.Base(localPath)
-	fullRemotePath := remotePath + "/" + fileName
-	return mgr.UploadFile(sessionID, localPath, fullRemotePath)
+	// remotePath is already the full destination path (constructed by frontend)
+	return mgr.UploadPath(sessionID, localPath, remotePath)
 }
 
 func (s *SSHService) SFTPChmod(sessionID string, remotePath string, mode string) error {

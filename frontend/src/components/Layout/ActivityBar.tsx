@@ -6,11 +6,11 @@ import {
     UnorderedListOutlined,
     MessageOutlined,
     LinkOutlined,
-    SettingOutlined,
     SwapOutlined,
     ApiOutlined,
     ToolOutlined,
 } from '@ant-design/icons';
+import { TbSettings } from 'react-icons/tb';
 import { IoGameControllerOutline } from 'react-icons/io5';
 import { VscGitMerge } from 'react-icons/vsc';
 import './ActivityBar.css';
@@ -33,7 +33,7 @@ const topItems: ActivityBarItem[] = [
 const bottomItems: ActivityBarItem[] = [
     { key: 'music', icon: <span style={{ fontSize: 17 }}>🎵</span>, label: '音乐播放器' },
     { key: 'emulator', icon: <IoGameControllerOutline style={{ fontSize: 18 }} />, label: '游戏模拟器' },
-    { key: 'settings', icon: <SettingOutlined />, label: '设置' },
+    { key: 'settings', icon: <TbSettings style={{ fontSize: 18 }} />, label: '设置' },
 ];
 
 interface ActivityBarProps {

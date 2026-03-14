@@ -8,6 +8,7 @@ import (
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"github.com/wailsapp/wails/v2/pkg/options/mac"
 
 	assetpkg "github.com/hsqbyte/hikit/internal/asset"
 	chatpkg "github.com/hsqbyte/hikit/internal/chat"
@@ -66,6 +67,14 @@ func main() {
 			Assets: assets,
 		},
 		BackgroundColour: &options.RGBA{R: 255, G: 255, B: 255, A: 1},
+		EnableDefaultContextMenu: true,
+		DragAndDrop: &options.DragAndDrop{
+			EnableFileDrop:     true,
+			DisableWebViewDrop: true,
+		},
+		Mac: &mac.Options{
+			WebviewIsTransparent: true,
+		},
 		OnStartup: func(ctx context.Context) {
 			app.startup(ctx)
 			sshService.Startup(ctx)

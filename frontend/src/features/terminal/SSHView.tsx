@@ -1,10 +1,11 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { Breadcrumb, Tooltip, message } from 'antd';
+import { Breadcrumb, Tooltip, Popover, message } from 'antd';
 import { SplitCellsOutlined, ReloadOutlined, PlusOutlined, CloseOutlined } from '@ant-design/icons';
+import { VscServer, VscGlobe, VscTerminalLinux, VscChip, VscPulse, VscCloudUpload, VscWatch, VscDashboard } from 'react-icons/vsc';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
-import { SSHConnect, SSHSendInput, SSHResize, SSHDisconnect, SSHOpenShell } from '../../../wailsjs/go/ssh/SSHService';
+import { SSHConnect, SSHSendInput, SSHResize, SSHDisconnect, SSHOpenShell, SSHGetServerInfo } from '../../../wailsjs/go/ssh/SSHService';
 import { EventsOn, EventsOff } from '../../../wailsjs/runtime/runtime';
 import FileManager from '../file-manager/FileManager';
 import './SSHView.css';
@@ -33,6 +34,7 @@ const SSHView: React.FC<SSHViewProps> = ({ hostName, groupName, host, assetId })
     const [connected, setConnected] = useState(false);
     const [connecting, setConnecting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [serverInfo, setServerInfo] = useState<Record<string, string> | null>(null);
 
     // Multi-tab terminal state
     const [tabs, setTabs] = useState<TermTab[]>([]);
@@ -148,6 +150,11 @@ const SSHView: React.FC<SSHViewProps> = ({ hostName, groupName, host, assetId })
             setActiveTabId(tabId);
             setConnected(true);
             setConnecting(false);
+
+            // Fetch server info in background
+            SSHGetServerInfo(sid).then(info => {
+                setServerInfo(info);
+            }).catch(() => {});
         } catch (err: any) {
             const errMsg = err?.message || String(err);
             setError(errMsg);
@@ -319,10 +326,61 @@ const SSHView: React.FC<SSHViewProps> = ({ hostName, groupName, host, assetId })
                         { title: hostName },
                     ]}
                 />
+                {connected && serverInfo && (
+                    <Popover
+                        trigger="click"
+                        placement="bottomLeft"
+                        arrow={false}
+                        overlayInnerStyle={{ padding: 0, borderRadius: 8, overflow: 'hidden' }}
+                        content={
+                            <div style={{ minWidth: 300, maxWidth: 400 }}>
+                                <div style={{ padding: '10px 14px', borderBottom: '1px solid #f0f0f0', fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <VscServer style={{ color: '#1677ff' }} /> 服务器详情
+                                </div>
+                                <div style={{ padding: '6px 0' }}>
+                                    {[
+                                        { icon: <VscServer />, label: '主机名', key: 'HOSTNAME' },
+                                        { icon: <VscTerminalLinux />, label: '系统', key: 'OS' },
+                                        { icon: <VscGlobe />, label: '内核', key: 'KERNEL', suffix: serverInfo.ARCH },
+                                        { icon: <VscChip />, label: 'CPU', key: 'CPU' },
+                                        { icon: <VscPulse />, label: '内存', key: 'MEMORY' },
+                                        { icon: <VscCloudUpload />, label: '磁盘', key: 'DISK' },
+                                        { icon: <VscWatch />, label: '运行时间', key: 'UPTIME' },
+                                        { icon: <VscDashboard />, label: '负载', key: 'LOAD' },
+                                        { icon: <VscGlobe />, label: 'IP 地址', key: 'IP' },
+                                    ].filter(item => serverInfo[item.key]).map((item, i) => (
+                                        <div key={i} style={{
+                                            display: 'flex', alignItems: 'center', padding: '5px 14px',
+                                            fontSize: 12, borderBottom: '1px solid #fafafa',
+                                        }}>
+                                            <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#666', minWidth: 80, flexShrink: 0 }}>
+                                                <span style={{ color: '#1677ff', fontSize: 13 }}>{item.icon}</span>
+                                                {item.label}
+                                            </span>
+                                            <span style={{ color: '#333', marginLeft: 'auto', textAlign: 'right', wordBreak: 'break-all' }}>
+                                                {serverInfo[item.key]}{item.suffix ? ` ${item.suffix}` : ''}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        }
+                    >
+                        <span className="ssh-server-summary">
+                            {[
+                                serverInfo.OS,
+                                serverInfo.CPU,
+                                serverInfo.MEMORY,
+                            ].filter(Boolean).join(' · ')}
+                        </span>
+                    </Popover>
+                )}
                 <div className="ssh-header-actions">
-                    <span className={`conn-status ${connected ? 'online' : connecting ? 'connecting' : 'offline'}`}>
-                        {connected ? '● 已连接' : connecting ? '○ 连接中...' : '● 未连接'}
-                    </span>
+                    {!connected && (
+                        <span className={`conn-status ${connecting ? 'connecting' : 'offline'}`}>
+                            {connecting ? '○ 连接中...' : '● 未连接'}
+                        </span>
+                    )}
                     {!connected && !connecting && (
                         <Tooltip title="重新连接">
                             <button className="ssh-action-btn" onClick={doConnect}>

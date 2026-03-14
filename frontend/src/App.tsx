@@ -22,10 +22,8 @@ import './App.css';
 
 const App: React.FC = () => {
     const { activeTabId, tabs, assets } = useConnectionStore();
-    const activeTab = tabs.find((t) => t.id === activeTabId);
     const [activityKey, setActivityKey] = useState('assets');
     const [sidebarVisible, setSidebarVisible] = useState(false);
-    const isOnWelcome = !activeTab;
 
     // Auto-show sidebar on mount
     useEffect(() => {
@@ -91,137 +89,6 @@ const App: React.FC = () => {
         return undefined;
     };
 
-    const currentAsset = activeTab ? findAsset(assets, activeTab.assetId) : undefined;
-    const parentGroup = activeTab ? findParentGroup(assets, activeTab.assetId) : undefined;
-
-    const renderContent = () => {
-        if (!activeTab) return null;
-
-        if (activeTab.connectionType === 'ssh') {
-            return (
-                <SSHView
-                    key={activeTab.assetId}
-                    hostName={activeTab.title}
-                    groupName={parentGroup?.name}
-                    host={currentAsset?.host}
-                    assetId={activeTab.assetId}
-                />
-            );
-        }
-
-        if (activeTab.connectionType === 'local_terminal') {
-            return (
-                <LocalTerminalView
-                    key={activeTab.id}
-                    name={activeTab.title}
-                    shell={currentAsset?.host}
-                />
-            );
-        }
-
-        if (activeTab.connectionType === 'postgresql') {
-            return (
-                <PostgreSQLView
-                    key={activeTab.id}
-                    hostName={activeTab.title}
-                    groupName={parentGroup?.name}
-                    host={currentAsset?.host}
-                    assetId={activeTab.assetId}
-                    pgMeta={activeTab.pgMeta as any}
-                />
-            );
-        }
-
-        if (activeTab.connectionType === 'redis') {
-            return (
-                <RedisView
-                    key={activeTab.id}
-                    hostName={activeTab.title}
-                    groupName={parentGroup?.name}
-                    assetId={activeTab.assetId}
-                />
-            );
-        }
-
-        if (activeTab.connectionType === 'web_bookmark') {
-            const url = activeTab.pgMeta?.url || currentAsset?.host || '';
-            return (
-                <WebProxyView
-                    key={activeTab.id}
-                    url={url}
-                    title={activeTab.title}
-                />
-            );
-        }
-
-        if (activeTab.connectionType === 'rest_client') {
-            return (
-                <RestClientView
-                    key={activeTab.id}
-                    name={activeTab.title}
-                    assetId={activeTab.assetId}
-                />
-            );
-        }
-
-        if (activeTab.connectionType === 'todo') {
-            return (
-                <TodoView
-                    key={activeTab.id}
-                    name={activeTab.title}
-                    assetId={activeTab.assetId}
-                />
-            );
-        }
-
-        if (activeTab.connectionType === 'memo') {
-            return (
-                <MemoView
-                    key={activeTab.id}
-                    name={activeTab.title}
-                    assetId={activeTab.assetId}
-                />
-            );
-        }
-
-        if (activeTab.connectionType === 'toolbox') {
-            const toolKey = activeTab.pgMeta?.type || 'json_formatter';
-            return (
-                <ToolboxView
-                    key={activeTab.id}
-                    toolKey={toolKey}
-                />
-            );
-        }
-
-        if (activeTab.connectionType === 'emulator') {
-            const core = activeTab.pgMeta?.type || 'nes';
-            const romUrl = activeTab.pgMeta?.host || '';
-            const romName = activeTab.pgMeta?.name || 'Game';
-            const biosUrl = activeTab.pgMeta?.url;
-            return (
-                <EmulatorView
-                    key={activeTab.id}
-                    romUrl={romUrl}
-                    core={core}
-                    romName={romName}
-                    biosUrl={biosUrl}
-                />
-            );
-        }
-
-        if (activeTab.connectionType === 'music') {
-            return <MusicView />;
-        }
-
-        return (
-            <div className="terminal-placeholder">
-                <p>连接到: {activeTab.title}</p>
-                <p>类型: {activeTab.connectionType}</p>
-                <p style={{ color: '#999', marginTop: 8 }}>该连接类型的界面正在开发中...</p>
-            </div>
-        );
-    };
 
     return (
         <ConfigProvider
@@ -277,7 +144,87 @@ const App: React.FC = () => {
                             <TabBar />
                             <div className="app-content">
                                 <ErrorBoundary>
-                                    {renderContent()}
+                                    {tabs.map((tab) => {
+                                        const asset = findAsset(assets, tab.assetId);
+                                        const group = findParentGroup(assets, tab.assetId);
+                                        const isActive = tab.id === activeTabId;
+
+                                        return (
+                                            <div
+                                                key={tab.id}
+                                                style={{ display: isActive ? 'contents' : 'none' }}
+                                            >
+                                                {tab.connectionType === 'ssh' && (
+                                                    <SSHView
+                                                        hostName={tab.title}
+                                                        groupName={group?.name}
+                                                        host={asset?.host}
+                                                        assetId={tab.assetId}
+                                                    />
+                                                )}
+                                                {tab.connectionType === 'local_terminal' && (
+                                                    <LocalTerminalView
+                                                        name={tab.title}
+                                                        shell={asset?.host}
+                                                    />
+                                                )}
+                                                {tab.connectionType === 'postgresql' && (
+                                                    <PostgreSQLView
+                                                        hostName={tab.title}
+                                                        groupName={group?.name}
+                                                        host={asset?.host}
+                                                        assetId={tab.assetId}
+                                                        pgMeta={tab.pgMeta as any}
+                                                    />
+                                                )}
+                                                {tab.connectionType === 'redis' && (
+                                                    <RedisView
+                                                        hostName={tab.title}
+                                                        groupName={group?.name}
+                                                        assetId={tab.assetId}
+                                                    />
+                                                )}
+                                                {tab.connectionType === 'web_bookmark' && (
+                                                    <WebProxyView
+                                                        url={tab.pgMeta?.url || asset?.host || ''}
+                                                        title={tab.title}
+                                                    />
+                                                )}
+                                                {tab.connectionType === 'rest_client' && (
+                                                    <RestClientView
+                                                        name={tab.title}
+                                                        assetId={tab.assetId}
+                                                    />
+                                                )}
+                                                {tab.connectionType === 'todo' && (
+                                                    <TodoView
+                                                        name={tab.title}
+                                                        assetId={tab.assetId}
+                                                    />
+                                                )}
+                                                {tab.connectionType === 'memo' && (
+                                                    <MemoView
+                                                        name={tab.title}
+                                                        assetId={tab.assetId}
+                                                    />
+                                                )}
+                                                {tab.connectionType === 'toolbox' && (
+                                                    <ToolboxView
+                                                        toolKey={tab.pgMeta?.type || 'json_formatter'}
+                                                    />
+                                                )}
+                                                {tab.connectionType === 'emulator' && (
+                                                    <EmulatorView
+                                                        romUrl={tab.pgMeta?.host || ''}
+                                                        core={tab.pgMeta?.type || 'nes'}
+                                                        romName={tab.pgMeta?.name || 'Game'}
+                                                        biosUrl={tab.pgMeta?.url}
+                                                    />
+                                                )}
+                                                {tab.connectionType === 'music' && <MusicView />}
+                                            </div>
+                                        );
+                                    })}
                                 </ErrorBoundary>
                             </div>
                         </>

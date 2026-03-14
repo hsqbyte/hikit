@@ -30,9 +30,13 @@ type Session struct {
 
 // Manager manages all active SSH sessions
 type Manager struct {
-	sessions map[string]*Session
-	mu       sync.RWMutex
-	appCtx   context.Context
+	sessions       map[string]*Session
+	mu             sync.RWMutex
+	appCtx         context.Context
+	uploadCtx      context.Context
+	uploadCancel   context.CancelFunc
+	downloadCtxs   map[string]context.CancelFunc // per-download cancel funcs
+	downloadMu     sync.Mutex
 }
 
 var manager *Manager
@@ -40,8 +44,59 @@ var manager *Manager
 // InitManager creates the global session manager
 func InitManager(ctx context.Context) {
 	manager = &Manager{
-		sessions: make(map[string]*Session),
-		appCtx:   ctx,
+		sessions:     make(map[string]*Session),
+		appCtx:       ctx,
+		downloadCtxs: make(map[string]context.CancelFunc),
+	}
+}
+
+// StartUploadSession creates a cancellable context for the current upload batch
+func (m *Manager) StartUploadSession() {
+	if m.uploadCancel != nil {
+		m.uploadCancel()
+	}
+	m.uploadCtx, m.uploadCancel = context.WithCancel(m.appCtx)
+}
+
+// CancelUpload cancels the current upload session
+func (m *Manager) CancelUpload() {
+	if m.uploadCancel != nil {
+		m.uploadCancel()
+		m.uploadCancel = nil
+	}
+}
+
+// NewDownloadContext creates a new independent cancel context for a download.
+// Returns the context and a unique ID to cancel it later.
+func (m *Manager) NewDownloadContext(id string) context.Context {
+	m.downloadMu.Lock()
+	defer m.downloadMu.Unlock()
+	// Cancel existing with same id if any
+	if cancel, ok := m.downloadCtxs[id]; ok {
+		cancel()
+	}
+	ctx, cancel := context.WithCancel(m.appCtx)
+	m.downloadCtxs[id] = cancel
+	return ctx
+}
+
+// CancelDownload cancels ALL active downloads
+func (m *Manager) CancelDownload() {
+	m.downloadMu.Lock()
+	defer m.downloadMu.Unlock()
+	for id, cancel := range m.downloadCtxs {
+		cancel()
+		delete(m.downloadCtxs, id)
+	}
+}
+
+// FinishDownload removes a completed download context
+func (m *Manager) FinishDownload(id string) {
+	m.downloadMu.Lock()
+	defer m.downloadMu.Unlock()
+	if cancel, ok := m.downloadCtxs[id]; ok {
+		cancel()
+		delete(m.downloadCtxs, id)
 	}
 }
 
@@ -347,3 +402,26 @@ func (m *Manager) DisconnectAll() {
 		m.Disconnect(id)
 	}
 }
+
+// RunCommand executes a command on an existing SSH connection and returns its output
+func (m *Manager) RunCommand(sessionID, cmd string) (string, error) {
+	m.mu.RLock()
+	sess, ok := m.sessions[sessionID]
+	m.mu.RUnlock()
+	if !ok {
+		return "", fmt.Errorf("session %s not found", sessionID)
+	}
+
+	newSession, err := sess.Client.NewSession()
+	if err != nil {
+		return "", fmt.Errorf("failed to create session: %w", err)
+	}
+	defer newSession.Close()
+
+	out, err := newSession.CombinedOutput(cmd)
+	if err != nil {
+		return string(out), nil // Return output even on non-zero exit
+	}
+	return string(out), nil
+}
+
