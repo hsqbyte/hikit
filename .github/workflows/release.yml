@@ -237,11 +237,10 @@ jobs:
       - name: List artifacts
         run: ls -lh dist/
 
-      - name: Create GitHub Release on PUBLIC repo
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          repository: hsqbyte/hikit
-          token: ${{ secrets.PUBLIC_REPO_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           tag_name: ${{ github.ref_name }}
           name: "HiKit ${{ github.ref_name }}"
           body: |
