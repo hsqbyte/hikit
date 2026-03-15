@@ -35,27 +35,50 @@
 
 ![新しい接続](../screenshots/main.png)
 
-### SSH / SFTP
+---
 
-![SSH ターミナル & SFTP](../screenshots/ssh_sftp.png)
+### データベース管理
+
+<table>
+  <tr>
+    <td><img src="../screenshots/postgresql.png" alt="データベース管理"/></td>
+    <td><img src="../screenshots/sql_query.png" alt="SQLクエリ結果"/></td>
+  </tr>
+  <tr>
+    <td align="center">テーブルブラウザ</td>
+    <td align="center">SQLクエリ結果</td>
+  </tr>
+</table>
+
+![SQL AI アシスタント](../screenshots/sql_ai_助手.png)
+
+---
+
+### SSH / SFTP & Webプロキシ
+
+<table>
+  <tr>
+    <td><img src="../screenshots/ssh_sftp.png" alt="SSH &amp; SFTP"/></td>
+    <td><img src="../screenshots/web_proxy.png" alt="Webプロキシ"/></td>
+  </tr>
+  <tr>
+    <td align="center">SSH ターミナル &amp; SFTP</td>
+    <td align="center">Webプロキシ + MITM</td>
+  </tr>
+</table>
+
+---
+
+<details>
+<summary>📸 その他のスクリーンショット</summary>
 
 ### SSHポートフォワーディング
 
 ![SSHポートフォワーディング](../screenshots/ssh_proxy.png)
 
-### データベース管理
-
-![データベース管理](../screenshots/postgresql.png)
-![SQLクエリ結果](../screenshots/sql_query.png)
-![SQL AI アシスタント](../screenshots/sql_ai_助手.png)
-
 ### REST Client
 
 ![REST Client](../screenshots/rest_client.png)
-
-### Webプロキシ
-
-![Webプロキシ](../screenshots/web_proxy.png)
 
 ### ツールボックス
 
@@ -67,13 +90,23 @@
 
 ### Todo & メモ
 
-![Todo](../screenshots/todo.png)
-![メモ](../screenshots/memo.png)
+<table>
+  <tr>
+    <td><img src="../screenshots/todo.png" alt="Todo"/></td>
+    <td><img src="../screenshots/memo.png" alt="メモ"/></td>
+  </tr>
+</table>
 
 ### 音楽プレイヤー & ゲームエミュレータ
 
-![音楽プレイヤー](../screenshots/music.png)
-![ゲームエミュレータ](../screenshots/game.png)
+<table>
+  <tr>
+    <td><img src="../screenshots/music.png" alt="音楽プレイヤー"/></td>
+    <td><img src="../screenshots/game.png" alt="ゲームエミュレータ"/></td>
+  </tr>
+</table>
+
+</details>
 
 ---
 

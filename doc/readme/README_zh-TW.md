@@ -35,27 +35,50 @@
 
 ![新建連線](../screenshots/main.png)
 
-### SSH / SFTP
+---
 
-![SSH 終端機 & SFTP 檔案管理](../screenshots/ssh_sftp.png)
+### 資料庫管理
+
+<table>
+  <tr>
+    <td><img src="../screenshots/postgresql.png" alt="資料庫管理"/></td>
+    <td><img src="../screenshots/sql_query.png" alt="SQL 查詢結果"/></td>
+  </tr>
+  <tr>
+    <td align="center">資料表瀏覽</td>
+    <td align="center">SQL 查詢結果</td>
+  </tr>
+</table>
+
+![SQL AI 助手](../screenshots/sql_ai_助手.png)
+
+---
+
+### SSH / SFTP & Web 代理
+
+<table>
+  <tr>
+    <td><img src="../screenshots/ssh_sftp.png" alt="SSH 終端機 &amp; SFTP"/></td>
+    <td><img src="../screenshots/web_proxy.png" alt="Web 代理抓包"/></td>
+  </tr>
+  <tr>
+    <td align="center">SSH 終端機 &amp; SFTP</td>
+    <td align="center">Web 代理 + MITM</td>
+  </tr>
+</table>
+
+---
+
+<details>
+<summary>📸 更多截圖</summary>
 
 ### SSH 連接埠轉發
 
 ![SSH 連接埠轉發](../screenshots/ssh_proxy.png)
 
-### 資料庫管理
-
-![資料庫管理](../screenshots/postgresql.png)
-![SQL 查詢結果](../screenshots/sql_query.png)
-![SQL AI 助手](../screenshots/sql_ai_助手.png)
-
 ### REST Client
 
 ![REST Client](../screenshots/rest_client.png)
-
-### Web 代理
-
-![Web 代理抓包](../screenshots/web_proxy.png)
 
 ### 工具箱
 
@@ -67,13 +90,23 @@
 
 ### 待辦事項 & 備忘錄
 
-![待辦事項](../screenshots/todo.png)
-![備忘錄](../screenshots/memo.png)
+<table>
+  <tr>
+    <td><img src="../screenshots/todo.png" alt="待辦事項"/></td>
+    <td><img src="../screenshots/memo.png" alt="備忘錄"/></td>
+  </tr>
+</table>
 
 ### 音樂播放器 & 遊戲模擬器
 
-![音樂播放器](../screenshots/music.png)
-![遊戲模擬器](../screenshots/game.png)
+<table>
+  <tr>
+    <td><img src="../screenshots/music.png" alt="音樂播放器"/></td>
+    <td><img src="../screenshots/game.png" alt="遊戲模擬器"/></td>
+  </tr>
+</table>
+
+</details>
 
 ---
 

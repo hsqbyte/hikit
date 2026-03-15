@@ -35,45 +35,72 @@
 
 ![Nueva Conexión](../screenshots/main.png)
 
-### SSH / SFTP
-
-![SSH & SFTP](../screenshots/ssh_sftp.png)
-
-### Reenvío de Puertos SSH
-
-![SSH Port Forward](../screenshots/ssh_proxy.png)
+---
 
 ### Base de Datos
 
-![Base de Datos](../screenshots/postgresql.png)
-![Resultados SQL](../screenshots/sql_query.png)
+<table>
+  <tr>
+    <td><img src="../screenshots/postgresql.png" alt="Base de Datos"/></td>
+    <td><img src="../screenshots/sql_query.png" alt="Resultados SQL"/></td>
+  </tr>
+  <tr>
+    <td align="center">Explorador de tablas</td>
+    <td align="center">Resultados SQL</td>
+  </tr>
+</table>
+
 ![Asistente SQL IA](../screenshots/sql_ai_助手.png)
 
-### REST Client
+---
 
+### SSH / SFTP & Proxy Web
+
+<table>
+  <tr>
+    <td><img src="../screenshots/ssh_sftp.png" alt="SSH &amp; SFTP"/></td>
+    <td><img src="../screenshots/web_proxy.png" alt="Proxy Web"/></td>
+  </tr>
+  <tr>
+    <td align="center">SSH &amp; SFTP</td>
+    <td align="center">Proxy Web + MITM</td>
+  </tr>
+</table>
+
+---
+
+<details>
+<summary>📸 Más capturas de pantalla</summary>
+
+### Reenvío de Puertos SSH
+![SSH Port Forward](../screenshots/ssh_proxy.png)
+
+### REST Client
 ![REST Client](../screenshots/rest_client.png)
 
-### Proxy Web
-
-![Proxy Web](../screenshots/web_proxy.png)
-
 ### Caja de Herramientas
-
 ![Caja de Herramientas](../screenshots/tool.png)
 
 ### Git
-
 ![Git](../screenshots/git.png)
 
 ### Tareas & Notas
-
-![Tareas](../screenshots/todo.png)
-![Notas](../screenshots/memo.png)
+<table>
+  <tr>
+    <td><img src="../screenshots/todo.png" alt="Tareas"/></td>
+    <td><img src="../screenshots/memo.png" alt="Notas"/></td>
+  </tr>
+</table>
 
 ### Reproductor & Emulador
+<table>
+  <tr>
+    <td><img src="../screenshots/music.png" alt="Reproductor"/></td>
+    <td><img src="../screenshots/game.png" alt="Emulador"/></td>
+  </tr>
+</table>
 
-![Reproductor](../screenshots/music.png)
-![Emulador](../screenshots/game.png)
+</details>
 
 ---
 

@@ -35,27 +35,50 @@
 
 ![새 연결](../screenshots/main.png)
 
-### SSH / SFTP
+---
 
-![SSH 터미널 & SFTP](../screenshots/ssh_sftp.png)
+### 데이터베이스 관리
+
+<table>
+  <tr>
+    <td><img src="../screenshots/postgresql.png" alt="데이터베이스 관리"/></td>
+    <td><img src="../screenshots/sql_query.png" alt="SQL 쿼리 결과"/></td>
+  </tr>
+  <tr>
+    <td align="center">테이블 브라우저</td>
+    <td align="center">SQL 쿼리 결과</td>
+  </tr>
+</table>
+
+![SQL AI 어시스턴트](../screenshots/sql_ai_助手.png)
+
+---
+
+### SSH / SFTP & 웹 프록시
+
+<table>
+  <tr>
+    <td><img src="../screenshots/ssh_sftp.png" alt="SSH &amp; SFTP"/></td>
+    <td><img src="../screenshots/web_proxy.png" alt="웹 프록시"/></td>
+  </tr>
+  <tr>
+    <td align="center">SSH 터미널 &amp; SFTP</td>
+    <td align="center">웹 프록시 + MITM</td>
+  </tr>
+</table>
+
+---
+
+<details>
+<summary>📸 더 많은 스크린샷</summary>
 
 ### SSH 포트 포워딩
 
 ![SSH 포트 포워딩](../screenshots/ssh_proxy.png)
 
-### 데이터베이스 관리
-
-![데이터베이스 관리](../screenshots/postgresql.png)
-![SQL 쿼리 결과](../screenshots/sql_query.png)
-![SQL AI 어시스턴트](../screenshots/sql_ai_助手.png)
-
 ### REST Client
 
 ![REST Client](../screenshots/rest_client.png)
-
-### 웹 프록시
-
-![웹 프록시](../screenshots/web_proxy.png)
 
 ### 툴박스
 
@@ -67,13 +90,23 @@
 
 ### 할 일 목록 & 메모
 
-![할 일 목록](../screenshots/todo.png)
-![메모](../screenshots/memo.png)
+<table>
+  <tr>
+    <td><img src="../screenshots/todo.png" alt="할 일 목록"/></td>
+    <td><img src="../screenshots/memo.png" alt="메모"/></td>
+  </tr>
+</table>
 
 ### 음악 플레이어 & 게임 에뮬레이터
 
-![음악 플레이어](../screenshots/music.png)
-![게임 에뮬레이터](../screenshots/game.png)
+<table>
+  <tr>
+    <td><img src="../screenshots/music.png" alt="음악 플레이어"/></td>
+    <td><img src="../screenshots/game.png" alt="게임 에뮬레이터"/></td>
+  </tr>
+</table>
+
+</details>
 
 ---
 
