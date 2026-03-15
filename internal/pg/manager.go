@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	_ "github.com/lib/pq"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
@@ -64,6 +65,14 @@ func (c *ConnConfig) dsn() string {
 	)
 }
 
+// configureDB applies connection pool settings to avoid idle disconnections.
+func configureDB(db *sql.DB) {
+	db.SetMaxOpenConns(5)
+	db.SetMaxIdleConns(2)
+	db.SetConnMaxLifetime(30 * time.Minute)
+	db.SetConnMaxIdleTime(10 * time.Minute)
+}
+
 // Connect establishes a new PostgreSQL connection
 func (s *PGService) Connect(cfg ConnConfig) (string, error) {
 	if cfg.Port == 0 {
@@ -77,6 +86,7 @@ func (s *PGService) Connect(cfg ConnConfig) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to open connection: %w", err)
 	}
+	configureDB(db)
 
 	if err := db.Ping(); err != nil {
 		db.Close()
@@ -696,3 +706,49 @@ func (s *PGService) CopyTables(srcSessionID string, dstSessionID string, srcSche
 
 	return nil
 }
+
+// ListIndexes returns all indexes for a table.
+func (s *PGService) ListIndexes(sessionID, schema, table string) ([]IndexInfo, error) {
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return sess.ListIndexes(schema, table)
+}
+
+// CreateIndex creates a new index on a table.
+func (s *PGService) CreateIndex(sessionID, schema, table, indexName string, columns []string, unique bool, method string) error {
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return err
+	}
+	return sess.CreateIndex(schema, table, indexName, columns, unique, method)
+}
+
+// DropIndex drops an index by name.
+func (s *PGService) DropIndex(sessionID, schema, indexName string) error {
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return err
+	}
+	return sess.DropIndex(schema, indexName)
+}
+
+// ListForeignKeys returns all FK constraints for a table.
+func (s *PGService) ListForeignKeys(sessionID, schema, table string) ([]ForeignKeyInfo, error) {
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return sess.ListForeignKeys(schema, table)
+}
+
+// ExportTableCSV exports a full table as UTF-8 CSV string.
+func (s *PGService) ExportTableCSV(sessionID, schema, table string) (string, error) {
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return "", err
+	}
+	return sess.ExportTableCSV(schema, table)
+}
+
