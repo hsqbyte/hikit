@@ -50,7 +50,7 @@
   </tr>
 </table>
 
-![SQL KI-Assistent](../screenshots/sql_ai_助手.png)
+![SQL KI-Assistent](../screenshots/sql_ai_%E5%8A%A9%E6%89%8B.png)
 
 ---
 

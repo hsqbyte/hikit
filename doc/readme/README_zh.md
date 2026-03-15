@@ -55,7 +55,7 @@
   </tr>
 </table>
 
-![SQL AI 助手](../screenshots/sql_ai_助手.png)
+![SQL AI 助手](../screenshots/sql_ai_%E5%8A%A9%E6%89%8B.png)
 
 ---
 
