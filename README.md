@@ -12,15 +12,6 @@ English | [简体中文](doc/readme/README_zh.md) | [繁體中文](doc/readme/RE
 
 ---
 
-## Table of Contents
-
-- [Features](#features)
-- [Preview](#preview)
-- [Development](#development)
-- [Tech Stack](#tech-stack)
-
----
-
 ## Features
 
 | Module | Description |
@@ -51,13 +42,42 @@ Supports SSH, Local Terminal, SSH Tunnel, Telnet, RDP, Docker, and databases inc
 
 ---
 
-### SSH / SFTP
+### Database Management
 
-Multi-tab remote terminal with integrated SFTP file management.
+Full-featured PostgreSQL / MySQL / Redis client — asset tree + SQL editor + AI assistant.
 
-![SSH Terminal & SFTP](doc/screenshots/ssh_sftp.png)
+<table>
+  <tr>
+    <td><img src="doc/screenshots/postgresql.png" alt="Database Management"/></td>
+    <td><img src="doc/screenshots/sql_query.png" alt="SQL Query Results"/></td>
+  </tr>
+  <tr>
+    <td align="center">Table Browser</td>
+    <td align="center">SQL Query Results</td>
+  </tr>
+</table>
+
+![SQL AI Assistant](doc/screenshots/sql_ai_助手.png)
 
 ---
+
+### SSH / SFTP & Web Proxy
+
+<table>
+  <tr>
+    <td><img src="doc/screenshots/ssh_sftp.png" alt="SSH Terminal &amp; SFTP"/></td>
+    <td><img src="doc/screenshots/web_proxy.png" alt="Web Proxy"/></td>
+  </tr>
+  <tr>
+    <td align="center">SSH Terminal &amp; SFTP</td>
+    <td align="center">Web Proxy + MITM</td>
+  </tr>
+</table>
+
+---
+
+<details>
+<summary>📸 More Screenshots</summary>
 
 ### SSH Port Forwarding
 
@@ -67,29 +87,11 @@ Local & remote SSH tunneling, quickly expose internal network ports.
 
 ---
 
-### Database Management
-
-Supports Redis, MySQL, MariaDB, PostgreSQL, SQLite, SQL Server, ClickHouse, Oracle — asset tree + SQL editor + query results.
-
-![Database Management](doc/screenshots/postgresql.png)
-![SQL Query Results](doc/screenshots/sql_query.png)
-![SQL AI Assistant](doc/screenshots/sql_ai_助手.png)
-
----
-
 ### REST Client
 
 HTTP interface debugging tool compatible with `.http` file format.
 
 ![REST Client](doc/screenshots/rest_client.png)
-
----
-
-### Web Proxy
-
-HTTP/HTTPS packet capture with MITM traffic tampering support.
-
-![Web Proxy](doc/screenshots/web_proxy.png)
 
 ---
 
@@ -109,35 +111,35 @@ Visual management of local Git repositories: changes, logs, branches.
 
 ---
 
-### Todo
+### Todo & Memo
 
-Lightweight task management to quickly track your work items.
-
-![Todo](doc/screenshots/todo.png)
-
----
-
-### Memo
-
-Markdown editor with real-time preview.
-
-![Memo](doc/screenshots/memo.png)
-
----
-
-### Music Player
-
-Online music search, lyrics sync, and offline playback.
-
-![Music Player](doc/screenshots/music.png)
+<table>
+  <tr>
+    <td><img src="doc/screenshots/todo.png" alt="Todo"/></td>
+    <td><img src="doc/screenshots/memo.png" alt="Memo"/></td>
+  </tr>
+  <tr>
+    <td align="center">Todo</td>
+    <td align="center">Markdown Memo</td>
+  </tr>
+</table>
 
 ---
 
-### Game Emulator
+### Music Player & Game Emulator
 
-Built-in classic game emulator supporting FC, SFC, and NEO GEO platforms.
+<table>
+  <tr>
+    <td><img src="doc/screenshots/music.png" alt="Music Player"/></td>
+    <td><img src="doc/screenshots/game.png" alt="Game Emulator"/></td>
+  </tr>
+  <tr>
+    <td align="center">Music Player</td>
+    <td align="center">Game Emulator</td>
+  </tr>
+</table>
 
-![Game Emulator](doc/screenshots/game.png)
+</details>
 
 ---
 
