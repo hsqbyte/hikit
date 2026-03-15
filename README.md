@@ -48,16 +48,14 @@ Full-featured PostgreSQL / MySQL / Redis client — asset tree + SQL editor + AI
 
 <table>
   <tr>
-    <td><img src="doc/screenshots/postgresql.png" alt="Database Management"/></td>
+    <td><img src="doc/screenshots/sql_ai_%E5%8A%A9%E6%89%8B.png" alt="SQL AI Assistant"/></td>
     <td><img src="doc/screenshots/sql_query.png" alt="SQL Query Results"/></td>
   </tr>
   <tr>
-    <td align="center">Table Browser</td>
+    <td align="center">SQL AI Assistant</td>
     <td align="center">SQL Query Results</td>
   </tr>
 </table>
-
-![SQL AI Assistant](doc/screenshots/sql_ai_%E5%8A%A9%E6%89%8B.png)
 
 ---
 
