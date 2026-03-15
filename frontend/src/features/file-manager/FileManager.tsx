@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { EventsOn, EventsOff } from '../../../wailsjs/runtime/runtime';
-import { Input, Table, Button, Tooltip, Modal, Dropdown, message, Progress } from 'antd';
+import { Input, Table, Button, Tooltip, Modal, Dropdown, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { MenuProps } from 'antd';
 import FileViewerModal from './FileViewerModal';
 import SearchModal from './SearchModal';
+import TransferQueuePanel, { TransferItem } from './TransferQueuePanel';
 import {
     ArrowLeftOutlined,
     ReloadOutlined,
@@ -23,12 +24,6 @@ import {
     FileSearchOutlined,
     ScissorOutlined,
     SnippetsOutlined,
-    CloseOutlined,
-    CheckCircleOutlined,
-    CloseCircleOutlined,
-    MinusCircleOutlined,
-    LoadingOutlined,
-    DownOutlined,
 } from '@ant-design/icons';
 import {
     VscFolder, VscFile, VscFileCode, VscFileZip,
@@ -200,30 +195,13 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number; record: FileItem } | null>(null);
 
     // Transfer queue state (supports upload + download)
-    interface UploadFileItem {
-        id: number;
-        name: string;
-        localPath: string;
-        remotePath: string;
-        targetPath: string;
-        isDir: boolean;
-        status: 'pending' | 'uploading' | 'done' | 'failed' | 'cancelled';
-        percent: number;
-        transferred: number;
-        total: number;
-        direction: 'upload' | 'download';
-        currentFile?: string;   // current sub-file being downloaded (folder only)
-        filesDone?: number;     // files completed (folder only)
-        filesTotal?: number;    // total files in folder
-        parentId?: number;      // parent folder item id (for child files)
-    }
-    const [uploadFiles, setUploadFiles] = useState<UploadFileItem[]>([]);
+    const [uploadFiles, setUploadFiles] = useState<TransferItem[]>([]);
     const [uploadVisible, setUploadVisible] = useState(false);
     const [uploadCollapsed, setUploadCollapsed] = useState(false);
     const uploadCancelRef = useRef(false);
     const uploadProcessingRef = useRef(false);
     const uploadIdCounter = useRef(0);
-    const uploadQueueRef = useRef<UploadFileItem[]>([]);
+    const uploadQueueRef = useRef<TransferItem[]>([]);
 
     const loadFilesRef = useRef<() => void>(() => {});
     const cancelCurrentOnlyRef = useRef(false);
@@ -392,7 +370,7 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
             if (!paths || paths.length === 0) return;
             setIsDragging(false);
 
-            const newItems: UploadFileItem[] = paths.map(p => {
+            const newItems: TransferItem[] = paths.map(p => {
                 const name = p.split('/').pop() || p.split('\\').pop() || 'file';
                 const remotePath = currentPathRef.current === '/' ? `/${name}` : `${currentPathRef.current}/${name}`;
                 return {
@@ -445,7 +423,7 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
             if (idx === -1 && data.fileName) {
                 const existingIdx = uploadQueueRef.current.findIndex(f => f.name === data.fileName && f.direction === 'download');
                 if (existingIdx !== -1) return; // Already exists, ignore late events
-                const newItem: UploadFileItem = {
+                const newItem: TransferItem = {
                     id: ++uploadIdCounter.current,
                     name: data.fileName,
                     localPath: '',
@@ -1015,106 +993,16 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
                 />
             </div>
 
-            {/* Upload Progress Panel - inline bottom */}
-            {uploadVisible && uploadFiles.length > 0 && (
-                <div className={`fm-upload-panel ${uploadCollapsed ? 'fm-upload-panel-collapsed' : ''}`}>
-                    <div className="fm-upload-panel-header" onClick={() => setUploadCollapsed(c => !c)}>
-                        <span className="fm-upload-panel-title">
-                            <DownOutlined className={`fm-upload-chevron ${uploadCollapsed ? 'collapsed' : ''}`} />
-                            传输 ({uploadFiles.filter(f => f.status === 'done').length}/{uploadFiles.length})
-                        </span>
-                        <div className="fm-upload-panel-actions" onClick={e => e.stopPropagation()}>
-                            {!uploadFiles.some(f => f.status === 'uploading' || f.status === 'pending') && (
-                                <Tooltip title="清空列表">
-                                    <Button
-                                        type="text"
-                                        size="small"
-                                        icon={<DeleteOutlined />}
-                                        onClick={handleClearUploadList}
-                                        className="fm-upload-cancel-btn"
-                                    >清空</Button>
-                                </Tooltip>
-                            )}
-                            <Button
-                                type="text"
-                                size="small"
-                                icon={<CloseOutlined />}
-                                onClick={() => setUploadVisible(false)}
-                                className="fm-upload-close-btn"
-                            />
-                        </div>
-                    </div>
-                    {!uploadCollapsed && (
-                        <div className="fm-upload-panel-list">
-                            {uploadFiles.map((file) => (
-                                <div key={file.id} className={`fm-upload-item fm-upload-item-${file.status}`}>
-                                    <div className="fm-upload-item-icon">
-                                        {file.status === 'done' && <CheckCircleOutlined style={{ color: '#52c41a' }} />}
-                                        {file.status === 'failed' && <CloseCircleOutlined style={{ color: '#ff4d4f' }} />}
-                                        {file.status === 'cancelled' && <MinusCircleOutlined style={{ color: '#999' }} />}
-                                        {file.status === 'uploading' && <LoadingOutlined style={{ color: '#1677ff' }} />}
-                                        {file.status === 'pending' && <UploadOutlined style={{ color: '#bbb' }} />}
-                                    </div>
-                                    <div className="fm-upload-item-info">
-                                        <div className="fm-upload-item-name" title={file.name}>
-                                            <span className={`fm-transfer-dir ${file.direction}`}>{file.direction === 'upload' ? '↑' : '↓'}</span>
-                                            {file.isDir && <VscFolder style={{ color: '#e8a838', marginRight: 4, verticalAlign: 'middle', fontSize: 14 }} />}
-                                            {file.name}
-                                        </div>
-                                        <div className="fm-upload-item-path" title={file.currentFile || file.targetPath}>
-                                            {file.currentFile || file.targetPath}
-                                        </div>
-                                        {file.status === 'uploading' && (
-                                            <>
-                                                {file.percent >= 0 && file.total > 0 && (
-                                                    <Progress
-                                                        percent={file.percent}
-                                                        size="small"
-                                                        showInfo={false}
-                                                        strokeColor={{ '0%': '#1677ff', '100%': '#52c41a' }}
-                                                        style={{ margin: '2px 0 0' }}
-                                                    />
-                                                )}
-                                                <div className="fm-upload-item-size">
-                                                    {formatSize(file.transferred)}{file.total > 0 ? ` / ${formatSize(file.total)}` : ''}
-                                                </div>
-                                            </>
-                                        )}
-                                        {file.status === 'done' && <div className="fm-upload-item-status done">{file.isDir && file.filesDone ? `已完成 (${file.filesDone} 文件)` : '已完成'}</div>}
-                                        {file.status === 'failed' && <div className="fm-upload-item-status failed">失败</div>}
-                                        {file.status === 'cancelled' && <div className="fm-upload-item-status cancelled">已取消</div>}
-                                        {file.status === 'pending' && <div className="fm-upload-item-status pending">等待中</div>}
-                                    </div>
-                                    <div className="fm-upload-item-action">
-                                        {(file.status === 'pending' || file.status === 'uploading') && (
-                                            <Tooltip title="取消">
-                                                <Button
-                                                    type="text"
-                                                    size="small"
-                                                    icon={<CloseOutlined />}
-                                                    className="fm-upload-item-cancel"
-                                                    onClick={() => handleCancelFile(file.id)}
-                                                />
-                                            </Tooltip>
-                                        )}
-                                        {(file.status === 'done' || file.status === 'failed' || file.status === 'cancelled') && (
-                                            <Tooltip title="移除">
-                                                <Button
-                                                    type="text"
-                                                    size="small"
-                                                    icon={<CloseOutlined />}
-                                                    className="fm-upload-item-remove"
-                                                    onClick={() => handleRemoveFile(file.id)}
-                                                />
-                                            </Tooltip>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            )}
+            <TransferQueuePanel
+                visible={uploadVisible}
+                files={uploadFiles}
+                collapsed={uploadCollapsed}
+                onToggleCollapse={() => setUploadCollapsed(c => !c)}
+                onClose={() => setUploadVisible(false)}
+                onClearAll={handleClearUploadList}
+                onCancelFile={handleCancelFile}
+                onRemoveFile={handleRemoveFile}
+            />
 
             {/* Right-click Context Menu */}
             {contextMenu && (
