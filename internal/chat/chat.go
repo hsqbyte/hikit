@@ -1,8 +1,6 @@
 package chat
 
 import (
-	"database/sql"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -277,17 +275,4 @@ func UpdateConversationSystem(id, system string) error {
 	return err
 }
 
-// --- Helper for Wails event payload ---
 
-// StreamChunk is emitted for each streaming token
-type StreamChunk struct {
-	ConversationID string `json:"conversation_id"`
-	Content        string `json:"content"`
-	Done           bool   `json:"done"`
-	Error          string `json:"error,omitempty"`
-	MessageID      string `json:"message_id"`
-}
-
-// ignore unused import
-var _ = json.Marshal
-var _ = sql.Open

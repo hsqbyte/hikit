@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/hsqbyte/hikit/internal/chat"
+	"github.com/hsqbyte/hikit/internal/llm"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -29,69 +30,113 @@ func (s *PGService) GetSchemaContext(sessionID, schema string) (string, error) {
 }
 
 // GetSchemaContext builds schema context for LLM.
-// Includes table structure + sample data for better SQL generation.
+// Uses two bulk queries (all columns + all PKs for the schema) to avoid N×round-trips.
 func (s *Session) GetSchemaContext(schema string) (string, error) {
 	tables, err := s.ListTables(schema)
 	if err != nil {
 		return "", err
 	}
 
+	// ── Bulk-fetch all columns for the schema in one query ──────────────────
+	colRows, err := s.DB.Query(`
+		SELECT c.table_name,
+		       c.column_name,
+		       c.udt_name,
+		       c.is_nullable,
+		       COALESCE(pd.description, '') AS col_comment
+		FROM information_schema.columns c
+		JOIN information_schema.tables t
+		  ON t.table_schema = c.table_schema AND t.table_name = c.table_name
+		LEFT JOIN pg_catalog.pg_statio_user_tables st
+		  ON st.schemaname = c.table_schema AND st.relname = c.table_name
+		LEFT JOIN pg_catalog.pg_attribute pa
+		  ON pa.attrelid = st.relid AND pa.attname = c.column_name
+		LEFT JOIN pg_catalog.pg_description pd
+		  ON pd.objoid = pa.attrelid AND pd.objsubid = pa.attnum
+		WHERE c.table_schema = $1
+		  AND t.table_type = 'BASE TABLE'
+		ORDER BY c.table_name, c.ordinal_position
+	`, schema)
+	if err != nil {
+		return "", fmt.Errorf("fetch columns: %w", err)
+	}
+	defer colRows.Close()
+
+	type colInfo struct {
+		name       string
+		dataType   string
+		isNullable string
+		comment    string
+	}
+	allCols := map[string][]colInfo{} // tableName → []colInfo
+	for colRows.Next() {
+		var tblName string
+		var ci colInfo
+		if err := colRows.Scan(&tblName, &ci.name, &ci.dataType, &ci.isNullable, &ci.comment); err != nil {
+			continue
+		}
+		allCols[tblName] = append(allCols[tblName], ci)
+	}
+
+	// ── Bulk-fetch all primary key columns for the schema in one query ───────
+	pkRows, err := s.DB.Query(`
+		SELECT kcu.table_name, kcu.column_name
+		FROM information_schema.table_constraints tc
+		JOIN information_schema.key_column_usage kcu
+		  ON tc.constraint_name = kcu.constraint_name
+		 AND tc.table_schema    = kcu.table_schema
+		WHERE tc.constraint_type = 'PRIMARY KEY'
+		  AND tc.table_schema    = $1
+	`, schema)
+	if err != nil {
+		// Non-fatal — just skip PK annotations
+		log.Printf("[SQL-AI] pk query failed: %v", err)
+	}
+	pkSet := map[string]map[string]bool{} // tableName → colName → true
+	if pkRows != nil {
+		defer pkRows.Close()
+		for pkRows.Next() {
+			var tblName, colName string
+			if err := pkRows.Scan(&tblName, &colName); err != nil {
+				continue
+			}
+			if pkSet[tblName] == nil {
+				pkSet[tblName] = map[string]bool{}
+			}
+			pkSet[tblName][colName] = true
+		}
+	}
+
+	// ── Build DDL-style context string ───────────────────────────────────────
 	var b strings.Builder
 	b.WriteString(fmt.Sprintf("-- Database: %s, Schema: %s, Tables: %d\n\n", s.Config.DBName, schema, len(tables)))
 
 	for _, tbl := range tables {
-		cols, err := s.GetColumns(schema, tbl.Name)
-		if err != nil {
-			log.Printf("[SQL-AI] skip table %s: %v", tbl.Name, err)
-			continue
-		}
-
-		// Table header comment
 		comment := ""
 		if tbl.Comment != "" {
 			comment = fmt.Sprintf(" -- %s", tbl.Comment)
 		}
 		b.WriteString(fmt.Sprintf("-- %s [%d rows]%s\n", tbl.Name, tbl.RowCount, comment))
-
-		// Compact column list: "col_name type [NOT NULL] [PK]"
-		pks, _ := s.GetPrimaryKeys(schema, tbl.Name)
-		pkSet := make(map[string]bool)
-		for _, pk := range pks {
-			pkSet[pk] = true
-		}
-
-		colNames := make([]string, 0, len(cols))
 		b.WriteString(fmt.Sprintf("CREATE TABLE \"%s\".\"%s\" (\n", schema, tbl.Name))
+
+		cols := allCols[tbl.Name]
 		for i, c := range cols {
-			colNames = append(colNames, c.Name)
-			b.WriteString(fmt.Sprintf("  \"%s\" %s", c.Name, c.DataType))
-			if c.IsNullable == "NO" {
+			b.WriteString(fmt.Sprintf("  \"%s\" %s", c.name, c.dataType))
+			if c.isNullable == "NO" {
 				b.WriteString(" NOT NULL")
 			}
-			if pkSet[c.Name] {
+			if pkSet[tbl.Name][c.name] {
 				b.WriteString(" PK")
 			}
-			if c.Comment != "" {
-				b.WriteString(fmt.Sprintf(" -- %s", c.Comment))
+			if c.comment != "" {
+				b.WriteString(fmt.Sprintf(" -- %s", c.comment))
 			}
 			if i < len(cols)-1 {
 				b.WriteString(",")
 			}
 			b.WriteString("\n")
 		}
-		b.WriteString(");\n")
-
-		// Sample data (3 rows) for LLM to understand actual values
-		sampleRows := s.getSampleData(schema, tbl.Name, colNames, 3)
-		if len(sampleRows) > 0 {
-			b.WriteString("-- Sample data:\n")
-			for _, row := range sampleRows {
-				b.WriteString("--   ")
-				b.WriteString(row)
-				b.WriteString("\n")
-			}
-		}
-		b.WriteString("\n")
+		b.WriteString(");\n\n")
 	}
 
 	return b.String(), nil
@@ -201,12 +246,18 @@ func (s *PGService) SQLAssistant(sessionID, schema, question string, history []m
 			log.Printf("[SQL-AI] Schema context from cache (%d chars)", len(schemaCtx))
 		} else {
 			log.Printf("[SQL-AI] Fetching schema context...")
+			// Notify the frontend so the user knows we're working
+			wailsRuntime.EventsEmit(s.ctx, "pg:ai-stream", map[string]interface{}{
+				"content": "正在分析表结构...\n", "done": false, "reasoning": true,
+			})
+			start := time.Now()
 			var err error
 			schemaCtx, err = s.GetSchemaContext(sessionID, schema)
 			if err != nil {
 				s.emitAIError(fmt.Sprintf("获取表结构失败: %v", err))
 				return
 			}
+			log.Printf("[SQL-AI] Schema fetched in %v (%d chars)", time.Since(start).Round(time.Millisecond), len(schemaCtx))
 			schemaCacheMu.Lock()
 			schemaCache[cacheKey] = schemaCacheEntry{context: schemaCtx, fetchedAt: time.Now()}
 			schemaCacheMu.Unlock()
@@ -413,54 +464,24 @@ func (s *PGService) SQLAssistant(sessionID, schema, question string, history []m
 			return
 		}
 
-		// Parse SSE stream
-		scanner := bufio.NewScanner(resp.Body)
-		scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
-		var fullContent strings.Builder
-
-		for scanner.Scan() {
-			select {
-			case <-ctx.Done():
+		// Parse SSE stream — forward reasoning and content tokens separately
+		fullContent, _ := llm.StreamSSEWithCallbacks(ctx, resp.Body, llm.StreamCallbacks{
+			OnReasoning: func(token string) {
 				wailsRuntime.EventsEmit(s.ctx, "pg:ai-stream", map[string]interface{}{
-					"content": fullContent.String(), "done": true,
+					"content": token, "done": false, "reasoning": true,
 				})
-				return
-			default:
-			}
-
-			line := scanner.Text()
-			if !strings.HasPrefix(line, "data: ") {
-				continue
-			}
-			data := strings.TrimPrefix(line, "data: ")
-			if data == "[DONE]" {
-				break
-			}
-
-			var chunk struct {
-				Choices []struct {
-					Delta struct {
-						Content string `json:"content"`
-					} `json:"delta"`
-				} `json:"choices"`
-			}
-			if err := json.Unmarshal([]byte(data), &chunk); err != nil {
-				continue
-			}
-
-			if len(chunk.Choices) > 0 && chunk.Choices[0].Delta.Content != "" {
-				token := chunk.Choices[0].Delta.Content
-				fullContent.WriteString(token)
+			},
+			OnToken: func(token string) {
 				wailsRuntime.EventsEmit(s.ctx, "pg:ai-stream", map[string]interface{}{
 					"content": token, "done": false,
 				})
-			}
-		}
+			},
+		})
 
-		log.Printf("[SQL-AI] Completed, response: %d chars", fullContent.Len())
+		log.Printf("[SQL-AI] Completed, response: %d chars", len(fullContent))
 
 		wailsRuntime.EventsEmit(s.ctx, "pg:ai-stream", map[string]interface{}{
-			"content": fullContent.String(), "done": true,
+			"content": fullContent, "done": true,
 		})
 	}()
 }

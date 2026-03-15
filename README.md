@@ -73,6 +73,7 @@ Supports Redis, MySQL, MariaDB, PostgreSQL, SQLite, SQL Server, ClickHouse, Orac
 
 ![Database Management](doc/screenshots/postgresql.png)
 ![SQL Query Results](doc/screenshots/sql_query.png)
+![SQL AI Assistant](doc/screenshots/sql_ai_助手.png)
 
 ---
 

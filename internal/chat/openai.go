@@ -1,7 +1,6 @@
 package chat
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -10,8 +9,20 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
+
+	"github.com/hsqbyte/hikit/internal/llm"
 )
+
+// StreamChunk is emitted for each streaming token
+type StreamChunk struct {
+	ConversationID string `json:"conversation_id"`
+	Content        string `json:"content"`
+	Done           bool   `json:"done"`
+	Error          string `json:"error,omitempty"`
+	MessageID      string `json:"message_id"`
+}
 
 // StreamingChat sends a message and streams the response via a callback
 func StreamingChat(ctx context.Context, conversationID string, onChunk func(StreamChunk)) {
@@ -68,76 +79,43 @@ func StreamingChat(ctx context.Context, conversationID string, onChunk func(Stre
 		return
 	}
 
-	// Parse SSE stream
-	scanner := bufio.NewScanner(resp.Body)
-	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
-	var fullContent strings.Builder
+	// Parse SSE stream using shared utility
 	msgID := fmt.Sprintf("msg_%d", time.Now().UnixNano())
-
-	for scanner.Scan() {
-		select {
-		case <-ctx.Done():
-			// User cancelled
-			onChunk(StreamChunk{ConversationID: conversationID, Content: fullContent.String(), Done: true, MessageID: msgID})
-			return
-		default:
-		}
-
-		line := scanner.Text()
-		if !strings.HasPrefix(line, "data: ") {
-			continue
-		}
-		data := strings.TrimPrefix(line, "data: ")
-		if data == "[DONE]" {
-			break
-		}
-
-		var chunk struct {
-			Choices []struct {
-				Delta struct {
-					Content string `json:"content"`
-				} `json:"delta"`
-			} `json:"choices"`
-		}
-		if err := json.Unmarshal([]byte(data), &chunk); err != nil {
-			continue
-		}
-
-		if len(chunk.Choices) > 0 && chunk.Choices[0].Delta.Content != "" {
-			token := chunk.Choices[0].Delta.Content
-			fullContent.WriteString(token)
-			onChunk(StreamChunk{
-				ConversationID: conversationID,
-				Content:        token,
-				Done:           false,
-				MessageID:      msgID,
-			})
-		}
-	}
+	fullContent, _ := llm.StreamSSE(ctx, resp.Body, func(token string) {
+		onChunk(StreamChunk{
+			ConversationID: conversationID,
+			Content:        token,
+			Done:           false,
+			MessageID:      msgID,
+		})
+	})
 
 	// Save assistant message to DB
-	if fullContent.Len() > 0 {
+	if len(fullContent) > 0 {
 		SaveMessage(Message{
 			ID:             msgID,
 			ConversationID: conversationID,
 			Role:           "assistant",
-			Content:        fullContent.String(),
+			Content:        fullContent,
 			CreatedAt:      time.Now().Format(time.RFC3339),
 		})
 	}
 
 	onChunk(StreamChunk{
 		ConversationID: conversationID,
-		Content:        fullContent.String(),
+		Content:        fullContent,
 		Done:           true,
 		MessageID:      msgID,
 	})
 
-	log.Printf("Chat completed: conv=%s, tokens=%d chars", conversationID, fullContent.Len())
+	log.Printf("Chat completed: conv=%s, tokens=%d chars", conversationID, len(fullContent))
 }
 
-// package-level cancel function for streaming
-var activeChatCancel context.CancelFunc
+// package-level cancel function for streaming (protected by mutex)
+var (
+	activeChatCancel context.CancelFunc
+	chatCancelMu     sync.Mutex
+)
 
 // SendMessage saves the user message, auto-titles, and starts streaming.
 // onChunk is called for each token; the caller should emit Wails events there.
@@ -163,19 +141,22 @@ func SendMessage(conversationID, messageID, content string, onChunk func(StreamC
 		UpdateConversationTitle(conversationID, GenerateTitle(content))
 	}
 
-	// Cancel any previous streaming
+	// Cancel any previous streaming (mutex-protected)
+	chatCancelMu.Lock()
 	if activeChatCancel != nil {
 		activeChatCancel()
 	}
-
 	ctx, cancel := context.WithCancel(context.Background())
 	activeChatCancel = cancel
+	chatCancelMu.Unlock()
 
 	go StreamingChat(ctx, conversationID, onChunk)
 }
 
 // StopGeneration cancels the current streaming response.
 func StopGeneration() {
+	chatCancelMu.Lock()
+	defer chatCancelMu.Unlock()
 	if activeChatCancel != nil {
 		activeChatCancel()
 		activeChatCancel = nil

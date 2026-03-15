@@ -47,6 +47,7 @@
 
 ![データベース管理](../screenshots/postgresql.png)
 ![SQLクエリ結果](../screenshots/sql_query.png)
+![SQL AI アシスタント](../screenshots/sql_ai_助手.png)
 
 ### REST Client
 

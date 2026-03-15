@@ -47,6 +47,7 @@
 
 ![資料庫管理](../screenshots/postgresql.png)
 ![SQL 查詢結果](../screenshots/sql_query.png)
+![SQL AI 助手](../screenshots/sql_ai_助手.png)
 
 ### REST Client
 

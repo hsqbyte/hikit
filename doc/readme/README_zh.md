@@ -71,6 +71,7 @@ SSH 隧道本地转发 / 远程转发，快速打通内网端口。
 
 ![数据库管理](../screenshots/postgresql.png)
 ![SQL 查询结果](../screenshots/sql_query.png)
+![SQL AI 助手](../screenshots/sql_ai_助手.png)
 
 ---
 

@@ -47,6 +47,7 @@
 
 ![Base de données](../screenshots/postgresql.png)
 ![Résultats SQL](../screenshots/sql_query.png)
+![Assistant SQL IA](../screenshots/sql_ai_助手.png)
 
 ### REST Client
 

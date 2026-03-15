@@ -181,3 +181,31 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
             activeTabId: id,
         })),
 }));
+
+// ── Shared Tree Utilities ──────────────────────────────────────────────────
+// Centralised here so App.tsx, AssetTree.tsx and other consumers don't each
+// carry their own copy.
+
+/** Recursively find an asset by ID in a nested tree. */
+export function findAsset(items: Asset[], id: string): Asset | undefined {
+    for (const item of items) {
+        if (item.id === id) return item;
+        if (item.children) {
+            const found = findAsset(item.children, id);
+            if (found) return found;
+        }
+    }
+    return undefined;
+}
+
+/** Find the direct parent group that contains the child with the given ID. */
+export function findParentGroup(items: Asset[], childId: string): Asset | undefined {
+    for (const item of items) {
+        if (item.children?.some((c) => c.id === childId)) return item;
+        if (item.children) {
+            const found = findParentGroup(item.children, childId);
+            if (found) return found;
+        }
+    }
+    return undefined;
+}

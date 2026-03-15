@@ -26,7 +26,7 @@ import { BsDisplay, BsHddNetwork } from 'react-icons/bs';
 import { AiOutlineMergeCells } from 'react-icons/ai';
 import { TbDatabase } from 'react-icons/tb';
 import type { DataNode } from 'antd/es/tree';
-import { useConnectionStore, Asset, ConnectionType } from '../../stores/connectionStore';
+import { useConnectionStore, Asset, ConnectionType, findAsset } from '../../stores/connectionStore';
 import {
     ConnectByAsset, ConnectByAssetViaSSH, ListDatabases, ListSchemas,
     ListTables, ListViews, ListFunctions,
@@ -68,16 +68,6 @@ const getIcon = (a: Asset): React.ReactNode => {
     return connectionIcons[a.connectionType || 'ssh'] || <VscTerminal style={iconStyle} />;
 };
 
-const findAsset = (assets: Asset[], id: string): Asset | undefined => {
-    for (const a of assets) {
-        if (a.id === id) return a;
-        if (a.children) {
-            const found = findAsset(a.children, id);
-            if (found) return found;
-        }
-    }
-    return undefined;
-};
 
 const connectionCategories: { label: string; items: { key: ConnectionType; label: string; icon: React.ReactNode }[] }[] = [
     {

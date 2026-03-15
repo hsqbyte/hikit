@@ -1,7 +1,6 @@
 package git
 
 import (
-	"encoding/json"
 	"fmt"
 	"os/exec"
 	"path/filepath"
@@ -245,12 +244,17 @@ func Commit(dir, message string) error {
 	return err
 }
 
-// GetLog returns commit history
+// GetLog returns commit history.
+// Uses NUL-separated fields to avoid JSON injection from arbitrary commit messages.
 func GetLog(dir string, count int) ([]CommitInfo, error) {
 	if count <= 0 {
 		count = 50
 	}
-	format := `{"hash":"%H","short":"%h","author":"%an","email":"%ae","date":"%ci","message":"%s"}`
+	// Fields: hash\x00short\x00author\x00email\x00date\x00message
+	// Records separated by \x01 so we survive multi-line commit messages.
+	const sep = "\x00"
+	const recSep = "\x01"
+	format := "%H" + sep + "%h" + sep + "%an" + sep + "%ae" + sep + "%ci" + sep + "%s" + recSep
 	out, err := run(dir, "log", fmt.Sprintf("-%d", count), fmt.Sprintf("--pretty=format:%s", format))
 	if err != nil {
 		return nil, err
@@ -260,16 +264,23 @@ func GetLog(dir string, count int) ([]CommitInfo, error) {
 	}
 
 	var commits []CommitInfo
-	for _, line := range strings.Split(out, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
+	for _, record := range strings.Split(out, recSep) {
+		record = strings.TrimSpace(record)
+		if record == "" {
 			continue
 		}
-		var c CommitInfo
-		if err := json.Unmarshal([]byte(line), &c); err != nil {
+		parts := strings.SplitN(record, sep, 6)
+		if len(parts) < 6 {
 			continue
 		}
-		commits = append(commits, c)
+		commits = append(commits, CommitInfo{
+			Hash:    parts[0],
+			Short:   parts[1],
+			Author:  parts[2],
+			Email:   parts[3],
+			Date:    parts[4],
+			Message: parts[5],
+		})
 	}
 	return commits, nil
 }

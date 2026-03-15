@@ -30,7 +30,9 @@ type Response struct {
 	Error      string            `json:"error,omitempty"`
 }
 
-// SaveHTTPContent persists .http editor content for a REST Client asset
+// maxResponseBody is the maximum response body size captured by the REST Client.
+const maxResponseBody = 10 * 1024 * 1024 // 10 MB
+
 func SaveHTTPContent(db *sql.DB, assetId string, content string) error {
 	_, err := db.Exec("UPDATE assets SET private_key=?, updated_at=? WHERE id=?",
 		content, time.Now().Format("2006-01-02 15:04:05"), assetId)
@@ -91,7 +93,7 @@ func Send(req Request) Response {
 	}
 	defer resp.Body.Close()
 
-	bodyBytes, err := io.ReadAll(resp.Body)
+	bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBody))
 	if err != nil {
 		return Response{
 			StatusCode: resp.StatusCode,
@@ -106,11 +108,17 @@ func Send(req Request) Response {
 		headers[k] = strings.Join(v, ", ")
 	}
 
+	body := string(bodyBytes)
+	truncated := int64(len(bodyBytes)) >= maxResponseBody
+	if truncated {
+		body += "\n\n[... response truncated at 10 MB ...]"
+	}
+
 	return Response{
 		StatusCode: resp.StatusCode,
 		Status:     resp.Status,
 		Headers:    headers,
-		Body:       string(bodyBytes),
+		Body:       body,
 		Duration:   time.Since(start).Milliseconds(),
 		Size:       int64(len(bodyBytes)),
 	}

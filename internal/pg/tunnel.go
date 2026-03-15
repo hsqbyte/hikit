@@ -36,14 +36,18 @@ func (t *SSHTunnel) Close() {
 
 // loadSSHCredentials loads SSH connection info from asset store
 func loadSSHCredentials(assetID string) (host string, port int, user string, password string, privateKey string, err error) {
+	if assetID == "" {
+		err = fmt.Errorf("SSH tunnel asset ID is empty — please set a valid SSH asset in the connection settings")
+		return
+	}
 	db := store.GetDB()
 	row := db.QueryRow(`
-		SELECT COALESCE(host, ''), port, COALESCE(username, ''), COALESCE(password, ''), COALESCE(private_key, '')
-		FROM assets WHERE id = ? AND type = 'host'
+		SELECT COALESCE(host, ''), COALESCE(port, 22), COALESCE(username, ''), COALESCE(password, ''), COALESCE(private_key, '')
+		FROM assets WHERE id = ?
 	`, assetID)
 	err = row.Scan(&host, &port, &user, &password, &privateKey)
 	if err != nil {
-		err = fmt.Errorf("SSH asset not found: %w", err)
+		err = fmt.Errorf("SSH asset (id=%s) not found — it may have been deleted; please reconfigure the SSH tunnel", assetID)
 	}
 	return
 }

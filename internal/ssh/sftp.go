@@ -171,7 +171,9 @@ func (m *Manager) ReadFile(sessionID, path string) ([]byte, error) {
 	}
 	defer f.Close()
 
-	return io.ReadAll(f)
+	// Limit to 10 MB — prevents OOM if user opens a large log file
+	const maxReadSize = 10 * 1024 * 1024
+	return io.ReadAll(io.LimitReader(f, maxReadSize))
 }
 
 // WriteFile writes content to a remote file
