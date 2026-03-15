@@ -162,6 +162,22 @@ const PostgreSQLView: React.FC<PostgreSQLViewProps> = ({
     const [sqlResult, setSqlResult] = useState<{ columns: string[]; rows: any[][]; error?: string; affected?: number } | null>(null);
     const [sqlRunning, setSqlRunning] = useState(false);
 
+    // Query history (persisted in localStorage per asset)
+    const historyKey = `pg-sql-history-${assetId}`;
+    const [sqlHistory, setSqlHistory] = useState<{ sql: string; ts: number; ok: boolean }[]>(() => {
+        try { return JSON.parse(localStorage.getItem(historyKey) || '[]'); } catch { return []; }
+    });
+    const [showHistory, setShowHistory] = useState(false);
+
+    const pushHistory = (sql: string, ok: boolean) => {
+        setSqlHistory(prev => {
+            const entry = { sql: sql.trim(), ts: Date.now(), ok };
+            const next = [entry, ...prev.filter(h => h.sql !== sql.trim())].slice(0, 100);
+            localStorage.setItem(historyKey, JSON.stringify(next));
+            return next;
+        });
+    };
+
     // Table list state (for tableList view)
     const [tableList, setTableList] = useState<TableInfoItem[]>([]);
     const [tableListLoading, setTableListLoading] = useState(false);
@@ -442,18 +458,45 @@ const PostgreSQLView: React.FC<PostgreSQLViewProps> = ({
         setSqlResult(null);
         try {
             const result = await ExecuteQuery(sessionID, sqlText);
+            const ok = !result?.error;
             setSqlResult({
                 columns: result?.columns || [],
                 rows: result?.rows || [],
                 error: result?.error || undefined,
                 affected: result?.affected,
             });
+            pushHistory(sqlText, ok);
         } catch (err: any) {
             setSqlResult({ columns: [], rows: [], error: err?.message || String(err) });
+            pushHistory(sqlText, false);
         } finally {
             setSqlRunning(false);
         }
     }, [sessionID, sqlText]);
+
+    // Export query result as CSV
+    const handleExportCSV = useCallback(() => {
+        if (!sqlResult || sqlResult.columns.length === 0) return;
+        const escape = (v: any) => {
+            if (v === null || v === undefined) return '';
+            const s = String(v);
+            return s.includes(',') || s.includes('"') || s.includes('\n')
+                ? `"${s.replace(/"/g, '""')}"`
+                : s;
+        };
+        const lines = [
+            sqlResult.columns.map(escape).join(','),
+            ...sqlResult.rows.map(row => row.map(escape).join(',')),
+        ];
+        // UTF-8 BOM for Excel compatibility
+        const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `query_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }, [sqlResult]);
 
     const handleSQLKeyDown = useCallback((e: React.KeyboardEvent) => {
         if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -1128,6 +1171,40 @@ const PostgreSQLView: React.FC<PostgreSQLViewProps> = ({
 
         return (
             <div className="pg-view-content pg-view-horizontal">
+                {/* Query History Drawer */}
+                {showHistory && (
+                    <div className="pg-history-panel">
+                        <div className="pg-history-header">
+                            <span>查询历史</span>
+                            <button className="pg-history-close" onClick={() => setShowHistory(false)}>✕</button>
+                        </div>
+                        <div className="pg-history-list">
+                            {sqlHistory.length === 0 && (
+                                <div className="pg-history-empty">暂无历史记录</div>
+                            )}
+                            {sqlHistory.map((h, i) => (
+                                <div
+                                    key={i}
+                                    className={`pg-history-item ${h.ok ? '' : 'pg-history-item-error'}`}
+                                    onClick={() => { setSqlText(h.sql); setShowHistory(false); }}
+                                    title={h.sql}
+                                >
+                                    <div className="pg-history-sql">{h.sql.length > 120 ? h.sql.slice(0, 120) + '…' : h.sql}</div>
+                                    <div className="pg-history-meta">
+                                        <span className={h.ok ? 'pg-history-ok' : 'pg-history-err'}>{h.ok ? '成功' : '失败'}</span>
+                                        <span>{new Date(h.ts).toLocaleString()}</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        {sqlHistory.length > 0 && (
+                            <div className="pg-history-footer">
+                                <button onClick={() => { setSqlHistory([]); localStorage.removeItem(historyKey); }}>清空历史</button>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 <div className="pg-sql-editor">
                     <div className="pg-sql-input-area">
                         <textarea
@@ -1142,6 +1219,19 @@ const PostgreSQLView: React.FC<PostgreSQLViewProps> = ({
                             <Button type="primary" size="small" icon={<PlayCircleOutlined />} onClick={handleExecuteSQL} loading={sqlRunning}>
                                 执行
                             </Button>
+                            <Button
+                                size="small"
+                                onClick={() => setShowHistory(h => !h)}
+                                type={showHistory ? 'primary' : 'default'}
+                                ghost={showHistory}
+                            >
+                                历史
+                            </Button>
+                            {sqlResult && sqlResult.columns.length > 0 && !sqlResult.error && (
+                                <Button size="small" onClick={handleExportCSV}>
+                                    导出 CSV
+                                </Button>
+                            )}
                             <Button
                                 size="small"
                                 icon={<MessageOutlined />}

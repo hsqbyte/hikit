@@ -837,3 +837,101 @@
     color: #999;
     font-style: italic;
 }
+/* ── Query History Panel ──────────────────────────────────── */
+.pg-history-panel {
+    width: 320px;
+    min-width: 260px;
+    max-width: 360px;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+}
+
+.pg-history-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.pg-history-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 14px;
+    padding: 0 2px;
+    line-height: 1;
+}
+.pg-history-close:hover { color: var(--text); }
+
+.pg-history-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.pg-history-empty {
+    color: var(--text-muted);
+    font-size: 12px;
+    text-align: center;
+    margin-top: 24px;
+}
+
+.pg-history-item {
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    border-left: 3px solid #52c41a;
+    background: var(--bg);
+    transition: background 0.15s;
+}
+.pg-history-item:hover { background: var(--hover); }
+.pg-history-item-error { border-left-color: #ff4d4f; }
+
+.pg-history-sql {
+    font-family: 'Menlo', 'Monaco', monospace;
+    font-size: 11px;
+    color: var(--text);
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin-bottom: 4px;
+}
+
+.pg-history-meta {
+    display: flex;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--text-muted);
+    justify-content: space-between;
+}
+
+.pg-history-ok  { color: #52c41a; font-weight: 500; }
+.pg-history-err { color: #ff4d4f; font-weight: 500; }
+
+.pg-history-footer {
+    padding: 8px 12px;
+    border-top: 1px solid var(--border);
+    text-align: right;
+}
+.pg-history-footer button {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 12px;
+    cursor: pointer;
+    padding: 0;
+}
+.pg-history-footer button:hover { color: #ff4d4f; }
