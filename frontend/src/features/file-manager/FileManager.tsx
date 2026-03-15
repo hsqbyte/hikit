@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import Editor from '@monaco-editor/react';
 import { EventsOn, EventsOff } from '../../../wailsjs/runtime/runtime';
-import { Input, Table, Button, Tooltip, Modal, Dropdown, message, List, Spin, Progress } from 'antd';
+import { Input, Table, Button, Tooltip, Modal, Dropdown, message, Progress } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { MenuProps } from 'antd';
+import FileViewerModal from './FileViewerModal';
+import SearchModal from './SearchModal';
 import {
     ArrowLeftOutlined,
     ReloadOutlined,
@@ -171,13 +172,14 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
     const [pathHistory, setPathHistory] = useState<string[]>(['/root']);
     const [historyIndex, setHistoryIndex] = useState(0);
 
-    // File viewer/editor state
+    // File viewer state (content/path/loading remain in parent for double-click trigger)
     const [viewerOpen, setViewerOpen] = useState(false);
     const [viewerContent, setViewerContent] = useState('');
     const [viewerPath, setViewerPath] = useState('');
+    const [viewerLoading, setViewerLoading] = useState(false);
+    // viewer editing state (still needed in handleDoubleClick reset)
     const [viewerEditing, setViewerEditing] = useState(false);
     const [viewerModified, setViewerModified] = useState(false);
-    const [viewerLoading, setViewerLoading] = useState(false);
 
     // Drag-drop state
     const [isDragging, setIsDragging] = useState(false);
@@ -188,7 +190,7 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
     // Clipboard for copy/cut
     const [clipboard, setClipboard] = useState<{ path: string; op: 'copy' | 'cut' } | null>(null);
 
-    // Search state
+    // Search modal state
     const [searchModalOpen, setSearchModalOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -375,18 +377,9 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
         }
     };
 
-    const handleViewerSave = async () => {
-        if (!sessionId || !viewerPath) return;
-        try {
-            await SFTPWriteFile(sessionId, viewerPath, viewerContent);
-            message.success('保存成功');
-            setViewerModified(false);
-            setViewerEditing(false);
-            loadFiles();
-        } catch (err: any) {
-            message.error('保存失败: ' + (err?.message || String(err)));
-        }
-    };
+    const handleViewerSave = useCallback(async () => {
+        loadFiles();
+    }, [loadFiles]);
 
     // Drag-and-drop: append to queue
     const currentPathRef = useRef(currentPath);
@@ -1144,137 +1137,24 @@ const FileManager: React.FC<FileManagerProps> = ({ sessionId, connected }) => {
                 </Dropdown>
             )}
 
-            {/* File Viewer / Editor Modal */}
-            <Modal
-                title={
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span>{viewerPath.split('/').pop()}</span>
-                        <span style={{ fontSize: 11, color: '#888', fontWeight: 'normal' }}>{viewerPath}</span>
-                    </div>
-                }
+            <FileViewerModal
                 open={viewerOpen}
-                onCancel={() => {
-                    if (viewerModified) {
-                        Modal.confirm({
-                            title: '未保存的更改',
-                            content: '有未保存的更改，确定要关闭吗？',
-                            okText: '关闭',
-                            cancelText: '取消',
-                            onOk: () => { setViewerOpen(false); setViewerEditing(false); setViewerModified(false); },
-                        });
-                    } else {
-                        setViewerOpen(false);
-                        setViewerEditing(false);
-                    }
-                }}
-                width="70vw"
-                bodyStyle={{ padding: 0 }}
-                footer={
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: 12, color: '#888', lineHeight: '32px' }}>
-                            {viewerContent.split('\n').length} 行
-                            {viewerModified && ' (已修改)'}
-                        </span>
-                        <div>
-                            {!viewerEditing ? (
-                                <Button onClick={() => setViewerEditing(true)} icon={<EditOutlined />}>编辑</Button>
-                            ) : (
-                                <>
-                                    <Button onClick={() => { setViewerEditing(false); setViewerModified(false); }} style={{ marginRight: 8 }}>取消</Button>
-                                    <Button type="primary" onClick={handleViewerSave} disabled={!viewerModified}>保存</Button>
-                                </>
-                            )}
-                        </div>
-                    </div>
-                }
-            >
-                {viewerLoading ? (
-                    <div style={{ padding: 40, textAlign: 'center', color: '#888' }}>加载中...</div>
-                ) : (
-                    <div style={{ height: '65vh', border: '1px solid #e8e8e8', borderRadius: 4, overflow: 'hidden' }}>
-                        <Editor
-                            height="100%"
-                            language={getMonacoLanguage(viewerPath)}
-                            value={viewerContent}
-                            theme="vs-dark"
-                            onChange={(value) => {
-                                if (viewerEditing && value !== undefined) {
-                                    setViewerContent(value);
-                                    setViewerModified(true);
-                                }
-                            }}
-                            options={{
-                                readOnly: !viewerEditing,
-                                minimap: { enabled: false },
-                                fontSize: 13,
-                                lineNumbers: 'on',
-                                scrollBeyondLastLine: false,
-                                wordWrap: 'on',
-                                automaticLayout: true,
-                                renderWhitespace: 'selection',
-                                tabSize: 4,
-                                folding: true,
-                                bracketPairColorization: { enabled: true },
-                            }}
-                        />
-                    </div>
-                )}
-            </Modal>
+                filePath={viewerPath}
+                content={viewerContent}
+                loading={viewerLoading}
+                sessionId={sessionId}
+                onClose={() => setViewerOpen(false)}
+                onContentChange={setViewerContent}
+                onSaved={handleViewerSave}
+            />
 
-            {/* Search Modal */}
-            <Modal
-                title="搜索文件"
+            <SearchModal
                 open={searchModalOpen}
-                onCancel={() => { setSearchModalOpen(false); setSearchResults([]); setSearchQuery(''); }}
-                width="50vw"
-                footer={null}
-                destroyOnClose
-            >
-                <Input.Search
-                    placeholder="输入文件名关键词"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onSearch={handleSearch}
-                    loading={searchLoading}
-                    enterButton="搜索"
-                    style={{ marginBottom: 12 }}
-                />
-                <div style={{ color: '#888', fontSize: 12, marginBottom: 8 }}>
-                    搜索范围: {currentPath} {searchResults.length > 0 && `(${searchResults.length} 个结果)`}
-                </div>
-                {searchLoading ? (
-                    <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
-                ) : (
-                    <List
-                        size="small"
-                        dataSource={searchResults}
-                        locale={{ emptyText: searchQuery ? '无结果' : '输入关键词开始搜索' }}
-                        style={{ maxHeight: '50vh', overflowY: 'auto' }}
-                        renderItem={(item: any) => (
-                            <List.Item
-                                style={{ cursor: 'pointer', padding: '6px 12px' }}
-                                onClick={() => {
-                                    const dir = item.path.substring(0, item.path.lastIndexOf('/')) || '/';
-                                    if (item.isDir) {
-                                        navigateTo(item.path);
-                                    } else {
-                                        navigateTo(dir);
-                                    }
-                                    setSearchModalOpen(false);
-                                    setSearchResults([]);
-                                    setSearchQuery('');
-                                }}
-                            >
-                                <List.Item.Meta
-                                    avatar={getFileIcon(item.name, item.isDir)}
-                                    title={<span style={{ fontSize: 13 }}>{item.name}</span>}
-                                    description={<span style={{ fontSize: 11, color: '#888' }}>{item.path} · {item.size}</span>}
-                                />
-                            </List.Item>
-                        )}
-                    />
-                )}
-            </Modal>
+                sessionId={sessionId}
+                currentPath={currentPath}
+                onNavigate={navigateTo}
+                onClose={() => setSearchModalOpen(false)}
+            />
         </div>
     );
 };
