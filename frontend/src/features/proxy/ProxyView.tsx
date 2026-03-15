@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
-    Button, InputNumber, Select, Switch, Input, Tooltip, Drawer, Empty, message,
-    Collapse, Modal, Form, Tag, Popconfirm,
+    Button, InputNumber, Select, Switch, Input, Tooltip, Empty, message,
+    Collapse, Form, Tag, Popconfirm,
 } from 'antd';
 import {
     PlayCircleOutlined, PauseCircleOutlined, ClearOutlined,
@@ -11,13 +11,15 @@ import {
 } from '@ant-design/icons';
 import {
     StartProxy, StopProxy, GetProxyStatus,
-    GetTrafficEntries, GetTrafficCount, ClearTraffic,
-    ExportCACert, LaunchBrowser, IsBrowserRunning,
+    GetTrafficEntries, ClearTraffic,
+    ExportCACert, LaunchBrowser,
     AddMITMRule, UpdateMITMRule, DeleteMITMRule, ToggleMITMRule, ListMITMRules,
     ReleaseBreakpoint,
 } from '../../../wailsjs/go/proxy/ProxyService';
 import { ListForwards } from '../../../wailsjs/go/ssh/SSHService';
 import { EventsOn, EventsOff } from '../../../wailsjs/runtime/runtime';
+import { TrafficDetailDrawer, statusClass, formatSize, formatDuration, extractPath } from './TrafficDetailDrawer';
+import { MITMRuleModal, BreakpointModal } from './ProxyModals';
 import './ProxyView.css';
 
 interface ProxyStatus {
@@ -105,44 +107,6 @@ interface BreakpointRequest {
     ruleName: string;
 }
 
-function statusClass(code: number): string {
-    if (code === 0) return 's0';
-    if (code < 300) return 's2xx';
-    if (code < 400) return 's3xx';
-    if (code < 500) return 's4xx';
-    return 's5xx';
-}
-
-function formatSize(bytes: number): string {
-    if (bytes <= 0) return '-';
-    if (bytes < 1024) return `${bytes}B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}K`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)}M`;
-}
-
-function formatDuration(ms: number): string {
-    if (ms <= 0) return '-';
-    if (ms < 1000) return `${ms}ms`;
-    return `${(ms / 1000).toFixed(1)}s`;
-}
-
-function extractPath(url: string): string {
-    try {
-        const u = new URL(url);
-        return u.pathname + u.search;
-    } catch {
-        return url;
-    }
-}
-
-function tryFormatJSON(text: string): string {
-    try {
-        const parsed = JSON.parse(text);
-        return JSON.stringify(parsed, null, 2);
-    } catch {
-        return text;
-    }
-}
 
 const ProxyView: React.FC = () => {
     // Proxy state
@@ -619,245 +583,28 @@ const ProxyView: React.FC = () => {
                 </div>
             </div>
 
-            {/* Detail Drawer */}
-            <Drawer
-                title={selectedEntry ? `${selectedEntry.method} ${selectedEntry.host}${extractPath(selectedEntry.url)}` : '请求详情'}
+            <TrafficDetailDrawer
                 open={drawerOpen}
+                entry={selectedEntry}
                 onClose={() => setDrawerOpen(false)}
-                width={420}
-                styles={{ body: { padding: '12px 16px' } }}
-            >
-                {selectedEntry && (
-                    <>
-                        {/* Basic Info */}
-                        <div className="traffic-detail-section">
-                            <h4>基本信息</h4>
-                            <dl className="traffic-detail-meta">
-                                <dt>URL</dt>
-                                <dd>{selectedEntry.url}</dd>
-                                <dt>方法</dt>
-                                <dd>{selectedEntry.method}</dd>
-                                <dt>状态码</dt>
-                                <dd>
-                                    <span className={`traffic-status ${statusClass(selectedEntry.statusCode)}`}>
-                                        {selectedEntry.statusCode || 'Pending'}
-                                    </span>
-                                </dd>
-                                <dt>耗时</dt>
-                                <dd>{formatDuration(selectedEntry.duration)}</dd>
-                                <dt>请求大小</dt>
-                                <dd>{formatSize(selectedEntry.requestSize)}</dd>
-                                <dt>响应大小</dt>
-                                <dd>{formatSize(selectedEntry.responseSize)}</dd>
-                                <dt>Content-Type</dt>
-                                <dd>{selectedEntry.contentType || '-'}</dd>
-                                <dt>时间</dt>
-                                <dd>{selectedEntry.timestamp}</dd>
-                            </dl>
-                        </div>
+            />
 
-                        {/* Request Headers */}
-                        {selectedEntry.requestHeaders && Object.keys(selectedEntry.requestHeaders).length > 0 && (
-                            <div className="traffic-detail-section">
-                                <h4>请求 Headers</h4>
-                                <div className="traffic-detail-headers">
-                                    {Object.entries(selectedEntry.requestHeaders).map(([k, v]) => (
-                                        <div key={k} className="header-item">
-                                            <span className="header-key">{k}:</span>
-                                            <span className="header-value">{v}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Response Headers */}
-                        {selectedEntry.responseHeaders && Object.keys(selectedEntry.responseHeaders).length > 0 && (
-                            <div className="traffic-detail-section">
-                                <h4>响应 Headers</h4>
-                                <div className="traffic-detail-headers">
-                                    {Object.entries(selectedEntry.responseHeaders).map(([k, v]) => (
-                                        <div key={k} className="header-item">
-                                            <span className="header-key">{k}:</span>
-                                            <span className="header-value">{v}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Request Body */}
-                        {selectedEntry.requestBody && (
-                            <div className="traffic-detail-section">
-                                <h4>请求 Body</h4>
-                                <pre className="traffic-detail-body">
-                                    {tryFormatJSON(selectedEntry.requestBody)}
-                                </pre>
-                            </div>
-                        )}
-
-                        {/* Response Body */}
-                        {selectedEntry.responseBody && (
-                            <div className="traffic-detail-section">
-                                <h4>响应 Body</h4>
-                                <pre className="traffic-detail-body">
-                                    {tryFormatJSON(selectedEntry.responseBody)}
-                                </pre>
-                            </div>
-                        )}
-                    </>
-                )}
-            </Drawer>
-
-            {/* MITM Rule Editor Modal */}
-            <Modal
-                title={editingRule ? '编辑规则' : '添加规则'}
+            <MITMRuleModal
                 open={ruleModalOpen}
-                onOk={handleSaveRule}
+                editingRule={editingRule}
+                form={ruleForm}
+                onSave={handleSaveRule}
                 onCancel={() => setRuleModalOpen(false)}
-                okText="保存"
-                cancelText="取消"
-                width={520}
-                destroyOnClose
-            >
-                <Form form={ruleForm} layout="vertical" size="small" style={{ marginTop: 12 }}>
-                    <Form.Item label="规则名称" name="name" rules={[{ required: true, message: '请输入规则名称' }]}>
-                        <Input placeholder="如: Mock 用户接口" />
-                    </Form.Item>
-                    <Form.Item label="URL 匹配" name="urlPattern" rules={[{ required: true, message: '请输入 URL 匹配模式' }]}>
-                        <Input placeholder="如: /api/user 或正则 .*\.js$" />
-                    </Form.Item>
-                    <div style={{ display: 'flex', gap: 12 }}>
-                        <Form.Item label="规则类型" name="ruleType" style={{ flex: 1 }}>
-                            <Select options={[
-                                { label: 'Mock 响应', value: 'mock_response' },
-                                { label: '修改 Header', value: 'modify_header' },
-                                { label: 'Map Local', value: 'map_local' },
-                                { label: '注入内容', value: 'inject_content' },
-                                { label: '延迟模拟', value: 'delay' },
-                                { label: '断点调试', value: 'breakpoint' },
-                            ]} />
-                        </Form.Item>
-                        <Form.Item label="正则匹配" name="isRegex" valuePropName="checked">
-                            <Switch size="small" />
-                        </Form.Item>
-                    </div>
+            />
 
-                    <Form.Item noStyle shouldUpdate={(prev, cur) => prev.ruleType !== cur.ruleType}>
-                        {() => {
-                            const ruleType = ruleForm.getFieldValue('ruleType') as RuleType;
-                            switch (ruleType) {
-                                case 'mock_response':
-                                    return (
-                                        <>
-                                            <div style={{ display: 'flex', gap: 12 }}>
-                                                <Form.Item label="状态码" name="mockStatusCode" style={{ width: 100 }}>
-                                                    <InputNumber min={100} max={599} />
-                                                </Form.Item>
-                                                <Form.Item label="Content-Type" name="mockContentType" style={{ flex: 1 }}>
-                                                    <Input placeholder="application/json" />
-                                                </Form.Item>
-                                            </div>
-                                            <Form.Item label="响应 Body" name="mockBody">
-                                                <Input.TextArea rows={6} placeholder='{"code":0,"msg":"ok","data":{}}' style={{ fontFamily: 'monospace', fontSize: 11 }} />
-                                            </Form.Item>
-                                        </>
-                                    );
-                                case 'modify_header':
-                                    return (
-                                        <>
-                                            <Form.Item label="添加/修改请求头 (JSON)" name="modifyRequestHeaders" normalize={(v: string) => { try { return JSON.parse(v); } catch { return v; } }} getValueProps={(v) => ({ value: typeof v === 'object' ? JSON.stringify(v, null, 2) : v })}>
-                                                <Input.TextArea rows={3} placeholder='{"X-Custom": "value"}' style={{ fontFamily: 'monospace', fontSize: 11 }} />
-                                            </Form.Item>
-                                            <Form.Item label="添加/修改响应头 (JSON)" name="modifyResponseHeaders" normalize={(v: string) => { try { return JSON.parse(v); } catch { return v; } }} getValueProps={(v) => ({ value: typeof v === 'object' ? JSON.stringify(v, null, 2) : v })}>
-                                                <Input.TextArea rows={3} placeholder='{"Access-Control-Allow-Origin": "*"}' style={{ fontFamily: 'monospace', fontSize: 11 }} />
-                                            </Form.Item>
-                                        </>
-                                    );
-                                case 'map_local':
-                                    return (
-                                        <Form.Item label="本地文件路径" name="localFilePath" rules={[{ required: true, message: '请输入文件路径' }]}>
-                                            <Input placeholder="/path/to/local/file.js" />
-                                        </Form.Item>
-                                    );
-                                case 'inject_content':
-                                    return (
-                                        <>
-                                            <Form.Item label="注入位置" name="injectPosition" initialValue="body_end">
-                                                <Select options={[
-                                                    { label: '</head> 之前', value: 'head_end' },
-                                                    { label: '<body> 之后', value: 'body_start' },
-                                                    { label: '</body> 之前', value: 'body_end' },
-                                                ]} />
-                                            </Form.Item>
-                                            <Form.Item label="注入内容 (HTML/JS/CSS)" name="injectContent">
-                                                <Input.TextArea rows={6} placeholder='<script>console.log("injected")</script>' style={{ fontFamily: 'monospace', fontSize: 11 }} />
-                                            </Form.Item>
-                                        </>
-                                    );
-                                case 'delay':
-                                    return (
-                                        <Form.Item label="延迟毫秒" name="delayMs">
-                                            <InputNumber min={0} max={30000} addonAfter="ms" style={{ width: '100%' }} />
-                                        </Form.Item>
-                                    );
-                                case 'breakpoint':
-                                    return (
-                                        <div style={{ color: '#999', fontSize: 12, padding: '8px 0' }}>
-                                            断点规则不需要额外配置。匹配的请求将暂停，等待你手动编辑后放行。
-                                        </div>
-                                    );
-                                default:
-                                    return null;
-                            }
-                        }}
-                    </Form.Item>
-                </Form>
-            </Modal>
-
-            {/* Breakpoint Modal */}
-            <Modal
-                title={
-                    <span>
-                        <ExperimentOutlined style={{ color: '#eb2f96', marginRight: 6 }} />
-                        断点拦截 {breakpointReq?.ruleName && `— ${breakpointReq.ruleName}`}
-                    </span>
-                }
+            <BreakpointModal
                 open={breakpointModalOpen}
-                onCancel={handleBreakpointAbort}
-                footer={[
-                    <Button key="abort" danger onClick={handleBreakpointAbort}>中止请求</Button>,
-                    <Button key="release" type="primary" onClick={handleBreakpointRelease}>放行请求</Button>,
-                ]}
-                width={560}
-                closable={false}
-                maskClosable={false}
-            >
-                {breakpointReq && (
-                    <div style={{ marginTop: 8 }}>
-                        <div style={{ marginBottom: 8 }}>
-                            <Tag color="blue">{breakpointReq.method}</Tag>
-                            <span style={{ fontFamily: 'monospace', fontSize: 12, wordBreak: 'break-all' }}>{breakpointReq.url}</span>
-                        </div>
-                        <div style={{ marginBottom: 6, fontSize: 12, color: '#999' }}>Host: {breakpointReq.host}</div>
-                        <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 4 }}>Headers (JSON, 可编辑):</div>
-                        <Input.TextArea
-                            value={bpHeadersText}
-                            onChange={(e) => setBpHeadersText(e.target.value)}
-                            rows={8}
-                            style={{ fontFamily: 'monospace', fontSize: 11 }}
-                        />
-                        {breakpointReq.body && (
-                            <>
-                                <div style={{ fontSize: 12, fontWeight: 500, marginTop: 8, marginBottom: 4 }}>Request Body:</div>
-                                <pre style={{ background: '#f6f8fa', padding: 8, borderRadius: 6, fontSize: 11, maxHeight: 150, overflow: 'auto' }}>
-                                    {tryFormatJSON(breakpointReq.body)}
-                                </pre>
-                            </>
-                        )}
-                    </div>
-                )}
-            </Modal>
+                request={breakpointReq}
+                headersText={bpHeadersText}
+                onHeadersChange={setBpHeadersText}
+                onRelease={handleBreakpointRelease}
+                onAbort={handleBreakpointAbort}
+            />
         </div>
     );
 };
