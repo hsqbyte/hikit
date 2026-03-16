@@ -1,2 +1,2 @@
-export { default as TodoView } from './TodoView';
+export { default as TodoView } from './ui/TodoView';
 

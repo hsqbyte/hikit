@@ -1,0 +1,353 @@
+/* ===== Root ===== */
+.settings-view {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: #f7f8fa;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* ===== Top bar ===== */
+.settings-top {
+    padding: 20px 28px 12px;
+}
+
+.settings-top-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin: 0 0 4px;
+}
+
+.settings-top-desc {
+    font-size: 13px;
+    color: #8c8fa3;
+    margin: 0;
+}
+
+/* ===== Body: left + right ===== */
+.settings-body {
+    flex: 1;
+    display: flex;
+    gap: 20px;
+    padding: 0 28px 20px;
+    overflow: hidden;
+}
+
+/* ===== Left: provider list ===== */
+.settings-list {
+    width: 280px;
+    flex-shrink: 0;
+    background: #fff;
+    border: 1px solid #e8eaef;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.settings-list-header {
+    padding: 12px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #8c8fa3;
+    border-bottom: 1px solid #f0f1f5;
+}
+
+.settings-list-items {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px;
+}
+
+.settings-list-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.15s;
+    margin-bottom: 4px;
+}
+
+.settings-list-item:hover {
+    background: #f5f7fa;
+}
+
+.settings-list-item.active {
+    background: #f0f5ff;
+    border-color: #d6e4ff;
+}
+
+.settings-item-icon {
+    font-size: 20px;
+    flex-shrink: 0;
+}
+
+.settings-item-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: #1a1a2e;
+    flex: 1;
+}
+
+.settings-item-badge {
+    font-size: 11px;
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-weight: 500;
+    flex-shrink: 0;
+}
+
+.settings-item-badge.pass {
+    color: #00b96b;
+    background: #f0faf5;
+    border: 1px solid #b7ebd4;
+}
+
+/* ===== Right: detail panel ===== */
+.settings-detail {
+    flex: 1;
+    min-width: 0;
+    background: #fff;
+    border: 1px solid #e8eaef;
+    border-radius: 12px;
+    padding: 24px;
+    overflow-y: auto;
+}
+
+.settings-detail-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    margin-bottom: 20px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid #f0f1f5;
+}
+
+.settings-detail-icon {
+    font-size: 28px;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.settings-detail-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin-bottom: 4px;
+}
+
+.settings-detail-desc {
+    font-size: 13px;
+    color: #8c8fa3;
+    line-height: 1.5;
+}
+
+.settings-detail-tip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: #f6ffed;
+    border: 1px solid #b7eb8f;
+    border-radius: 8px;
+    font-size: 12px;
+    color: #389e0d;
+    margin-bottom: 20px;
+}
+
+.settings-detail-tip code {
+    background: rgba(0, 0, 0, 0.06);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 11px;
+}
+
+/* ===== Detail sections ===== */
+.settings-detail-section {
+    margin-bottom: 20px;
+}
+
+.settings-detail-section-title {
+    display: flex;
+    align-items: center;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1a1a2e;
+    margin-bottom: 14px;
+}
+
+/* ===== Form fields ===== */
+.settings-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.settings-field {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.settings-field label {
+    font-size: 13px;
+    color: #555;
+    font-weight: 500;
+    width: 80px;
+    flex-shrink: 0;
+    text-align: right;
+}
+
+.settings-field-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.settings-input,
+.settings-select {
+    width: 100%;
+    padding: 7px 12px;
+    border: 1px solid #dde0e5;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #333;
+    background: #fafbfc;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.settings-input:focus,
+.settings-select:focus {
+    border-color: #1677ff;
+    box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.1);
+    background: #fff;
+}
+
+.settings-input::placeholder {
+    color: #bbb;
+}
+
+.settings-hint {
+    font-size: 11px;
+    color: #bbb;
+}
+
+.settings-error {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: #ff4d4f;
+}
+
+/* ===== Save btn ===== */
+.settings-save-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 16px;
+    border: 1px solid #dde0e5;
+    border-radius: 8px;
+    background: #fff;
+    color: #999;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: not-allowed;
+    transition: all 0.2s;
+}
+
+.settings-save-btn.active {
+    background: #1a1a2e;
+    color: #fff;
+    border-color: #1a1a2e;
+    cursor: pointer;
+}
+
+.settings-save-btn.active:hover {
+    background: #2d2d44;
+}
+
+/* ===== Badges ===== */
+.settings-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 11px;
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-weight: 500;
+}
+
+.settings-badge.unsaved {
+    color: #faad14;
+    background: #fffbe6;
+    border: 1px solid #ffe58f;
+}
+
+.settings-badge.saved {
+    color: #52c41a;
+    background: #f6ffed;
+    border: 1px solid #b7eb8f;
+}
+
+/* ===== Fetch model btn ===== */
+.settings-fetch-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 12px;
+    border: 1px solid #dde0e5;
+    border-radius: 6px;
+    background: #fff;
+    color: #1677ff;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-left: auto;
+}
+
+.settings-fetch-btn:hover:not(:disabled) {
+    background: #f0f5ff;
+    border-color: #91caff;
+}
+
+.settings-fetch-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ===== Codex empty ===== */
+.settings-codex-empty {
+    text-align: center;
+    padding: 20px;
+    color: #bbb;
+    font-size: 13px;
+}
+
+/* ===== Spin animation ===== */
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+/* ===== Scrollbar ===== */
+.settings-list-items::-webkit-scrollbar,
+.settings-detail::-webkit-scrollbar {
+    width: 4px;
+}
+
+.settings-list-items::-webkit-scrollbar-thumb,
+.settings-detail::-webkit-scrollbar-thumb {
+    background: #ddd;
+    border-radius: 2px;
+}

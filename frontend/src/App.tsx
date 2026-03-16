@@ -1,9 +1,10 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { ConfigProvider } from 'antd';
-import { ActivityBar, TabBar } from './components/Layout';
-import { TAB_VIEWS, SIDEBAR_PANELS, FULLSCREEN_VIEWS } from './registries';
-import ErrorBoundary from './components/ErrorBoundary';
-import { useConnectionStore, findAsset, findParentGroup } from './stores/connectionStore';
+import { ActivityBar } from './widgets/activity-bar';
+import { TabBar } from './widgets/tab-bar';
+import { TAB_VIEWS, SIDEBAR_PANELS, FULLSCREEN_VIEWS } from './app/registries';
+import { ErrorBoundary } from './shared/ui';
+import { useConnectionStore, findAsset, findParentGroup } from './entities/connection';
 import './App.css';
 
 const App: React.FC = () => {

@@ -1,1 +1,1 @@
-export { default as AssetTree } from './AssetTree';
+export { default as AssetTree } from './ui/AssetTree';

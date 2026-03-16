@@ -1,3 +1,3 @@
-export { default as ProxyView } from './ProxyView';
-export { default as WebProxyView } from './WebProxyView';
-export { default as PortForwardView } from './PortForwardView';
+export { default as ProxyView } from './ui/ProxyView';
+export { default as WebProxyView } from './ui/WebProxyView';
+export { default as PortForwardView } from './ui/PortForwardView';

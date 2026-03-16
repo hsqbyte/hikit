@@ -8,7 +8,7 @@ import {
 } from '@ant-design/icons';
 import { Table as AntTable } from 'antd';
 import { TableInfoItem, QueryResult } from './types';
-import SQLAssistantPanel from '../SQLAssistantPanel';
+import SQLAssistantPanel from '../ui/SQLAssistantPanel';
 
 interface PGClipboard {
     assetId: string;

@@ -1,2 +1,2 @@
-export { default as GamePanel } from './GamePanel';
-export { default as EmulatorView } from './EmulatorView';
+export { default as GamePanel } from './ui/GamePanel';
+export { default as EmulatorView } from './ui/EmulatorView';

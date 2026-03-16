@@ -1,1 +1,1 @@
-export { default as MemoView } from './MemoView';
+export { default as MemoView } from './ui/MemoView';

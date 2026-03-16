@@ -10,53 +10,31 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/mac"
 
-	assetpkg "github.com/hsqbyte/hikit/internal/asset"
-	chatpkg "github.com/hsqbyte/hikit/internal/chat"
-	codexpkg "github.com/hsqbyte/hikit/internal/codex"
-	gitpkg "github.com/hsqbyte/hikit/internal/git"
-	localpkg "github.com/hsqbyte/hikit/internal/local"
-	memopkg "github.com/hsqbyte/hikit/internal/memo"
-	musicpkg "github.com/hsqbyte/hikit/internal/music"
-	pgpkg "github.com/hsqbyte/hikit/internal/pg"
-	proxypkg "github.com/hsqbyte/hikit/internal/proxy"
-	redispkg "github.com/hsqbyte/hikit/internal/redis"
-	restpkg "github.com/hsqbyte/hikit/internal/restclient"
-	screenshotpkg "github.com/hsqbyte/hikit/internal/screenshot"
-	rompkg "github.com/hsqbyte/hikit/internal/rom"
-	sshpkg "github.com/hsqbyte/hikit/internal/ssh"
-	"github.com/hsqbyte/hikit/internal/store"
-	todopkg "github.com/hsqbyte/hikit/internal/todo"
+	"github.com/hsqbyte/hikit/bridge"
+	"github.com/hsqbyte/hikit/bridge/store"
 )
 
 //go:embed all:frontend/dist
 var assets embed.FS
 
 func main() {
-	// Initialize SQLite database
+	// Initialize SQLite database connection
 	if err := store.Init(); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 	defer store.Close()
 
-	// Create services — each module manages its own Wails bindings
-	app := NewApp()
-	sshService := sshpkg.NewSSHService()
-	localService := localpkg.NewLocalService()
-	pgService := pgpkg.NewPGService()
-	proxyService := proxypkg.NewProxyService()
-	assetService := assetpkg.NewAssetService()
-	memoService := memopkg.NewMemoService()
-	todoService := todopkg.NewTodoService()
-	musicService := musicpkg.NewMusicService()
-	romService := rompkg.NewRomService()
-	redisService := redispkg.NewRedisService()
-	restService := restpkg.NewRestClientService()
-	gitService := gitpkg.NewGitService()
-	chatService := chatpkg.NewChatService()
-	screenshotService := screenshotpkg.NewScreenshotService()
-	codexProxy := codexpkg.NewCodexProxy()
+	// Create all services
+	app := bridge.CreateApp()
 
-	// Create application with options
+	// Initialize all module tables (in dependency order)
+	if err := app.InitTables(); err != nil {
+		log.Fatalf("Failed to initialize tables: %v", err)
+	}
+
+	// Start local HTTP server for music & ROM streaming
+	go startLocalServer(app)
+
 	err := wails.Run(&options.App{
 		Title:     "HiKit",
 		Width:     1280,
@@ -75,41 +53,9 @@ func main() {
 		Mac: &mac.Options{
 			WebviewIsTransparent: true,
 		},
-		OnStartup: func(ctx context.Context) {
-			app.startup(ctx)
-			sshService.Startup(ctx)
-			localService.Startup(ctx)
-			proxyService.Startup(ctx)
-			musicService.Startup(ctx)
-			chatService.Startup(ctx)
-			gitService.Startup(ctx)
-			screenshotService.Startup(ctx)
-			pgService.Startup(ctx)
-			codexProxy.Startup(ctx)
-		},
-		OnShutdown: func(ctx context.Context) {
-			proxyService.Shutdown(ctx)
-			sshService.Shutdown(ctx)
-			musicService.Shutdown(ctx)
-			codexProxy.Shutdown()
-		},
-		Bind: []interface{}{
-			app,
-			sshService,
-			localService,
-			pgService,
-			proxyService,
-			assetService,
-			memoService,
-			todoService,
-			musicService,
-			romService,
-			redisService,
-			restService,
-			gitService,
-			chatService,
-			screenshotService,
-		},
+		OnStartup:  func(ctx context.Context) { app.Startup(ctx) },
+		OnShutdown: func(ctx context.Context) { app.Shutdown(ctx) },
+		Bind:       app.Bind(),
 	})
 
 	if err != nil {

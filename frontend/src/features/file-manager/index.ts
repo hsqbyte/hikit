@@ -1,1 +1,1 @@
-export { default as FileManager } from './FileManager';
+export { default as FileManager } from './ui/FileManager';

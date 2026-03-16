@@ -1,1 +1,1 @@
-export { default as GitPanel } from './GitPanel';
+export { default as GitPanel } from './ui/GitPanel';

@@ -1,1 +1,1 @@
-export { default as PomodoroPanel } from './PomodoroPanel';
+export { default as PomodoroPanel } from './ui/PomodoroPanel';

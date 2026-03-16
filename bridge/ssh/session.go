@@ -1,0 +1,380 @@
+package ssh
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"sync"
+	"time"
+
+	"golang.org/x/crypto/ssh"
+
+	"github.com/hsqbyte/hikit/bridge/asset"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
+)
+
+// Session represents an active SSH connection
+type Session struct {
+	ID      string
+	AssetID string
+	Client  *ssh.Client
+	session *ssh.Session
+	stdin   io.WriteCloser
+	stdout  io.Reader
+	stderr  io.Reader
+	ctx     context.Context
+	cancel  context.CancelFunc
+}
+
+// Manager manages all active SSH sessions
+type Manager struct {
+	sessions       map[string]*Session
+	mu             sync.RWMutex
+	appCtx         context.Context
+	uploadCtx      context.Context
+	uploadCancel   context.CancelFunc
+	downloadCtxs   map[string]context.CancelFunc // per-download cancel funcs
+	downloadMu     sync.Mutex
+}
+
+var manager *Manager
+
+// InitManager creates the global session manager
+func InitManager(ctx context.Context) {
+	manager = &Manager{
+		sessions:     make(map[string]*Session),
+		appCtx:       ctx,
+		downloadCtxs: make(map[string]context.CancelFunc),
+	}
+}
+
+// StartUploadSession creates a cancellable context for the current upload batch
+func (m *Manager) StartUploadSession() {
+	if m.uploadCancel != nil {
+		m.uploadCancel()
+	}
+	m.uploadCtx, m.uploadCancel = context.WithCancel(m.appCtx)
+}
+
+// CancelUpload cancels the current upload session
+func (m *Manager) CancelUpload() {
+	if m.uploadCancel != nil {
+		m.uploadCancel()
+		m.uploadCancel = nil
+		m.uploadCtx = nil // Reset so next upload doesn't reuse the cancelled context
+	}
+}
+
+// NewDownloadContext creates a new independent cancel context for a download.
+// Returns the context and a unique ID to cancel it later.
+func (m *Manager) NewDownloadContext(id string) context.Context {
+	m.downloadMu.Lock()
+	defer m.downloadMu.Unlock()
+	// Cancel existing with same id if any
+	if cancel, ok := m.downloadCtxs[id]; ok {
+		cancel()
+	}
+	ctx, cancel := context.WithCancel(m.appCtx)
+	m.downloadCtxs[id] = cancel
+	return ctx
+}
+
+// CancelDownload cancels ALL active downloads
+func (m *Manager) CancelDownload() {
+	m.downloadMu.Lock()
+	defer m.downloadMu.Unlock()
+	for id, cancel := range m.downloadCtxs {
+		cancel()
+		delete(m.downloadCtxs, id)
+	}
+}
+
+// FinishDownload removes a completed download context
+func (m *Manager) FinishDownload(id string) {
+	m.downloadMu.Lock()
+	defer m.downloadMu.Unlock()
+	if cancel, ok := m.downloadCtxs[id]; ok {
+		cancel()
+		delete(m.downloadCtxs, id)
+	}
+}
+
+// GetManager returns the global manager
+func GetManager() *Manager {
+	return manager
+}
+
+// Connect establishes an SSH connection and starts a PTY session
+func (m *Manager) Connect(assetID string) (string, error) {
+	// Load asset credentials
+	a, err := loadSSHAsset(assetID)
+	if err != nil {
+		return "", err
+	}
+
+	// Build SSH config
+	config, err := buildSSHConfig(a)
+	if err != nil {
+		return "", err
+	}
+
+	// Connect
+	addr := fmt.Sprintf("%s:%d", a.Host, a.Port)
+	client, err := ssh.Dial("tcp", addr, config)
+	if err != nil {
+		return "", fmt.Errorf("failed to connect to %s: %w", addr, err)
+	}
+
+	ctx, cancel := context.WithCancel(m.appCtx)
+	sess, err := openShellSession(client, assetID, ctx, cancel)
+	if err != nil {
+		client.Close()
+		cancel()
+		return "", err
+	}
+
+	m.mu.Lock()
+	m.sessions[sess.ID] = sess
+	m.mu.Unlock()
+
+	go m.readOutput(sess, sess.stdout, "stdout")
+	go m.readOutput(sess, sess.stderr, "stderr")
+	go m.waitSession(sess)
+
+	return sess.ID, nil
+}
+
+// loadSSHAsset reads SSH-relevant fields for an asset from the DB
+func loadSSHAsset(assetID string) (asset.SSHAsset, error) {
+	return asset.LoadSSHAsset(assetID)
+}
+
+// buildSSHConfig constructs an ssh.ClientConfig from an SSHAsset
+func buildSSHConfig(a asset.SSHAsset) (*ssh.ClientConfig, error) {
+	if a.Host == "" {
+		return nil, fmt.Errorf("host is empty for asset %s", a.Name)
+	}
+	if a.Port == 0 {
+		a.Port = 22
+	}
+	if a.Username == "" {
+		a.Username = "root"
+	}
+	cfg := &ssh.ClientConfig{
+		User:            a.Username,
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		Timeout:         10 * time.Second,
+	}
+	if a.PrivateKey != "" {
+		signer, err := ssh.ParsePrivateKey([]byte(a.PrivateKey))
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse private key: %w", err)
+		}
+		cfg.Auth = []ssh.AuthMethod{ssh.PublicKeys(signer)}
+	} else if a.Password != "" {
+		cfg.Auth = []ssh.AuthMethod{ssh.Password(a.Password)}
+	} else {
+		return nil, fmt.Errorf("no authentication method provided")
+	}
+	return cfg, nil
+}
+
+// openShellSession opens a PTY shell on an existing SSH client and returns a Session.
+func openShellSession(client *ssh.Client, assetID string, ctx context.Context, cancel context.CancelFunc) (*Session, error) {
+	sshSession, err := client.NewSession()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create session: %w", err)
+	}
+
+	modes := ssh.TerminalModes{
+		ssh.ECHO:          1,
+		ssh.TTY_OP_ISPEED: 14400,
+		ssh.TTY_OP_OSPEED: 14400,
+	}
+	if err := sshSession.RequestPty("xterm-256color", 40, 120, modes); err != nil {
+		sshSession.Close()
+		return nil, fmt.Errorf("failed to request PTY: %w", err)
+	}
+
+	stdin, err := sshSession.StdinPipe()
+	if err != nil {
+		sshSession.Close()
+		return nil, fmt.Errorf("failed to get stdin: %w", err)
+	}
+	stdout, err := sshSession.StdoutPipe()
+	if err != nil {
+		sshSession.Close()
+		return nil, fmt.Errorf("failed to get stdout: %w", err)
+	}
+	stderr, err := sshSession.StderrPipe()
+	if err != nil {
+		sshSession.Close()
+		return nil, fmt.Errorf("failed to get stderr: %w", err)
+	}
+
+	if err := sshSession.Shell(); err != nil {
+		sshSession.Close()
+		return nil, fmt.Errorf("failed to start shell: %w", err)
+	}
+
+	return &Session{
+		ID:      fmt.Sprintf("ssh-%s-%d", assetID, time.Now().UnixMilli()),
+		AssetID: assetID,
+		Client:  client,
+		session: sshSession,
+		stdin:   stdin,
+		stdout:  stdout,
+		stderr:  stderr,
+		ctx:     ctx,
+		cancel:  cancel,
+	}, nil
+}
+
+// OpenNewShell creates a new shell session on an existing SSH client connection
+func (m *Manager) OpenNewShell(existingSessionID string) (string, error) {
+	m.mu.RLock()
+	existingSess, ok := m.sessions[existingSessionID]
+	m.mu.RUnlock()
+	if !ok {
+		return "", fmt.Errorf("session not found: %s", existingSessionID)
+	}
+
+	ctx, cancel := context.WithCancel(m.appCtx)
+	sess, err := openShellSession(existingSess.Client, existingSess.AssetID, ctx, cancel)
+	if err != nil {
+		cancel()
+		return "", err
+	}
+
+	m.mu.Lock()
+	m.sessions[sess.ID] = sess
+	m.mu.Unlock()
+
+	go m.readOutput(sess, sess.stdout, "stdout")
+	go m.readOutput(sess, sess.stderr, "stderr")
+	go m.waitSession(sess)
+
+	return sess.ID, nil
+}
+
+// readOutput reads from an SSH output pipe and emits Wails events
+func (m *Manager) readOutput(sess *Session, reader io.Reader, streamType string) {
+	buf := make([]byte, 4096)
+	for {
+		select {
+		case <-sess.ctx.Done():
+			return
+		default:
+			n, err := reader.Read(buf)
+			if n > 0 {
+				// Emit to frontend via Wails event
+				runtime.EventsEmit(m.appCtx, "ssh:output:"+sess.ID, string(buf[:n]))
+			}
+			if err != nil {
+				return
+			}
+		}
+	}
+}
+
+// waitSession waits for the SSH session to end
+func (m *Manager) waitSession(sess *Session) {
+	sess.session.Wait()
+	runtime.EventsEmit(m.appCtx, "ssh:closed:"+sess.ID, "session ended")
+	m.Disconnect(sess.ID)
+}
+
+// SendInput sends user input to the SSH session
+func (m *Manager) SendInput(sessionID string, data string) error {
+	m.mu.RLock()
+	sess, ok := m.sessions[sessionID]
+	m.mu.RUnlock()
+
+	if !ok {
+		return fmt.Errorf("session not found: %s", sessionID)
+	}
+
+	_, err := sess.stdin.Write([]byte(data))
+	return err
+}
+
+// ResizeTerminal resizes the PTY
+func (m *Manager) ResizeTerminal(sessionID string, cols, rows int) error {
+	m.mu.RLock()
+	sess, ok := m.sessions[sessionID]
+	m.mu.RUnlock()
+
+	if !ok {
+		return fmt.Errorf("session not found: %s", sessionID)
+	}
+
+	return sess.session.WindowChange(rows, cols)
+}
+
+// Disconnect closes an SSH session
+func (m *Manager) Disconnect(sessionID string) {
+	m.mu.Lock()
+	sess, ok := m.sessions[sessionID]
+	if ok {
+		delete(m.sessions, sessionID)
+	}
+	// Check if any other session shares the same SSH client
+	clientStillUsed := false
+	if ok && sess != nil {
+		for _, other := range m.sessions {
+			if other.Client == sess.Client {
+				clientStillUsed = true
+				break
+			}
+		}
+	}
+	m.mu.Unlock()
+
+	if ok && sess != nil {
+		sess.cancel()
+		sess.stdin.Close()
+		sess.session.Close()
+		// Only close the underlying SSH client if no other session uses it
+		if !clientStillUsed {
+			sess.Client.Close()
+		}
+	}
+}
+
+// DisconnectAll closes all sessions
+func (m *Manager) DisconnectAll() {
+	m.mu.Lock()
+	ids := make([]string, 0, len(m.sessions))
+	for id := range m.sessions {
+		ids = append(ids, id)
+	}
+	m.mu.Unlock()
+
+	for _, id := range ids {
+		m.Disconnect(id)
+	}
+}
+
+// RunCommand executes a command on an existing SSH connection and returns its output
+func (m *Manager) RunCommand(sessionID, cmd string) (string, error) {
+	m.mu.RLock()
+	sess, ok := m.sessions[sessionID]
+	m.mu.RUnlock()
+	if !ok {
+		return "", fmt.Errorf("session %s not found", sessionID)
+	}
+
+	newSession, err := sess.Client.NewSession()
+	if err != nil {
+		return "", fmt.Errorf("failed to create session: %w", err)
+	}
+	defer newSession.Close()
+
+	out, err := newSession.CombinedOutput(cmd)
+	if err != nil {
+		return string(out), nil // Return output even on non-zero exit
+	}
+	return string(out), nil
+}
+

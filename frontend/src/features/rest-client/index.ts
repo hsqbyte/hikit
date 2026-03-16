@@ -1,1 +1,1 @@
-export { default as RestClientView } from './RestClientView';
+export { default as RestClientView } from './ui/RestClientView';

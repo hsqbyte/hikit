@@ -1,0 +1,56 @@
+ b√ƒ©ø部分v9p90oooooo0o0o0o0o08o7oooooooo㷣😐u.activity-bar {
+     width: 40px;
+     flex-shrink: 0;
+     display: flex;
+     flex-direction: column;
+     justify-content: space-between;
+     background: #f5f5f5;
+     border-right: 1px solid #e8e8e8;
+     padding: 8px 0;
+ }
+
+ .activity-bar-top,
+ .activity-bar-bottom {
+     display: flex;
+     flex-direction: column;
+     align-items: center;
+     gap: 2px;
+ }
+
+ .activity-bar-item {
+     width: 32px;
+     height: 32px;
+     display: flex;
+     align-items: center;
+     justify-content: center;
+     background: transparent;
+     border: none;
+     border-radius: 6px;
+     color: #999;
+     font-size: 16px;
+     cursor: pointer;
+     transition: all 0.15s;
+     position: relative;
+ }
+
+ .activity-bar-item:hover {
+     background: #e8e8e8;
+     color: #333;
+ }
+
+ .activity-bar-item.active {
+     color: #1677ff;
+     background: #e6f4ff;
+ }
+
+ .activity-bar-item.active::before {
+     content: '';
+     position: absolute;
+     left: -4px;
+     top: 50%;
+     transform: translateY(-50%);
+     width: 3px;
+     height: 16px;
+     background: #1677ff;
+     border-radius: 0 2px 2px 0;
+ }

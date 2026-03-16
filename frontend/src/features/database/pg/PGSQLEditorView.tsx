@@ -1,7 +1,7 @@
 import React from 'react';
 import { Table, Button, message } from 'antd';
 import { PlayCircleOutlined, MessageOutlined } from '@ant-design/icons';
-import SQLAssistantPanel from '../SQLAssistantPanel';
+import SQLAssistantPanel from '../ui/SQLAssistantPanel';
 import { QueryResult } from './types';
 
 interface PGSQLEditorViewProps {
