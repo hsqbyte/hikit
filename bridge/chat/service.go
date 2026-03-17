@@ -58,8 +58,15 @@ func (s *ChatService) UpdateSystem(id, system string) error {
 func (s *ChatService) GetMessages(conversationID string) ([]Message, error) {
 	return GetMessages(conversationID)
 }
-func (s *ChatService) SaveMessage(m Message) error   { return SaveMessage(m) }
-func (s *ChatService) DeleteMessage(id string) error { return DeleteMessage(id) }
+func (s *ChatService) SaveMessage(m Message) error          { return SaveMessage(m) }
+func (s *ChatService) DeleteMessage(id string) error        { return DeleteMessage(id) }
+func (s *ChatService) ClearHistory(conversationID string) error {
+	return ClearMessages(conversationID)
+}
+func (s *ChatService) GetConversation(id string) (Conversation, error) {
+	return GetConversation(id)
+}
+func (s *ChatService) BulkDeleteMessages(ids []string) error { return BulkDeleteMessages(ids) }
 
 // ============================================================
 // Streaming Chat

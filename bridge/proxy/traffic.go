@@ -91,3 +91,15 @@ func (ts *TrafficStore) Clear() {
 	defer ts.mu.Unlock()
 	ts.entries = ts.entries[:0]
 }
+
+// GetByID returns the traffic entry with the given ID, or false if not found.
+func (ts *TrafficStore) GetByID(id string) (TrafficEntry, bool) {
+	ts.mu.RLock()
+	defer ts.mu.RUnlock()
+	for i := len(ts.entries) - 1; i >= 0; i-- {
+		if ts.entries[i].ID == id {
+			return ts.entries[i], true
+		}
+	}
+	return TrafficEntry{}, false
+}

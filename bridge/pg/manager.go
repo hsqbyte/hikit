@@ -604,3 +604,22 @@ func (s *PGService) ExportTableCSV(sessionID, schema, table string) (string, err
 	return sess.ExportTableCSV(schema, table)
 }
 
+// ListSessions returns the IDs of all currently active PostgreSQL sessions.
+func (s *PGService) ListSessions() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	ids := make([]string, 0, len(s.sessions))
+	for id := range s.sessions {
+		ids = append(ids, id)
+	}
+	return ids
+}
+
+// GetSessionConfig returns the connection config for an active session.
+func (s *PGService) GetSessionConfig(sessionID string) (ConnConfig, error) {
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return ConnConfig{}, err
+	}
+	return sess.Config, nil
+}

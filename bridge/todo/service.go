@@ -13,3 +13,4 @@ func (s *TodoService) UpdateItem(item TodoItem) error             { return Updat
 func (s *TodoService) DeleteItem(id string) error                 { return Delete(id) }
 func (s *TodoService) ToggleItem(id string) error                 { return ToggleComplete(id) }
 func (s *TodoService) CreateItem(item TodoItem) (TodoItem, error) { return Create(item) }
+func (s *TodoService) BulkDelete(ids []string) error              { return BulkDelete(ids) }

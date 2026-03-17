@@ -367,3 +367,31 @@ func GetCommitDiff(dir, hash string) (string, error) {
 	}
 	return out, nil
 }
+
+// Stash saves current changes to the stash with an optional message.
+func Stash(dir, message string) error {
+	args := []string{"stash", "push"}
+	if message != "" {
+		args = append(args, "-m", message)
+	}
+	_, err := run(dir, args...)
+	return err
+}
+
+// StashPop applies the top stash entry and removes it.
+func StashPop(dir string) error {
+	_, err := run(dir, "stash", "pop")
+	return err
+}
+
+// StashList returns the list of stash entries (most recent first).
+func StashList(dir string) ([]string, error) {
+	out, err := run(dir, "stash", "list")
+	if err != nil {
+		return nil, err
+	}
+	if out == "" {
+		return []string{}, nil
+	}
+	return strings.Split(out, "\n"), nil
+}

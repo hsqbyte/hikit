@@ -89,3 +89,11 @@ func (s *LocalService) GetAvailableShells() []string {
 	return shells
 }
 
+// ListSessions returns the IDs of all currently active local terminal sessions.
+func (s *LocalService) ListSessions() []string {
+	m, err := s.mgr()
+	if err != nil {
+		return []string{}
+	}
+	return m.ActiveSessionIDs()
+}

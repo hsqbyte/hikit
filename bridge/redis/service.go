@@ -259,3 +259,24 @@ func (s *RedisService) SwitchDB(sessionID string, db int) error {
 	return nil
 }
 
+// ListSessions returns the IDs of all currently active Redis sessions.
+func (s *RedisService) ListSessions() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	ids := make([]string, 0, len(s.sessions))
+	for id := range s.sessions {
+		ids = append(ids, id)
+	}
+	return ids
+}
+
+// GetSessionConfig returns the connection config for an active session.
+func (s *RedisService) GetSessionConfig(sessionID string) (ConnConfig, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	sess, ok := s.sessions[sessionID]
+	if !ok {
+		return ConnConfig{}, fmt.Errorf("session not found: %s", sessionID)
+	}
+	return sess.Config, nil
+}

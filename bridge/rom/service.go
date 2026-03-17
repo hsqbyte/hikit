@@ -12,6 +12,7 @@ func (s *RomService) Download(url, filename string) (string, error) { return Dow
 func (s *RomService) DownloadFile(url, filename string) error       { return DownloadFile(url, filename) }
 func (s *RomService) ListCached() ([]Info, error)                   { return ListCached() }
 func (s *RomService) Read(filename string) (string, error)          { return Read(filename) }
+func (s *RomService) Delete(filename string) error                  { return Delete(filename) }
 
 func (s *RomService) DownloadArcade(romUrl, romFilename, biosUrl, biosFilename string) (string, error) {
 	return DownloadArcade(romUrl, romFilename, biosUrl, biosFilename)

@@ -27,6 +27,9 @@ func (s *GitService) Checkout(dir, branch string) error          { return Checko
 func (s *GitService) CreateBranch(dir, name string) error        { return CreateBranch(dir, name) }
 func (s *GitService) DeleteBranch(dir, name string) error        { return DeleteBranch(dir, name) }
 func (s *GitService) DiscardFile(dir, file string) error         { return DiscardFile(dir, file) }
+func (s *GitService) Stash(dir, message string) error            { return Stash(dir, message) }
+func (s *GitService) StashPop(dir string) error                  { return StashPop(dir) }
+func (s *GitService) StashList(dir string) ([]string, error)     { return StashList(dir) }
 
 func (s *GitService) GetDiff(dir, file string, staged bool) (DiffResult, error) {
 	return GetDiff(dir, file, staged)

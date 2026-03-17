@@ -55,3 +55,21 @@ func (s *ScreenshotService) CaptureScreenshot(mode string) (string, error) {
 
 	return "ok", nil
 }
+
+// CaptureFullScreen captures the entire screen to the clipboard (non-interactive).
+func (s *ScreenshotService) CaptureFullScreen() (string, error) {
+	if runtime.GOOS != "darwin" {
+		return "", fmt.Errorf("当前仅支持 macOS")
+	}
+
+	if _, err := exec.LookPath("screencapture"); err != nil {
+		return "", fmt.Errorf("screencapture 未找到: %w", err)
+	}
+
+	cmd := exec.Command("screencapture", "-c", "-x")
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("全屏截图失败: %w", err)
+	}
+
+	return "ok", nil
+}
