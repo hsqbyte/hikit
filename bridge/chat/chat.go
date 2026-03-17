@@ -207,6 +207,13 @@ func DeleteMessage(id string) error {
 	return err
 }
 
+// ClearMessages deletes all messages for a conversation (keeps the conversation record)
+func ClearMessages(conversationID string) error {
+	db := store.MustGetDB()
+	_, err := db.Exec(`DELETE FROM chat_messages WHERE conversation_id = ?`, conversationID)
+	return err
+}
+
 // BuildAPIMessages builds the messages array for the OpenAI API call
 func BuildAPIMessages(conversationID string) ([]map[string]string, error) {
 	db := store.MustGetDB()
@@ -251,4 +258,40 @@ func UpdateConversationSystem(id, system string) error {
 	return err
 }
 
+// GetConversation returns a single conversation by ID.
+func GetConversation(id string) (Conversation, error) {
+	db := store.MustGetDB()
+	var c Conversation
+	err := db.QueryRow(`
+		SELECT id, title, COALESCE(model, ''), COALESCE(system, ''), created_at, updated_at
+		FROM chat_conversations WHERE id = ?
+	`, id).Scan(&c.ID, &c.Title, &c.Model, &c.System, &c.CreatedAt, &c.UpdatedAt)
+	if err != nil {
+		return Conversation{}, err
+	}
+	return c, nil
+}
 
+// BulkDeleteMessages deletes multiple messages by ID in a single transaction.
+func BulkDeleteMessages(ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	db := store.MustGetDB()
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	stmt, err := tx.Prepare("DELETE FROM chat_messages WHERE id = ?")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	for _, id := range ids {
+		if _, err := stmt.Exec(id); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}

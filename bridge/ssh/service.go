@@ -403,3 +403,21 @@ func (s *SSHService) SFTPMove(sessionID string, srcPath string, dstPath string) 
 	}
 	return m.RenameFile(sessionID, srcPath, dstPath)
 }
+
+// ListSessions returns a snapshot of currently active SSH session IDs and their asset IDs.
+func (s *SSHService) ListSessions() []map[string]string {
+	m, err := s.mgr()
+	if err != nil {
+		return nil
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	result := make([]map[string]string, 0, len(m.sessions))
+	for id, sess := range m.sessions {
+		result = append(result, map[string]string{
+			"sessionId": id,
+			"assetId":   sess.AssetID,
+		})
+	}
+	return result
+}

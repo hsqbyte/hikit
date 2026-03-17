@@ -174,6 +174,17 @@ func (m *Manager) DisconnectAll() {
 	}
 }
 
+// ActiveSessionIDs returns the IDs of all currently active local terminal sessions.
+func (m *Manager) ActiveSessionIDs() []string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	ids := make([]string, 0, len(m.sessions))
+	for id := range m.sessions {
+		ids = append(ids, id)
+	}
+	return ids
+}
+
 // detectDefaultShell returns the user's default shell
 func detectDefaultShell() string {
 	shell := os.Getenv("SHELL")

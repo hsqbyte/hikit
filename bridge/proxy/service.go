@@ -94,6 +94,11 @@ func (ps *ProxyService) ClearTraffic() {
 	ps.store.Clear()
 }
 
+// GetTrafficEntry returns a single traffic entry by ID (returns empty entry if not found).
+func (ps *ProxyService) GetTrafficEntry(id string) (TrafficEntry, bool) {
+	return ps.store.GetByID(id)
+}
+
 // ============================================================
 // Browser (chromedp)
 // ============================================================

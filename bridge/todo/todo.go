@@ -146,3 +146,28 @@ func DeleteByListID(listID string) error {
 	_, err := db.Exec("DELETE FROM todo_items WHERE list_id=?", listID)
 	return err
 }
+
+// BulkDelete removes multiple todo items by their IDs in a single transaction.
+func BulkDelete(ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	db := store.MustGetDB()
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	stmt, err := tx.Prepare("DELETE FROM todo_items WHERE id=?")
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	defer stmt.Close()
+	for _, id := range ids {
+		if _, err := stmt.Exec(id); err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+	return tx.Commit()
+}

@@ -1,14 +1,19 @@
 package ssh
 
-import "testing"
+import (
+	"context"
+	"testing"
+)
 
-// TestSSHService_Sessions verifies session state management
+// TestManager_Sessions verifies session map is initialized on NewManager
 func TestSSHService_SessionsMap(t *testing.T) {
-	svc := NewSSHService()
-	if svc.sessions == nil {
+	ctx := context.Background()
+	InitManager(ctx)
+	m := GetManager()
+	if m.sessions == nil {
 		t.Fatal("sessions map should be initialized")
 	}
-	if len(svc.sessions) != 0 {
-		t.Error("new service should have empty sessions")
+	if len(m.sessions) != 0 {
+		t.Error("new manager should have empty sessions")
 	}
 }

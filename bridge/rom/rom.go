@@ -200,3 +200,13 @@ func Read(filename string) (string, error) {
 	}
 	return base64.StdEncoding.EncodeToString(data), nil
 }
+
+// Delete removes a cached ROM file from the local cache directory.
+func Delete(filename string) error {
+	romsDir := RomsDir()
+	localPath := filepath.Join(romsDir, filename)
+	if err := os.Remove(localPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("delete failed: %w", err)
+	}
+	return nil
+}

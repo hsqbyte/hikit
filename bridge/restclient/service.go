@@ -17,3 +17,8 @@ func (s *RestClientService) LoadHTTPContent(assetId string) string {
 func (s *RestClientService) SendHTTPRequest(req Request) Response {
 	return Send(req)
 }
+
+// ClearHTTPContent clears the saved editor content for a REST Client asset.
+func (s *RestClientService) ClearHTTPContent(assetId string) error {
+	return SaveHTTPContent(assetId, "")
+}

@@ -286,3 +286,27 @@ func Move(id, newParentID string) error {
 		newParentID, time.Now().Format("2006-01-02 15:04:05"), id)
 	return err
 }
+
+// GetByID returns a single asset by ID, or an error if not found.
+func GetByID(id string) (Asset, error) {
+	db := store.MustGetDB()
+	var a Asset
+	err := db.QueryRow(`
+		SELECT id, name, type, COALESCE(parent_id, ''),
+		       COALESCE(connection_type, ''), COALESCE(host, ''),
+		       port, COALESCE(username, ''), COALESCE(password, ''),
+		       COALESCE(private_key, ''), COALESCE(database, ''),
+		       COALESCE(ssh_tunnel_id, ''), COALESCE(color, ''), COALESCE(env, ''),
+		       sort_order, created_at, updated_at
+		FROM assets WHERE id = ?
+	`, id).Scan(
+		&a.ID, &a.Name, &a.Type, &a.ParentID,
+		&a.ConnectionType, &a.Host, &a.Port, &a.Username,
+		&a.Password, &a.PrivateKey, &a.Database, &a.SshTunnelId,
+		&a.Color, &a.Env, &a.SortOrder, &a.CreatedAt, &a.UpdatedAt,
+	)
+	if err != nil {
+		return Asset{}, fmt.Errorf("asset (id=%s) not found: %w", id, err)
+	}
+	return a, nil
+}
