@@ -1,7 +1,6 @@
 package music
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -59,7 +58,7 @@ func InitPlaylistTables() error {
 
 // ListPlaylists returns all playlists
 func ListPlaylists() ([]Playlist, error) {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	rows, err := db.Query(`
 		SELECT p.id, p.name, p.cover, p.created_at,
 			(SELECT COUNT(*) FROM playlist_tracks pt WHERE pt.playlist_id = p.id) as track_count
@@ -87,7 +86,7 @@ func ListPlaylists() ([]Playlist, error) {
 
 // CreatePlaylist creates a new playlist
 func CreatePlaylist(id, name string) (*Playlist, error) {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	now := time.Now().Format(time.RFC3339)
 	_, err := db.Exec(`INSERT INTO playlists (id, name, created_at) VALUES (?, ?, ?)`, id, name, now)
 	if err != nil {
@@ -98,21 +97,21 @@ func CreatePlaylist(id, name string) (*Playlist, error) {
 
 // DeletePlaylist deletes a playlist
 func DeletePlaylist(id string) error {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	_, err := db.Exec(`DELETE FROM playlists WHERE id = ?`, id)
 	return err
 }
 
 // RenamePlaylist renames a playlist
 func RenamePlaylist(id, name string) error {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	_, err := db.Exec(`UPDATE playlists SET name = ? WHERE id = ?`, name, id)
 	return err
 }
 
 // AddTrackToPlaylist adds a track to a playlist
 func AddTrackToPlaylist(playlistID string, track Track) error {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	artistsJSON, _ := json.Marshal(track.Artists)
 	_, err := db.Exec(`INSERT OR REPLACE INTO playlist_tracks
 		(playlist_id, track_id, source, name, artists, album, duration, cover, added_at)
@@ -130,7 +129,7 @@ func AddTrackToPlaylist(playlistID string, track Track) error {
 
 // RemoveTrackFromPlaylist removes a track from a playlist
 func RemoveTrackFromPlaylist(playlistID, trackID, source string) error {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	_, err := db.Exec(`DELETE FROM playlist_tracks WHERE playlist_id = ? AND track_id = ? AND source = ?`,
 		playlistID, trackID, source)
 	return err
@@ -138,7 +137,7 @@ func RemoveTrackFromPlaylist(playlistID, trackID, source string) error {
 
 // GetPlaylistTracks returns all tracks in a playlist
 func GetPlaylistTracks(playlistID string) ([]Track, error) {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	rows, err := db.Query(`
 		SELECT track_id, name, artists, album, duration, cover, source
 		FROM playlist_tracks
@@ -173,6 +172,3 @@ func GetPlaylistTracks(playlistID string) ([]Track, error) {
 	return tracks, nil
 }
 
-func getDB() *sql.DB {
-	return store.GetDB()
-}

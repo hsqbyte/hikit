@@ -25,46 +25,59 @@ func (s *LocalService) Startup(ctx context.Context) {
 
 // Shutdown is called by Wails when the app shuts down (lifecycle hook)
 func (s *LocalService) Shutdown(ctx context.Context) {
-	if mgr := GetManager(); mgr != nil {
-		mgr.DisconnectAll()
+	if m, err := s.mgr(); err == nil {
+		m.DisconnectAll()
 	}
+}
+
+// mgr returns the local terminal manager or an error if not initialized.
+func (s *LocalService) mgr() (*Manager, error) {
+	m := GetManager()
+	if m == nil {
+		return nil, fmt.Errorf("local terminal manager not initialized")
+	}
+	return m, nil
 }
 
 // ============================================================
 // Local Terminal Methods
 // ============================================================
 
+// LocalConnect opens a new local terminal session with the given shell.
 func (s *LocalService) LocalConnect(shell string) (string, error) {
-	mgr := GetManager()
-	if mgr == nil {
-		return "", fmt.Errorf("local terminal manager not initialized")
+	m, err := s.mgr()
+	if err != nil {
+		return "", err
 	}
-	return mgr.Connect(shell)
+	return m.Connect(shell)
 }
 
+// LocalSendInput sends raw input data to an active local terminal session.
 func (s *LocalService) LocalSendInput(sessionID string, data string) error {
-	mgr := GetManager()
-	if mgr == nil {
-		return fmt.Errorf("local terminal manager not initialized")
+	m, err := s.mgr()
+	if err != nil {
+		return err
 	}
-	return mgr.SendInput(sessionID, data)
+	return m.SendInput(sessionID, data)
 }
 
+// LocalResize resizes the pseudo-terminal of a local terminal session.
 func (s *LocalService) LocalResize(sessionID string, cols int, rows int) error {
-	mgr := GetManager()
-	if mgr == nil {
-		return fmt.Errorf("local terminal manager not initialized")
+	m, err := s.mgr()
+	if err != nil {
+		return err
 	}
-	return mgr.Resize(sessionID, cols, rows)
+	return m.Resize(sessionID, cols, rows)
 }
 
+// LocalDisconnect closes a local terminal session.
 func (s *LocalService) LocalDisconnect(sessionID string) {
-	mgr := GetManager()
-	if mgr != nil {
-		mgr.Disconnect(sessionID)
+	if m, err := s.mgr(); err == nil {
+		m.Disconnect(sessionID)
 	}
 }
 
+// GetAvailableShells returns a list of available shell executables.
 func (s *LocalService) GetAvailableShells() []string {
 	shells := []string{}
 	candidates := []string{"bash", "zsh", "fish", "sh"}
@@ -75,3 +88,4 @@ func (s *LocalService) GetAvailableShells() []string {
 	}
 	return shells
 }
+

@@ -3,12 +3,13 @@ package restclient
 import (
 	"bytes"
 	"crypto/tls"
-	"database/sql"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/hsqbyte/hikit/bridge/store"
 )
 
 // Request describes a REST Client request
@@ -33,14 +34,17 @@ type Response struct {
 // maxResponseBody is the maximum response body size captured by the REST Client.
 const maxResponseBody = 10 * 1024 * 1024 // 10 MB
 
-func SaveHTTPContent(db *sql.DB, assetId string, content string) error {
+// SaveHTTPContent persists the .http editor content for a REST Client asset.
+func SaveHTTPContent(assetId string, content string) error {
+	db := store.MustGetDB()
 	_, err := db.Exec("UPDATE assets SET private_key=?, updated_at=? WHERE id=?",
 		content, time.Now().Format("2006-01-02 15:04:05"), assetId)
 	return err
 }
 
-// LoadHTTPContent loads the .http editor content for a REST Client asset
-func LoadHTTPContent(db *sql.DB, assetId string) string {
+// LoadHTTPContent loads the .http editor content for a REST Client asset.
+func LoadHTTPContent(assetId string) string {
+	db := store.MustGetDB()
 	var content string
 	err := db.QueryRow("SELECT COALESCE(private_key, '') FROM assets WHERE id=?", assetId).Scan(&content)
 	if err != nil {

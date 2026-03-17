@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -299,6 +298,35 @@ func (s *PGService) OpenSQLFile() {
 	}()
 }
 
+// execStmtsWithProgress executes a slice of SQL statements and emits
+// "pg:import-progress" Wails events for start / per-statement / done.
+func (s *PGService) execStmtsWithProgress(sess *Session, stmts []string) {
+	total := len(stmts)
+	wailsRuntime.EventsEmit(s.ctx, "pg:import-progress", map[string]interface{}{
+		"type": "start", "total": total,
+	})
+	for i, stmt := range stmts {
+		truncated := stmt
+		if len(truncated) > 120 {
+			truncated = truncated[:120] + "..."
+		}
+		_, execErr := sess.DB.Exec(stmt)
+		if execErr != nil {
+			wailsRuntime.EventsEmit(s.ctx, "pg:import-progress", map[string]interface{}{
+				"type": "error", "index": i + 1, "total": total,
+				"sql":  truncated, "message": execErr.Error(),
+			})
+		} else {
+			wailsRuntime.EventsEmit(s.ctx, "pg:import-progress", map[string]interface{}{
+				"type": "ok", "index": i + 1, "total": total, "sql": truncated,
+			})
+		}
+	}
+	wailsRuntime.EventsEmit(s.ctx, "pg:import-progress", map[string]interface{}{
+		"type": "done", "total": total,
+	})
+}
+
 // ImportSQLFromFile imports the previously loaded SQL file with progress.
 func (s *PGService) ImportSQLFromFile(sessionID string) error {
 	if s.pendingSQLContent == "" {
@@ -308,207 +336,31 @@ func (s *PGService) ImportSQLFromFile(sessionID string) error {
 	if err != nil {
 		return err
 	}
-
 	stmts := splitSQL(s.pendingSQLContent)
-	total := len(stmts)
-	if total == 0 {
+	if len(stmts) == 0 {
 		return fmt.Errorf("没有可执行的 SQL 语句")
 	}
-
-	wailsRuntime.EventsEmit(s.ctx, "pg:import-progress", map[string]interface{}{
-		"type": "start", "total": total,
-	})
-
-	for i, stmt := range stmts {
-		truncated := stmt
-		if len(truncated) > 120 {
-			truncated = truncated[:120] + "..."
-		}
-		_, execErr := sess.DB.Exec(stmt)
-		if execErr != nil {
-			wailsRuntime.EventsEmit(s.ctx, "pg:import-progress", map[string]interface{}{
-				"type":    "error",
-				"index":   i + 1,
-				"total":   total,
-				"sql":     truncated,
-				"message": execErr.Error(),
-			})
-		} else {
-			wailsRuntime.EventsEmit(s.ctx, "pg:import-progress", map[string]interface{}{
-				"type":  "ok",
-				"index": i + 1,
-				"total": total,
-				"sql":   truncated,
-			})
-		}
-	}
-
-	wailsRuntime.EventsEmit(s.ctx, "pg:import-progress", map[string]interface{}{
-		"type": "done", "total": total,
-	})
-
-	// Clear cached content
+	s.execStmtsWithProgress(sess, stmts)
 	s.pendingSQLContent = ""
 	return nil
 }
 
 // ImportSQLWithProgress splits SQL into statements, executes each one,
 // and emits "pg:import-progress" events with log messages.
-// Returns total executed count and any error.
 func (s *PGService) ImportSQLWithProgress(sessionID string, sqlContent string) error {
 	sess, err := s.GetSession(sessionID)
 	if err != nil {
 		return err
 	}
-
 	stmts := splitSQL(sqlContent)
-	total := len(stmts)
-	if total == 0 {
+	if len(stmts) == 0 {
 		return fmt.Errorf("没有可执行的 SQL 语句")
 	}
-
-	wailsRuntime.EventsEmit(s.ctx, "pg:import-progress", map[string]interface{}{
-		"type": "start", "total": total,
-	})
-
-	for i, stmt := range stmts {
-		truncated := stmt
-		if len(truncated) > 120 {
-			truncated = truncated[:120] + "..."
-		}
-
-		_, execErr := sess.DB.Exec(stmt)
-		if execErr != nil {
-			wailsRuntime.EventsEmit(s.ctx, "pg:import-progress", map[string]interface{}{
-				"type":    "error",
-				"index":   i + 1,
-				"total":   total,
-				"sql":     truncated,
-				"message": execErr.Error(),
-			})
-			// Continue executing remaining statements
-		} else {
-			wailsRuntime.EventsEmit(s.ctx, "pg:import-progress", map[string]interface{}{
-				"type":  "ok",
-				"index": i + 1,
-				"total": total,
-				"sql":   truncated,
-			})
-		}
-	}
-
-	wailsRuntime.EventsEmit(s.ctx, "pg:import-progress", map[string]interface{}{
-		"type": "done", "total": total,
-	})
-
+	s.execStmtsWithProgress(sess, stmts)
 	return nil
 }
 
-// splitSQL splits a SQL script into individual statements by semicolons,
-// respecting string literals and dollar-quoted strings.
-func splitSQL(content string) []string {
-	content = strings.TrimSpace(content)
-	if content == "" {
-		return nil
-	}
 
-	var stmts []string
-	var current strings.Builder
-	inSingleQuote := false
-	inDollarQuote := false
-	dollarTag := ""
-	i := 0
-
-	for i < len(content) {
-		ch := content[i]
-
-		// Handle single-quoted strings
-		if !inDollarQuote && ch == '\'' {
-			inSingleQuote = !inSingleQuote
-			current.WriteByte(ch)
-			i++
-			continue
-		}
-
-		if inSingleQuote {
-			current.WriteByte(ch)
-			i++
-			continue
-		}
-
-		// Handle dollar-quoted strings ($$...$$)
-		if ch == '$' && !inDollarQuote {
-			// Try to find dollar-quote tag
-			j := i + 1
-			for j < len(content) && (content[j] == '_' || (content[j] >= 'a' && content[j] <= 'z') || (content[j] >= 'A' && content[j] <= 'Z') || (content[j] >= '0' && content[j] <= '9')) {
-				j++
-			}
-			if j < len(content) && content[j] == '$' {
-				dollarTag = content[i : j+1]
-				inDollarQuote = true
-				current.WriteString(dollarTag)
-				i = j + 1
-				continue
-			}
-		}
-
-		if inDollarQuote {
-			// Check if we hit the closing dollar tag
-			if ch == '$' && i+len(dollarTag) <= len(content) && content[i:i+len(dollarTag)] == dollarTag {
-				current.WriteString(dollarTag)
-				i += len(dollarTag)
-				inDollarQuote = false
-				continue
-			}
-			current.WriteByte(ch)
-			i++
-			continue
-		}
-
-		// Handle line comments
-		if ch == '-' && i+1 < len(content) && content[i+1] == '-' {
-			for i < len(content) && content[i] != '\n' {
-				i++
-			}
-			continue
-		}
-
-		// Handle block comments
-		if ch == '/' && i+1 < len(content) && content[i+1] == '*' {
-			i += 2
-			for i+1 < len(content) {
-				if content[i] == '*' && content[i+1] == '/' {
-					i += 2
-					break
-				}
-				i++
-			}
-			continue
-		}
-
-		// Semicolon = statement separator
-		if ch == ';' {
-			s := strings.TrimSpace(current.String())
-			if s != "" {
-				stmts = append(stmts, s)
-			}
-			current.Reset()
-			i++
-			continue
-		}
-
-		current.WriteByte(ch)
-		i++
-	}
-
-	// Remaining content
-	s := strings.TrimSpace(current.String())
-	if s != "" {
-		stmts = append(stmts, s)
-	}
-
-	return stmts
-}
 
 // ExportSQL exports the structure and data of a schema as SQL statements
 func (s *PGService) ExportSQL(sessionID string, schema string, dataOnly bool, structOnly bool) (string, error) {

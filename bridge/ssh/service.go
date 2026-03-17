@@ -28,14 +28,17 @@ func (s *SSHService) Startup(ctx context.Context) {
 	InitManager(ctx)
 }
 
-// ensureManager lazily initializes the SSH manager if not already done
-func (s *SSHService) ensureManager() *Manager {
-	mgr := GetManager()
-	if mgr == nil && s.ctx != nil {
+// mgr lazily initializes and returns the SSH manager, or an error if unavailable.
+func (s *SSHService) mgr() (*Manager, error) {
+	m := GetManager()
+	if m == nil && s.ctx != nil {
 		InitManager(s.ctx)
-		mgr = GetManager()
+		m = GetManager()
 	}
-	return mgr
+	if m == nil {
+		return nil, fmt.Errorf("SSH manager not initialized")
+	}
+	return m, nil
 }
 
 // Shutdown is called by Wails when the app shuts down (lifecycle hook)
@@ -43,8 +46,8 @@ func (s *SSHService) Shutdown(ctx context.Context) {
 	if fm := GetForwardManager(s.ctx); fm != nil {
 		fm.StopAll()
 	}
-	if mgr := s.ensureManager(); mgr != nil {
-		mgr.DisconnectAll()
+	if m, err := s.mgr(); err == nil {
+		m.DisconnectAll()
 	}
 }
 
@@ -107,50 +110,54 @@ func (s *SSHService) ListSSHAssets() ([]map[string]interface{}, error) {
 // SSH Terminal Methods
 // ============================================================
 
+// SSHConnect establishes a new interactive SSH session to the given asset.
 func (s *SSHService) SSHConnect(assetID string) (string, error) {
-	mgr := s.ensureManager()
-	if mgr == nil {
-		return "", fmt.Errorf("SSH manager not initialized")
+	m, err := s.mgr()
+	if err != nil {
+		return "", err
 	}
-	return mgr.Connect(assetID)
+	return m.Connect(assetID)
 }
 
+// SSHSendInput sends raw input data to an active SSH terminal session.
 func (s *SSHService) SSHSendInput(sessionID string, data string) error {
-	mgr := s.ensureManager()
-	if mgr == nil {
-		return fmt.Errorf("SSH manager not initialized")
+	m, err := s.mgr()
+	if err != nil {
+		return err
 	}
-	return mgr.SendInput(sessionID, data)
+	return m.SendInput(sessionID, data)
 }
 
+// SSHResize resizes the pseudo-terminal of an active SSH session.
 func (s *SSHService) SSHResize(sessionID string, cols int, rows int) error {
-	mgr := s.ensureManager()
-	if mgr == nil {
-		return fmt.Errorf("SSH manager not initialized")
+	m, err := s.mgr()
+	if err != nil {
+		return err
 	}
-	return mgr.ResizeTerminal(sessionID, cols, rows)
+	return m.ResizeTerminal(sessionID, cols, rows)
 }
 
+// SSHDisconnect closes an active SSH terminal session.
 func (s *SSHService) SSHDisconnect(sessionID string) {
-	mgr := s.ensureManager()
-	if mgr != nil {
-		mgr.Disconnect(sessionID)
+	if m, err := s.mgr(); err == nil {
+		m.Disconnect(sessionID)
 	}
 }
 
+// SSHOpenShell opens an additional shell on an already-connected SSH session.
 func (s *SSHService) SSHOpenShell(existingSessionID string) (string, error) {
-	mgr := s.ensureManager()
-	if mgr == nil {
-		return "", fmt.Errorf("SSH manager not initialized")
+	m, err := s.mgr()
+	if err != nil {
+		return "", err
 	}
-	return mgr.OpenNewShell(existingSessionID)
+	return m.OpenNewShell(existingSessionID)
 }
 
 // SSHGetServerInfo returns basic server information
 func (s *SSHService) SSHGetServerInfo(sessionID string) (map[string]string, error) {
-	mgr := s.ensureManager()
-	if mgr == nil {
-		return nil, fmt.Errorf("SSH manager not initialized")
+	m, err := s.mgr()
+	if err != nil {
+		return nil, err
 	}
 
 	// Run a combined command to get all info at once (one SSH round-trip)
@@ -165,7 +172,7 @@ func (s *SSHService) SSHGetServerInfo(sessionID string) (map[string]string, erro
 		`echo "LOAD=$(cat /proc/loadavg 2>/dev/null | awk '{print $1, $2, $3}' || uptime 2>/dev/null | sed 's/.*load average: //')" && ` +
 		`echo "IP=$(hostname -I 2>/dev/null | awk '{print $1}' || ifconfig 2>/dev/null | grep 'inet ' | grep -v 127.0.0.1 | awk '{print $2}' | head -1)"`
 
-	output, err := mgr.RunCommand(sessionID, cmd)
+	output, err := m.RunCommand(sessionID, cmd)
 	if err != nil {
 		return nil, err
 	}
@@ -189,49 +196,49 @@ func (s *SSHService) SSHGetServerInfo(sessionID string) (map[string]string, erro
 // ============================================================
 
 func (s *SSHService) SFTPListFiles(sessionID string, path string) ([]FileInfo, error) {
-	mgr := s.ensureManager()
-	if mgr == nil {
-		return nil, fmt.Errorf("SSH manager not initialized")
+	m, err := s.mgr()
+	if err != nil {
+		return nil, err
 	}
-	return mgr.ListFiles(sessionID, path)
+	return m.ListFiles(sessionID, path)
 }
 
 func (s *SSHService) SFTPMakeDir(sessionID string, path string) error {
-	mgr := s.ensureManager()
-	if mgr == nil {
-		return fmt.Errorf("SSH manager not initialized")
+	m, err := s.mgr()
+	if err != nil {
+		return err
 	}
-	return mgr.MakeDir(sessionID, path)
+	return m.MakeDir(sessionID, path)
 }
 
 func (s *SSHService) SFTPDelete(sessionID string, path string) error {
-	mgr := s.ensureManager()
-	if mgr == nil {
-		return fmt.Errorf("SSH manager not initialized")
+	m, err := s.mgr()
+	if err != nil {
+		return err
 	}
-	return mgr.DeleteFile(sessionID, path)
+	return m.DeleteFile(sessionID, path)
 }
 
 func (s *SSHService) SFTPRename(sessionID string, oldPath string, newPath string) error {
-	mgr := s.ensureManager()
-	if mgr == nil {
-		return fmt.Errorf("SSH manager not initialized")
+	m, err := s.mgr()
+	if err != nil {
+		return err
 	}
-	return mgr.RenameFile(sessionID, oldPath, newPath)
+	return m.RenameFile(sessionID, oldPath, newPath)
 }
 
 func (s *SSHService) SFTPGetHomePath(sessionID string) (string, error) {
-	mgr := s.ensureManager()
-	if mgr == nil {
-		return "", fmt.Errorf("SSH manager not initialized")
+	m, err := s.mgr()
+	if err != nil {
+		return "", err
 	}
-	return mgr.GetHomePath(sessionID)
+	return m.GetHomePath(sessionID)
 }
 
 func (s *SSHService) SFTPUploadFile(sessionID string, remotePath string) error {
-	mgr := s.ensureManager()
-	if mgr == nil {
-		return fmt.Errorf("SSH manager not initialized")
+	m, err := s.mgr()
+	if err != nil {
+		return err
 	}
 
 	localPath, err := wr.OpenFileDialog(s.ctx, wr.OpenDialogOptions{
@@ -246,17 +253,17 @@ func (s *SSHService) SFTPUploadFile(sessionID string, remotePath string) error {
 
 	// Reset upload context so a previously cancelled context doesn't cause
 	// the upload to fail immediately on the first write.
-	mgr.StartUploadSession()
+	m.StartUploadSession()
 
 	fileName := filepath.Base(localPath)
 	fullRemotePath := remotePath + "/" + fileName
-	return mgr.UploadPath(sessionID, localPath, fullRemotePath)
+	return m.UploadPath(sessionID, localPath, fullRemotePath)
 }
 
 func (s *SSHService) SFTPDownloadFile(sessionID string, remotePath string) error {
-	mgr := s.ensureManager()
-	if mgr == nil {
-		return fmt.Errorf("SSH manager not initialized")
+	m, err := s.mgr()
+	if err != nil {
+		return err
 	}
 
 	fileName := filepath.Base(remotePath)
@@ -273,15 +280,15 @@ func (s *SSHService) SFTPDownloadFile(sessionID string, remotePath string) error
 	}
 
 	dlID := fmt.Sprintf("file:%s:%d", remotePath, time.Now().UnixNano())
-	cancelCtx := mgr.NewDownloadContext(dlID)
-	defer mgr.FinishDownload(dlID)
-	return mgr.DownloadFileWithProgress(sessionID, remotePath, savePath, cancelCtx)
+	cancelCtx := m.NewDownloadContext(dlID)
+	defer m.FinishDownload(dlID)
+	return m.DownloadFileWithProgress(sessionID, remotePath, savePath, cancelCtx)
 }
 
 func (s *SSHService) SFTPDownloadFolder(sessionID string, remotePath string) error {
-	mgr := s.ensureManager()
-	if mgr == nil {
-		return fmt.Errorf("SSH manager not initialized")
+	m, err := s.mgr()
+	if err != nil {
+		return err
 	}
 
 	folderName := filepath.Base(remotePath)
@@ -298,53 +305,50 @@ func (s *SSHService) SFTPDownloadFolder(sessionID string, remotePath string) err
 
 	localPath := filepath.Join(saveDir, folderName)
 	dlID := fmt.Sprintf("folder:%s:%d", remotePath, time.Now().UnixNano())
-	cancelCtx := mgr.NewDownloadContext(dlID)
-	defer mgr.FinishDownload(dlID)
-	return mgr.DownloadFolder(sessionID, remotePath, localPath, cancelCtx)
+	cancelCtx := m.NewDownloadContext(dlID)
+	defer m.FinishDownload(dlID)
+	return m.DownloadFolder(sessionID, remotePath, localPath, cancelCtx)
 }
 
 func (s *SSHService) SFTPDownloadToPath(sessionID string, remotePath string, localPath string) error {
-	mgr := s.ensureManager()
-	if mgr == nil {
-		return fmt.Errorf("SSH manager not initialized")
+	m, err := s.mgr()
+	if err != nil {
+		return err
 	}
 	dlID := fmt.Sprintf("file:%s:%d", remotePath, time.Now().UnixNano())
-	cancelCtx := mgr.NewDownloadContext(dlID)
-	defer mgr.FinishDownload(dlID)
+	cancelCtx := m.NewDownloadContext(dlID)
+	defer m.FinishDownload(dlID)
 	parentDir := filepath.Dir(localPath)
 	if err := os.MkdirAll(parentDir, 0755); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
-	return mgr.DownloadFileWithProgress(sessionID, remotePath, localPath, cancelCtx)
+	return m.DownloadFileWithProgress(sessionID, remotePath, localPath, cancelCtx)
 }
 
 func (s *SSHService) SFTPStartUpload() {
-	mgr := s.ensureManager()
-	if mgr != nil {
-		mgr.StartUploadSession()
+	if m, err := s.mgr(); err == nil {
+		m.StartUploadSession()
 	}
 }
 
 func (s *SSHService) SFTPCancelUpload() {
-	mgr := s.ensureManager()
-	if mgr != nil {
-		mgr.CancelUpload()
+	if m, err := s.mgr(); err == nil {
+		m.CancelUpload()
 	}
 }
 
 func (s *SSHService) SFTPCancelDownload() {
-	mgr := s.ensureManager()
-	if mgr != nil {
-		mgr.CancelDownload()
+	if m, err := s.mgr(); err == nil {
+		m.CancelDownload()
 	}
 }
 
 func (s *SSHService) SFTPReadFile(sessionID string, remotePath string) (string, error) {
-	mgr := s.ensureManager()
-	if mgr == nil {
-		return "", fmt.Errorf("SSH manager not initialized")
+	m, err := s.mgr()
+	if err != nil {
+		return "", err
 	}
-	data, err := mgr.ReadFile(sessionID, remotePath)
+	data, err := m.ReadFile(sessionID, remotePath)
 	if err != nil {
 		return "", err
 	}
@@ -352,50 +356,50 @@ func (s *SSHService) SFTPReadFile(sessionID string, remotePath string) (string, 
 }
 
 func (s *SSHService) SFTPWriteFile(sessionID string, remotePath string, content string) error {
-	mgr := s.ensureManager()
-	if mgr == nil {
-		return fmt.Errorf("SSH manager not initialized")
+	m, err := s.mgr()
+	if err != nil {
+		return err
 	}
-	return mgr.WriteFile(sessionID, remotePath, []byte(content))
+	return m.WriteFile(sessionID, remotePath, []byte(content))
 }
 
 func (s *SSHService) SFTPUploadFromPath(sessionID string, localPath string, remotePath string) error {
-	mgr := s.ensureManager()
-	if mgr == nil {
-		return fmt.Errorf("SSH manager not initialized")
+	m, err := s.mgr()
+	if err != nil {
+		return err
 	}
 	// remotePath is already the full destination path (constructed by frontend)
-	return mgr.UploadPath(sessionID, localPath, remotePath)
+	return m.UploadPath(sessionID, localPath, remotePath)
 }
 
 func (s *SSHService) SFTPChmod(sessionID string, remotePath string, mode string) error {
-	mgr := s.ensureManager()
-	if mgr == nil {
-		return fmt.Errorf("SSH manager not initialized")
+	m, err := s.mgr()
+	if err != nil {
+		return err
 	}
-	return mgr.Chmod(sessionID, remotePath, mode)
+	return m.Chmod(sessionID, remotePath, mode)
 }
 
 func (s *SSHService) SFTPSearch(sessionID string, basePath string, pattern string) ([]SearchResult, error) {
-	mgr := s.ensureManager()
-	if mgr == nil {
-		return nil, fmt.Errorf("SSH manager not initialized")
+	m, err := s.mgr()
+	if err != nil {
+		return nil, err
 	}
-	return mgr.SearchFiles(sessionID, basePath, pattern, 200)
+	return m.SearchFiles(sessionID, basePath, pattern, 200)
 }
 
 func (s *SSHService) SFTPCopy(sessionID string, srcPath string, dstPath string) error {
-	mgr := s.ensureManager()
-	if mgr == nil {
-		return fmt.Errorf("SSH manager not initialized")
+	m, err := s.mgr()
+	if err != nil {
+		return err
 	}
-	return mgr.CopyFile(sessionID, srcPath, dstPath)
+	return m.CopyFile(sessionID, srcPath, dstPath)
 }
 
 func (s *SSHService) SFTPMove(sessionID string, srcPath string, dstPath string) error {
-	mgr := s.ensureManager()
-	if mgr == nil {
-		return fmt.Errorf("SSH manager not initialized")
+	m, err := s.mgr()
+	if err != nil {
+		return err
 	}
-	return mgr.RenameFile(sessionID, srcPath, dstPath)
+	return m.RenameFile(sessionID, srcPath, dstPath)
 }

@@ -101,7 +101,7 @@ func offlineCacheDir() string {
 
 // IsTrackCached checks if a track is already cached offline
 func IsTrackCached(trackID, source string) bool {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	if db == nil {
 		return false
 	}
@@ -115,7 +115,7 @@ func IsTrackCached(trackID, source string) bool {
 
 // GetOfflinePlayURL returns the local file URL if the track is cached
 func GetOfflinePlayURL(trackID, source string) (string, bool) {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	if db == nil {
 		return "", false
 	}
@@ -184,7 +184,7 @@ func CacheTrackOffline(musicDLBase string, track Track, autoCached bool) error {
 	}
 
 	// Save to database
-	db := store.GetDB()
+	db := store.MustGetDB()
 	artistsJSON, _ := json.Marshal(track.Artists)
 	autoFlag := 0
 	if autoCached {
@@ -203,13 +203,13 @@ func CacheTrackOffline(musicDLBase string, track Track, autoCached bool) error {
 		return err
 	}
 
-	log.Printf("Offline cached: %s - %s (%d bytes)", track.Name, artist, written)
+	log.Printf("[music] offline cached: %s - %s (%d bytes)", track.Name, artist, written)
 	return nil
 }
 
 // DeleteOfflineTrack removes a cached track
 func DeleteOfflineTrack(trackID, source string) error {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	if db == nil {
 		return fmt.Errorf("database not initialized")
 	}
@@ -233,7 +233,7 @@ func DeleteOfflineTrack(trackID, source string) error {
 
 // ListOfflineTracks returns all cached tracks
 func ListOfflineTracks() ([]OfflineTrack, error) {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	if db == nil {
 		return nil, fmt.Errorf("database not initialized")
 	}
@@ -285,7 +285,7 @@ func ListOfflineTracks() ([]OfflineTrack, error) {
 
 // GetOfflineCacheSize returns total size of all cached files in bytes
 func GetOfflineCacheSize() int64 {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	if db == nil {
 		return 0
 	}
@@ -299,7 +299,7 @@ func GetOfflineCacheSize() int64 {
 
 // ClearOfflineCache removes all cached tracks
 func ClearOfflineCache() error {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	if db == nil {
 		return fmt.Errorf("database not initialized")
 	}

@@ -99,12 +99,7 @@ func (s *RedisService) GetKeyInfo(sessionID string, key string) (*KeyInfo, error
 	ttl := ttlCmd.Val()
 	encoding := encodingCmd.Val()
 
-	ttlSec := int64(-1)
-	if ttl < 0 {
-		ttlSec = int64(ttl.Seconds())
-	} else {
-		ttlSec = int64(ttl.Seconds())
-	}
+	ttlSec := int64(ttl.Seconds())
 
 	// Get size based on type
 	var size int64

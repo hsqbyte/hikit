@@ -37,7 +37,7 @@ type SavedForwardRule struct {
 
 // SaveForwardRule persists a forward rule to SQLite
 func SaveForwardRule(rule SavedForwardRule) (SavedForwardRule, error) {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	if rule.ID == "" {
 		rule.ID = uuid.New().String()
 	}
@@ -53,7 +53,7 @@ func SaveForwardRule(rule SavedForwardRule) (SavedForwardRule, error) {
 
 // LoadForwardRules loads all persisted forward rules from SQLite
 func LoadForwardRules() ([]SavedForwardRule, error) {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	rows, err := db.Query(`
 		SELECT r.id, r.asset_id, r.type, r.local_port, r.remote_addr, r.enabled, r.created_at
 		FROM forward_rules r
@@ -83,7 +83,7 @@ func LoadForwardRules() ([]SavedForwardRule, error) {
 
 // DeleteForwardRule removes a forward rule from SQLite
 func DeleteForwardRule(id string) error {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	_, err := db.Exec("DELETE FROM forward_rules WHERE id=?", id)
 	return err
 }

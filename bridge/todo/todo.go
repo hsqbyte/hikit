@@ -46,7 +46,7 @@ type TodoItem struct {
 
 // GetByListID returns all todo items for a given list (asset)
 func GetByListID(listID string) ([]TodoItem, error) {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	rows, err := db.Query(`
 		SELECT id, list_id, title, completed, COALESCE(due_date, ''), sort_order, created_at, updated_at
 		FROM todo_items
@@ -78,7 +78,7 @@ func GetByListID(listID string) ([]TodoItem, error) {
 
 // Create adds a new todo item
 func Create(item TodoItem) (TodoItem, error) {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	if item.ID == "" {
 		item.ID = uuid.New().String()
 	}
@@ -108,7 +108,7 @@ func Create(item TodoItem) (TodoItem, error) {
 
 // Update modifies an existing todo item
 func Update(item TodoItem) error {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	item.UpdatedAt = time.Now().Format("2006-01-02 15:04:05")
 
 	completed := 0
@@ -125,14 +125,14 @@ func Update(item TodoItem) error {
 
 // Delete removes a todo item
 func Delete(id string) error {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	_, err := db.Exec("DELETE FROM todo_items WHERE id=?", id)
 	return err
 }
 
 // ToggleComplete flips the completed status of a todo item
 func ToggleComplete(id string) error {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	_, err := db.Exec(`
 		UPDATE todo_items SET completed = CASE WHEN completed = 0 THEN 1 ELSE 0 END,
 		       updated_at = ? WHERE id = ?
@@ -142,7 +142,7 @@ func ToggleComplete(id string) error {
 
 // DeleteByListID removes all items for a list (called when asset is deleted)
 func DeleteByListID(listID string) error {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	_, err := db.Exec("DELETE FROM todo_items WHERE list_id=?", listID)
 	return err
 }

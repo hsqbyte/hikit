@@ -40,7 +40,7 @@ func loadSSHCredentials(assetID string) (host string, port int, user string, pas
 		err = fmt.Errorf("SSH tunnel asset ID is empty — please set a valid SSH asset in the connection settings")
 		return
 	}
-	db := store.GetDB()
+	db := store.MustGetDB()
 	row := db.QueryRow(`
 		SELECT COALESCE(host, ''), COALESCE(port, 22), COALESCE(username, ''), COALESCE(password, ''), COALESCE(private_key, '')
 		FROM assets WHERE id = ?

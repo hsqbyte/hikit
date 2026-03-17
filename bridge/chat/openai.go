@@ -108,7 +108,7 @@ func StreamingChat(ctx context.Context, conversationID string, onChunk func(Stre
 		MessageID:      msgID,
 	})
 
-	log.Printf("Chat completed: conv=%s, tokens=%d chars", conversationID, len(fullContent))
+	log.Printf("[chat] completed: conv=%s, tokens=%d chars", conversationID, len(fullContent))
 }
 
 // package-level cancel function for streaming (protected by mutex)

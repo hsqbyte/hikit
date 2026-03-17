@@ -40,7 +40,7 @@ type Memo struct {
 
 // GetByAssetID returns the memo for a given asset (one memo per asset)
 func GetByAssetID(assetID string) (Memo, error) {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	var m Memo
 	err := db.QueryRow(`
 		SELECT id, asset_id, COALESCE(title, ''), COALESCE(content, ''),
@@ -58,7 +58,7 @@ func GetByAssetID(assetID string) (Memo, error) {
 
 // Save creates or updates a memo for an asset (upsert)
 func Save(m Memo) (Memo, error) {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	now := time.Now().Format("2006-01-02 15:04:05")
 	m.UpdatedAt = now
 
@@ -96,7 +96,7 @@ func Save(m Memo) (Memo, error) {
 
 // DeleteByAssetID removes memo for an asset
 func DeleteByAssetID(assetID string) error {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	_, err := db.Exec("DELETE FROM memos WHERE asset_id=?", assetID)
 	return err
 }

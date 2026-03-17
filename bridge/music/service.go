@@ -65,32 +65,32 @@ func (s *MusicService) Startup(ctx context.Context) {
 	go func() {
 		musicDLPath := findMusicDL()
 		if musicDLPath == "" {
-			log.Println("go-music-dl not found, music feature disabled")
+			log.Println("[music] go-music-dl not found, feature disabled")
 			return
 		}
-		log.Printf("Found go-music-dl at %s", musicDLPath)
+		log.Printf("[music] found go-music-dl at %s", musicDLPath)
 		s.musicCmd = exec.Command(musicDLPath, "web", "--port", MusicDLPort, "--no-browser")
 		s.musicCmd.Stdout = os.Stdout
 		s.musicCmd.Stderr = os.Stderr
-		log.Printf("Starting go-music-dl on port %s", MusicDLPort)
+		log.Printf("[music] starting go-music-dl on port %s", MusicDLPort)
 		if err := s.musicCmd.Start(); err != nil {
-			log.Printf("Failed to start go-music-dl: %v", err)
+			log.Printf("[music] failed to start go-music-dl: %v", err)
 		}
 	}()
 
 	// Init tables
 	if err := InitPlaylistTables(); err != nil {
-		log.Printf("Failed to init playlist tables: %v", err)
+		log.Printf("[music] failed to init playlist tables: %v", err)
 	}
 	if err := InitOfflineTables(); err != nil {
-		log.Printf("Failed to init offline tables: %v", err)
+		log.Printf("[music] failed to init offline tables: %v", err)
 	}
 }
 
 func (s *MusicService) Shutdown(ctx context.Context) {
 	if s.musicCmd != nil && s.musicCmd.Process != nil {
 		s.musicCmd.Process.Kill()
-		log.Println("Stopped go-music-dl")
+		log.Println("[music] stopped go-music-dl")
 	}
 }
 

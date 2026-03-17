@@ -1,3 +1,4 @@
+// Package store provides unified SQLite access for all bridge packages.
 package store
 
 import (
@@ -11,7 +12,7 @@ import (
 
 var db *sql.DB
 
-// Init opens the SQLite database connection.
+// Init opens the SQLite database connection and applies performance/safety pragmas.
 // Table creation is handled by each package's InitTables() function.
 func Init() error {
 	configDir, err := os.UserConfigDir()
@@ -30,19 +31,40 @@ func Init() error {
 		return fmt.Errorf("failed to open database: %w", err)
 	}
 
-	// Enable WAL mode for better performance
-	if _, err := db.Exec("PRAGMA journal_mode=WAL"); err != nil {
-		return err
+	return SetPragmas(db)
+}
+
+// SetPragmas applies recommended SQLite pragmas for performance and correctness.
+// Call this after opening any SQLite connection.
+func SetPragmas(d *sql.DB) error {
+	pragmas := []string{
+		"PRAGMA journal_mode=WAL",
+		"PRAGMA foreign_keys=ON",
+		"PRAGMA busy_timeout=5000",
+	}
+	for _, p := range pragmas {
+		if _, err := d.Exec(p); err != nil {
+			return fmt.Errorf("pragma %q: %w", p, err)
+		}
 	}
 	return nil
 }
 
-// GetDB returns the database instance
+// GetDB returns the database instance (may be nil if Init has not been called).
 func GetDB() *sql.DB {
 	return db
 }
 
-// Close closes the database connection
+// MustGetDB returns the database instance and panics if Init has not been called.
+// Use inside bridge packages where a nil DB is an unrecoverable programmer error.
+func MustGetDB() *sql.DB {
+	if db == nil {
+		panic("[store] MustGetDB called before Init — ensure store.Init() is called at startup")
+	}
+	return db
+}
+
+// Close closes the database connection.
 func Close() {
 	if db != nil {
 		db.Close()

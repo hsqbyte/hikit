@@ -72,10 +72,7 @@ func InitTables() error {
 
 // GetSettings returns current chat settings
 func GetSettings() ChatSettings {
-	db := store.GetDB()
-	if db == nil {
-		return ChatSettings{BaseURL: "https://api.openai.com/v1", Model: "gpt-4o-mini"}
-	}
+	db := store.MustGetDB()
 	s := ChatSettings{BaseURL: "https://api.openai.com/v1", Model: "gpt-4o-mini"}
 	db.QueryRow(`SELECT value FROM chat_settings WHERE key = 'api_key'`).Scan(&s.APIKey)
 	db.QueryRow(`SELECT value FROM chat_settings WHERE key = 'base_url'`).Scan(&s.BaseURL)
@@ -92,10 +89,7 @@ func GetSettings() ChatSettings {
 
 // SaveSettings saves chat settings
 func SaveSettings(s ChatSettings) error {
-	db := store.GetDB()
-	if db == nil {
-		return fmt.Errorf("database not initialized")
-	}
+	db := store.MustGetDB()
 	for _, kv := range []struct{ k, v string }{
 		{"api_key", s.APIKey},
 		{"base_url", s.BaseURL},
@@ -111,10 +105,7 @@ func SaveSettings(s ChatSettings) error {
 
 // ListConversations returns all conversations
 func ListConversations() ([]Conversation, error) {
-	db := store.GetDB()
-	if db == nil {
-		return nil, fmt.Errorf("database not initialized")
-	}
+	db := store.MustGetDB()
 	rows, err := db.Query(`
 		SELECT id, title, model, system, created_at, updated_at
 		FROM chat_conversations
@@ -141,10 +132,7 @@ func ListConversations() ([]Conversation, error) {
 
 // CreateConversation creates a new conversation
 func CreateConversation(id, title string) (*Conversation, error) {
-	db := store.GetDB()
-	if db == nil {
-		return nil, fmt.Errorf("database not initialized")
-	}
+	db := store.MustGetDB()
 	now := time.Now().Format(time.RFC3339)
 	settings := GetSettings()
 	_, err := db.Exec(`INSERT INTO chat_conversations (id, title, model, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
@@ -157,10 +145,7 @@ func CreateConversation(id, title string) (*Conversation, error) {
 
 // DeleteConversation deletes a conversation and its messages
 func DeleteConversation(id string) error {
-	db := store.GetDB()
-	if db == nil {
-		return fmt.Errorf("database not initialized")
-	}
+	db := store.MustGetDB()
 	db.Exec(`DELETE FROM chat_messages WHERE conversation_id = ?`, id)
 	_, err := db.Exec(`DELETE FROM chat_conversations WHERE id = ?`, id)
 	return err
@@ -168,7 +153,7 @@ func DeleteConversation(id string) error {
 
 // UpdateConversationTitle updates a conversation's title
 func UpdateConversationTitle(id, title string) error {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	_, err := db.Exec(`UPDATE chat_conversations SET title = ?, updated_at = ? WHERE id = ?`,
 		title, time.Now().Format(time.RFC3339), id)
 	return err
@@ -176,10 +161,7 @@ func UpdateConversationTitle(id, title string) error {
 
 // GetMessages returns all messages for a conversation
 func GetMessages(conversationID string) ([]Message, error) {
-	db := store.GetDB()
-	if db == nil {
-		return nil, fmt.Errorf("database not initialized")
-	}
+	db := store.MustGetDB()
 	rows, err := db.Query(`
 		SELECT id, conversation_id, role, content, tokens_used, created_at
 		FROM chat_messages
@@ -207,10 +189,7 @@ func GetMessages(conversationID string) ([]Message, error) {
 
 // SaveMessage saves a message to the database
 func SaveMessage(m Message) error {
-	db := store.GetDB()
-	if db == nil {
-		return fmt.Errorf("database not initialized")
-	}
+	db := store.MustGetDB()
 	_, err := db.Exec(`INSERT OR REPLACE INTO chat_messages (id, conversation_id, role, content, tokens_used, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
 		m.ID, m.ConversationID, m.Role, m.Content, m.TokensUsed, m.CreatedAt)
 	if err != nil {
@@ -223,17 +202,14 @@ func SaveMessage(m Message) error {
 
 // DeleteMessage deletes a message
 func DeleteMessage(id string) error {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	_, err := db.Exec(`DELETE FROM chat_messages WHERE id = ?`, id)
 	return err
 }
 
 // BuildAPIMessages builds the messages array for the OpenAI API call
 func BuildAPIMessages(conversationID string) ([]map[string]string, error) {
-	db := store.GetDB()
-	if db == nil {
-		return nil, fmt.Errorf("database not initialized")
-	}
+	db := store.MustGetDB()
 
 	var msgs []map[string]string
 
@@ -269,7 +245,7 @@ func GenerateTitle(content string) string {
 
 // UpdateConversationSystem updates system prompt
 func UpdateConversationSystem(id, system string) error {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	_, err := db.Exec(`UPDATE chat_conversations SET system = ?, updated_at = ? WHERE id = ?`,
 		system, time.Now().Format(time.RFC3339), id)
 	return err

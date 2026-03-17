@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"strconv"
 	"sync"
 	"time"
 
@@ -68,7 +67,7 @@ func GetForwardManager(ctx context.Context) *ForwardManager {
 
 // connectSSH establishes an SSH connection for forwarding using asset credentials
 func connectSSH(assetID string) (*ssh.Client, string, error) {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	row := db.QueryRow(`
 		SELECT id, name, COALESCE(host, ''), port, COALESCE(username, ''),
 		       COALESCE(password, ''), COALESCE(private_key, '')
@@ -488,7 +487,7 @@ func (fm *ForwardManager) handleSOCKS5(state *forwardState, conn net.Conn) {
 
 // GetAssetSSHConnections returns list of SSH assets for UI dropdown
 func GetAssetSSHConnections() ([]asset.Asset, error) {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	rows, err := db.Query(`
 		SELECT id, name, COALESCE(host, ''), port
 		FROM assets WHERE type = 'host' AND connection_type = 'ssh'
@@ -509,5 +508,3 @@ func GetAssetSSHConnections() ([]asset.Asset, error) {
 	return assets, nil
 }
 
-// helper — unused import guard
-var _ = strconv.Itoa

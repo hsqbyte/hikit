@@ -56,7 +56,7 @@ func LoadCredentials(assetID string) (host string, port int, user, pass string, 
 		err = fmt.Errorf("asset ID is empty")
 		return
 	}
-	db := store.GetDB()
+	db := store.MustGetDB()
 	row := db.QueryRow(`
 		SELECT COALESCE(host,''), COALESCE(port,0), COALESCE(username,''), COALESCE(password,'')
 		FROM assets WHERE id = ? AND type = 'host'
@@ -85,7 +85,7 @@ func LoadSSHAsset(assetID string) (SSHAsset, error) {
 	if assetID == "" {
 		return SSHAsset{}, fmt.Errorf("asset ID is empty")
 	}
-	db := store.GetDB()
+	db := store.MustGetDB()
 	var a SSHAsset
 	a.ID = assetID
 	err := db.QueryRow(`
@@ -123,7 +123,7 @@ type Asset struct {
 
 // GetAll returns all assets as a flat list
 func GetAll() ([]Asset, error) {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	rows, err := db.Query(`
 		SELECT id, name, type, COALESCE(parent_id, ''), 
 		       COALESCE(connection_type, ''), COALESCE(host, ''), 
@@ -200,7 +200,7 @@ func buildTree(assets []Asset) []Asset {
 
 // Create adds a new asset
 func Create(a Asset) (Asset, error) {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	if a.ID == "" {
 		a.ID = uuid.New().String()
 	}
@@ -221,7 +221,7 @@ func Create(a Asset) (Asset, error) {
 
 // Update modifies an existing asset
 func Update(a Asset) error {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	a.UpdatedAt = time.Now().Format("2006-01-02 15:04:05")
 
 	_, err := db.Exec(`
@@ -236,7 +236,7 @@ func Update(a Asset) error {
 
 // Delete removes an asset and all its children
 func Delete(id string) error {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	// Delete children first (recursive via CASCADE wouldn't work without FK enforcement)
 	// So we do it manually
 	if err := deleteChildren(db, id); err != nil {
@@ -273,7 +273,7 @@ func deleteChildren(db *sql.DB, parentID string) error {
 
 // Rename updates just the name of an asset
 func Rename(id, name string) error {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	_, err := db.Exec("UPDATE assets SET name=?, updated_at=? WHERE id=?",
 		name, time.Now().Format("2006-01-02 15:04:05"), id)
 	return err
@@ -281,7 +281,7 @@ func Rename(id, name string) error {
 
 // Move changes the parent of an asset
 func Move(id, newParentID string) error {
-	db := store.GetDB()
+	db := store.MustGetDB()
 	_, err := db.Exec("UPDATE assets SET parent_id=NULLIF(?, ''), updated_at=? WHERE id=?",
 		newParentID, time.Now().Format("2006-01-02 15:04:05"), id)
 	return err

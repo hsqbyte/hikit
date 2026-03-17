@@ -106,6 +106,8 @@ func (a *App) Shutdown(ctx context.Context) {
 	a.Proxy.Shutdown(ctx)
 	a.SSH.Shutdown(ctx)
 	a.Music.Shutdown(ctx)
+	a.PG.DisconnectAll()
+	a.Redis.DisconnectAll()
 	a.Codex.Shutdown()
 }
 
@@ -126,5 +128,6 @@ func (a *App) Bind() []interface{} {
 		a.Git,
 		a.Chat,
 		a.Screenshot,
+		a.Codex,
 	}
 }
