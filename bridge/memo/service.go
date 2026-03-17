@@ -11,8 +11,13 @@ type MemoService struct{ ctx context.Context }
 func NewMemoService() *MemoService                 { return &MemoService{} }
 func (s *MemoService) Startup(ctx context.Context) { s.ctx = ctx }
 
-func (s *MemoService) GetMemo(assetID string) (Memo, error) { return GetByAssetID(assetID) }
-func (s *MemoService) SaveMemo(m Memo) (Memo, error)        { return Save(m) }
+func (s *MemoService) GetMemo(assetID string) (Memo, error)                  { return GetByAssetID(assetID) }
+func (s *MemoService) SaveMemo(m Memo) (Memo, error)                          { return Save(m) }
+func (s *MemoService) PinMemo(assetID string, pinned bool) error              { return PinMemo(assetID, pinned) }
+func (s *MemoService) ListPinned() ([]Memo, error)                            { return ListPinned() }
+func (s *MemoService) SearchMemos(keyword string) ([]Memo, error)             { return SearchMemos(keyword) }
+func (s *MemoService) SetMemoTags(assetID string, tags []string) error        { return SetMemoTags(assetID, tags) }
+func (s *MemoService) ListMemosByTag(tag string) ([]Memo, error)              { return ListMemosByTag(tag) }
 
 // WordCountResult holds stats about the memo content.
 type WordCountResult struct {

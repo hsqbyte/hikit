@@ -329,9 +329,78 @@ func CreateBranch(dir, name string) error {
 	return err
 }
 
+// TagInfo represents a git tag.
+type TagInfo struct {
+	Name string `json:"name"`
+	Hash string `json:"hash"` // commit hash the tag points to
+	Date string `json:"date"` // ISO 8601 date of the tagged commit
+}
+
+// ListTags returns all tags in the repository, sorted by most recent date.
+func ListTags(dir string) ([]TagInfo, error) {
+	out, err := run(dir, "tag", "-l", "--sort=-creatordate",
+		"--format=%(refname:short)|%(objectname:short)|%(creatordate:strict)")
+	if err != nil {
+		return nil, err
+	}
+	if out == "" {
+		return []TagInfo{}, nil
+	}
+	var tags []TagInfo
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "|", 3)
+		t := TagInfo{Name: parts[0]}
+		if len(parts) > 1 {
+			t.Hash = parts[1]
+		}
+		if len(parts) > 2 {
+			t.Date = parts[2]
+		}
+		tags = append(tags, t)
+	}
+	return tags, nil
+}
+
+// CreateTag creates a lightweight tag pointing to ref (defaults to HEAD if empty).
+func CreateTag(dir, name, ref string) error {
+	if name == "" {
+		return fmt.Errorf("tag name must not be empty")
+	}
+	args := []string{"tag", name}
+	if ref != "" {
+		args = append(args, ref)
+	}
+	_, err := run(dir, args...)
+	return err
+}
+
+// DeleteTag deletes a local tag.
+func DeleteTag(dir, name string) error {
+	_, err := run(dir, "tag", "-d", name)
+	return err
+}
+
 // DeleteBranch deletes a local branch
 func DeleteBranch(dir, name string) error {
 	_, err := run(dir, "branch", "-d", name)
+	return err
+}
+
+// DeleteBranchForce force-deletes a local branch (git branch -D).
+// Use when the branch has unmerged changes that would block a normal delete.
+func DeleteBranchForce(dir, name string) error {
+	_, err := run(dir, "branch", "-D", name)
+	return err
+}
+
+// MergeBranch merges the specified branch into the current branch.
+// Returns an error if the merge fails (e.g. conflicts).
+func MergeBranch(dir, branch string) error {
+	_, err := run(dir, "merge", branch)
 	return err
 }
 
@@ -384,14 +453,60 @@ func StashPop(dir string) error {
 	return err
 }
 
-// StashList returns the list of stash entries (most recent first).
-func StashList(dir string) ([]string, error) {
+// StashEntry represents a single stash entry from git stash list.
+type StashEntry struct {
+	Index   int    `json:"index"`   // numeric index: stash@{N}
+	Branch  string `json:"branch"`  // the branch the stash was made on
+	Message string `json:"message"` // the stash message/subject
+	Raw     string `json:"raw"`     // full raw line
+}
+
+// StashList returns the list of stash entries as structured objects, most recent first.
+func StashList(dir string) ([]StashEntry, error) {
 	out, err := run(dir, "stash", "list")
 	if err != nil {
 		return nil, err
 	}
 	if out == "" {
-		return []string{}, nil
+		return []StashEntry{}, nil
 	}
-	return strings.Split(out, "\n"), nil
+	var entries []StashEntry
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		// Format: stash@{N}: On <branch>: <message>
+		//      or stash@{N}: WIP on <branch>: <message>
+		entry := StashEntry{Raw: line, Index: len(entries)}
+		// Try to extract structured info
+		// stash@{0}: ...
+		if idx := strings.Index(line, "}:"); idx > 0 {
+			rest := strings.TrimSpace(line[idx+2:])
+			// "On branch: message" or "WIP on branch: message"
+			rest = strings.TrimPrefix(rest, "WIP ")
+			if strings.HasPrefix(rest, "on ") {
+				rest = rest[3:] // strip "on "
+				if colonIdx := strings.Index(rest, ":"); colonIdx > 0 {
+					entry.Branch = strings.TrimSpace(rest[:colonIdx])
+					entry.Message = strings.TrimSpace(rest[colonIdx+1:])
+				} else {
+					entry.Branch = rest
+				}
+			} else if strings.HasPrefix(rest, "On ") {
+				rest = rest[3:]
+				if colonIdx := strings.Index(rest, ":"); colonIdx > 0 {
+					entry.Branch = strings.TrimSpace(rest[:colonIdx])
+					entry.Message = strings.TrimSpace(rest[colonIdx+1:])
+				} else {
+					entry.Branch = rest
+				}
+			} else {
+				entry.Message = rest
+			}
+		}
+		entries = append(entries, entry)
+	}
+	return entries, nil
 }
+

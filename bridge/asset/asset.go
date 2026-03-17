@@ -310,3 +310,54 @@ func GetByID(id string) (Asset, error) {
 	}
 	return a, nil
 }
+
+// Search returns a flat list of assets whose name matches the keyword (case-insensitive LIKE).
+// If keyword is empty, it behaves like GetAll().
+func Search(keyword string) ([]Asset, error) {
+	db := store.MustGetDB()
+	pattern := "%" + keyword + "%"
+	rows, err := db.Query(`
+		SELECT id, name, type, COALESCE(parent_id, ''),
+		       COALESCE(connection_type, ''), COALESCE(host, ''),
+		       port, COALESCE(username, ''), COALESCE(password, ''),
+		       COALESCE(private_key, ''), COALESCE(database, ''),
+		       COALESCE(ssh_tunnel_id, ''), COALESCE(color, ''), COALESCE(env, ''),
+		       sort_order, created_at, updated_at
+		FROM assets
+		WHERE name LIKE ? COLLATE NOCASE
+		ORDER BY sort_order, name
+	`, pattern)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var assets []Asset
+	for rows.Next() {
+		var a Asset
+		err := rows.Scan(&a.ID, &a.Name, &a.Type, &a.ParentID,
+			&a.ConnectionType, &a.Host, &a.Port, &a.Username,
+			&a.Password, &a.PrivateKey, &a.Database, &a.SshTunnelId,
+			&a.Color, &a.Env,
+			&a.SortOrder, &a.CreatedAt, &a.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		assets = append(assets, a)
+	}
+	if assets == nil {
+		assets = []Asset{}
+	}
+	return assets, nil
+}
+
+// BulkDelete removes multiple assets and all their children.
+// It stops at the first error and returns it.
+func BulkDelete(ids []string) error {
+	for _, id := range ids {
+		if err := Delete(id); err != nil {
+			return err
+		}
+	}
+	return nil
+}

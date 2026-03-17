@@ -50,6 +50,12 @@ func (s *ChatService) UpdateTitle(id, title string) error { return UpdateConvers
 func (s *ChatService) UpdateSystem(id, system string) error {
 	return UpdateConversationSystem(id, system)
 }
+func (s *ChatService) ListConversationsByModel(model string) ([]Conversation, error) {
+	return ListConversationsByModel(model)
+}
+func (s *ChatService) UpdateConversationModel(id, model string) error {
+	return UpdateConversationModel(id, model)
+}
 
 // ============================================================
 // Messages
@@ -67,6 +73,12 @@ func (s *ChatService) GetConversation(id string) (Conversation, error) {
 	return GetConversation(id)
 }
 func (s *ChatService) BulkDeleteMessages(ids []string) error { return BulkDeleteMessages(ids) }
+func (s *ChatService) ExportSession(conversationID string) (string, error) {
+	return ExportSession(conversationID)
+}
+func (s *ChatService) GetConversationStats(conversationID string) (ConversationStats, error) {
+	return GetConversationStats(conversationID)
+}
 
 // ============================================================
 // Streaming Chat

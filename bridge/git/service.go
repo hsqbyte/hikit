@@ -26,10 +26,12 @@ func (s *GitService) Fetch(dir string) error                     { return Fetch(
 func (s *GitService) Checkout(dir, branch string) error          { return Checkout(dir, branch) }
 func (s *GitService) CreateBranch(dir, name string) error        { return CreateBranch(dir, name) }
 func (s *GitService) DeleteBranch(dir, name string) error        { return DeleteBranch(dir, name) }
+func (s *GitService) DeleteBranchForce(dir, name string) error    { return DeleteBranchForce(dir, name) }
+func (s *GitService) MergeBranch(dir, branch string) error        { return MergeBranch(dir, branch) }
 func (s *GitService) DiscardFile(dir, file string) error         { return DiscardFile(dir, file) }
 func (s *GitService) Stash(dir, message string) error            { return Stash(dir, message) }
 func (s *GitService) StashPop(dir string) error                  { return StashPop(dir) }
-func (s *GitService) StashList(dir string) ([]string, error)     { return StashList(dir) }
+func (s *GitService) StashList(dir string) ([]StashEntry, error)    { return StashList(dir) }
 
 func (s *GitService) GetDiff(dir, file string, staged bool) (DiffResult, error) {
 	return GetDiff(dir, file, staged)
@@ -46,6 +48,9 @@ func (s *GitService) GetBranches(dir string) ([]BranchInfo, error) {
 func (s *GitService) GetCommitDiff(dir, hash string) (string, error) {
 	return GetCommitDiff(dir, hash)
 }
+func (s *GitService) ListTags(dir string) ([]TagInfo, error)          { return ListTags(dir) }
+func (s *GitService) CreateTag(dir, name, ref string) error           { return CreateTag(dir, name, ref) }
+func (s *GitService) DeleteTag(dir, name string) error                { return DeleteTag(dir, name) }
 
 func (s *GitService) SelectRepo() (string, error) {
 	dir, err := wailsRuntime.OpenDirectoryDialog(s.ctx, wailsRuntime.OpenDialogOptions{

@@ -414,3 +414,71 @@ func (s *RedisService) CreateKey(sessionID string, key string, keyType string, v
 	return nil
 }
 
+// ============================================================
+// TTL Inspection
+// ============================================================
+
+// KeyTTL returns the remaining TTL of a key in seconds.
+//   - -1: key exists but has no expiry
+//   - -2: key does not exist
+//   - >=0: seconds until expiry
+func (s *RedisService) KeyTTL(sessionID string, key string) (int64, error) {
+	client, err := s.getSession(sessionID)
+	if err != nil {
+		return 0, err
+	}
+	d, err := client.TTL(context.Background(), key).Result()
+	if err != nil {
+		return 0, fmt.Errorf("TTL 查询失败: %w", err)
+	}
+	switch d {
+	case -2 * time.Second:
+		return -2, nil // key not found
+	case -1 * time.Second:
+		return -1, nil // no expiry
+	default:
+		return int64(d.Seconds()), nil
+	}
+}
+
+// ============================================================
+// DB-level Operations
+// ============================================================
+
+// CountKeys returns the total number of keys in the current Redis database (DBSIZE).
+func (s *RedisService) CountKeys(sessionID string) (int64, error) {
+	client, err := s.getSession(sessionID)
+	if err != nil {
+		return 0, err
+	}
+	return client.DBSize(context.Background()).Result()
+}
+
+// FlushDB removes all keys from the current Redis database (FLUSHDB ASYNC).
+// This operation is irreversible — use with caution.
+func (s *RedisService) FlushDB(sessionID string) error {
+	client, err := s.getSession(sessionID)
+	if err != nil {
+		return err
+	}
+	return client.FlushDBAsync(context.Background()).Err()
+}
+
+// KeyExists checks if one or more keys exist. Returns the count of existing keys.
+// (Redis EXISTS can accept multiple key names; duplicates count multiple times.)
+func (s *RedisService) KeyExists(sessionID string, keys []string) (int64, error) {
+	client, err := s.getSession(sessionID)
+	if err != nil {
+		return 0, err
+	}
+	return client.Exists(context.Background(), keys...).Result()
+}
+
+// KeyType returns the data type of a key ("string", "list", "set", "zset", "hash", "stream", "none").
+func (s *RedisService) KeyType(sessionID string, key string) (string, error) {
+	client, err := s.getSession(sessionID)
+	if err != nil {
+		return "", err
+	}
+	return client.Type(context.Background(), key).Result()
+}

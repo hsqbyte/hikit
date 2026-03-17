@@ -623,3 +623,51 @@ func (s *PGService) GetSessionConfig(sessionID string) (ConnConfig, error) {
 	}
 	return sess.Config, nil
 }
+
+// ExplainQuery runs EXPLAIN ANALYZE on a SQL statement and returns the plan as plain text.
+func (s *PGService) ExplainQuery(sessionID string, sqlText string) (string, error) {
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return "", err
+	}
+	return sess.ExplainQuery(sqlText)
+}
+
+// GetTableRowCount returns the exact row count for a table via COUNT(*).
+func (s *PGService) GetTableRowCount(sessionID string, schema string, table string) (int64, error) {
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return 0, err
+	}
+	return sess.GetTableRowCount(schema, table)
+}
+
+// VacuumAnalyze runs VACUUM ANALYZE on a specific table.
+func (s *PGService) VacuumAnalyze(sessionID string, schema string, table string) error {
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return err
+	}
+	return sess.VacuumAnalyze(schema, table)
+}
+
+// AddColumn adds a new column to a table.
+func (s *PGService) AddColumn(sessionID, schema, table, column, columnType, defaultExpr string) error {
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return err
+	}
+	return sess.AddColumn(schema, table, column, columnType, defaultExpr)
+}
+
+// DropColumn removes a column from a table.
+func (s *PGService) DropColumn(sessionID, schema, table, column string) error {
+	sess, err := s.GetSession(sessionID)
+	if err != nil {
+		return err
+	}
+	return sess.DropColumn(schema, table, column)
+}
+
+
+

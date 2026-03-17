@@ -6,8 +6,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
+	assetpkg "github.com/hsqbyte/hikit/bridge/asset"
 	wr "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -421,3 +423,150 @@ func (s *SSHService) ListSessions() []map[string]string {
 	}
 	return result
 }
+
+// SessionInfo is a typed snapshot of an active SSH session.
+type SessionInfo struct {
+	SessionID string `json:"sessionId"`
+	AssetID   string `json:"assetId"`
+}
+
+// ListSessionsInfo returns a typed snapshot of currently active SSH sessions.
+func (s *SSHService) ListSessionsInfo() []SessionInfo {
+	m, err := s.mgr()
+	if err != nil {
+		return []SessionInfo{}
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	result := make([]SessionInfo, 0, len(m.sessions))
+	for id, sess := range m.sessions {
+		result = append(result, SessionInfo{
+			SessionID: id,
+			AssetID:   sess.AssetID,
+		})
+	}
+	return result
+}
+
+// RenameAsset renames an SSH asset (connection label) by its asset ID.
+// The new name must be non-empty.
+func (s *SSHService) RenameAsset(assetID, newName string) error {
+	if newName == "" {
+		return fmt.Errorf("new name must not be empty")
+	}
+	return assetpkg.Rename(assetID, newName)
+}
+
+// MultiCommandResult holds the output of a command run on a single SSH session.
+type MultiCommandResult struct {
+	SessionID string `json:"sessionId"`
+	AssetID   string `json:"assetId"`
+	Output    string `json:"output"`
+	Error     string `json:"error,omitempty"`
+}
+
+// RunCommandOnAll runs a shell command concurrently on all active SSH sessions.
+// Results are collected and returned; the call blocks until all sessions respond.
+func (s *SSHService) RunCommandOnAll(cmd string) []MultiCommandResult {
+	m, err := s.mgr()
+	if err != nil {
+		return []MultiCommandResult{}
+	}
+	m.mu.RLock()
+	sessions := make([]*Session, 0, len(m.sessions))
+	for _, sess := range m.sessions {
+		sessions = append(sessions, sess)
+	}
+	m.mu.RUnlock()
+
+	results := make([]MultiCommandResult, len(sessions))
+	var wg sync.WaitGroup
+	wg.Add(len(sessions))
+	for i, sess := range sessions {
+		i, sess := i, sess
+		go func() {
+			defer wg.Done()
+			newSess, sErr := sess.Client.NewSession()
+			if sErr != nil {
+				results[i] = MultiCommandResult{
+					SessionID: sess.ID,
+					AssetID:   sess.AssetID,
+					Error:     sErr.Error(),
+				}
+				return
+			}
+			defer newSess.Close()
+			out, runErr := newSess.CombinedOutput(cmd)
+			res := MultiCommandResult{
+				SessionID: sess.ID,
+				AssetID:   sess.AssetID,
+				Output:    strings.TrimSpace(string(out)),
+			}
+			if runErr != nil {
+				res.Error = runErr.Error()
+			}
+			results[i] = res
+		}()
+	}
+	wg.Wait()
+	return results
+}
+
+// GetSessionAsset returns the Asset details for the asset associated with a session.
+func (s *SSHService) GetSessionAsset(sessionID string) (assetpkg.Asset, error) {
+	m, err := s.mgr()
+	if err != nil {
+		return assetpkg.Asset{}, err
+	}
+	m.mu.RLock()
+	sess, ok := m.sessions[sessionID]
+	m.mu.RUnlock()
+	if !ok {
+		return assetpkg.Asset{}, fmt.Errorf("session not found: %s", sessionID)
+	}
+	return assetpkg.GetByID(sess.AssetID)
+}
+
+// ActiveSessionAsset holds brief info about an active SSH session and its asset.
+type ActiveSessionAsset struct {
+	SessionID string `json:"sessionId"`
+	AssetID   string `json:"assetId"`
+	Name      string `json:"name"`
+	Host      string `json:"host"`
+	Port      int    `json:"port"`
+}
+
+// ListActiveAssets returns brief asset info for all active SSH sessions.
+func (s *SSHService) ListActiveAssets() []ActiveSessionAsset {
+	m, err := s.mgr()
+	if err != nil {
+		return []ActiveSessionAsset{}
+	}
+	m.mu.RLock()
+	sessions := make([]*Session, 0, len(m.sessions))
+	for _, sess := range m.sessions {
+		sessions = append(sessions, sess)
+	}
+	m.mu.RUnlock()
+
+	result := make([]ActiveSessionAsset, 0, len(sessions))
+	for _, sess := range sessions {
+		asset, aErr := assetpkg.GetByID(sess.AssetID)
+		if aErr != nil {
+			result = append(result, ActiveSessionAsset{
+				SessionID: sess.ID,
+				AssetID:   sess.AssetID,
+			})
+			continue
+		}
+		result = append(result, ActiveSessionAsset{
+			SessionID: sess.ID,
+			AssetID:   sess.AssetID,
+			Name:      asset.Name,
+			Host:      asset.Host,
+			Port:      asset.Port,
+		})
+	}
+	return result
+}
+

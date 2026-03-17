@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -159,6 +160,51 @@ func UpdateConversationTitle(id, title string) error {
 	return err
 }
 
+// ListConversationsByModel returns conversations that use the given model.
+// An empty model string returns all conversations (same as ListConversations).
+func ListConversationsByModel(model string) ([]Conversation, error) {
+	db := store.MustGetDB()
+	var rows interface {
+		Close() error
+		Next() bool
+		Scan(...interface{}) error
+	}
+	var err error
+	if model == "" {
+		return ListConversations()
+	}
+	rows, err = db.Query(`
+		SELECT id, title, model, system, created_at, updated_at
+		FROM chat_conversations
+		WHERE model = ?
+		ORDER BY updated_at DESC
+	`, model)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var convs []Conversation
+	for rows.Next() {
+		var c Conversation
+		if err := rows.Scan(&c.ID, &c.Title, &c.Model, &c.System, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			continue
+		}
+		convs = append(convs, c)
+	}
+	if convs == nil {
+		convs = []Conversation{}
+	}
+	return convs, nil
+}
+
+// UpdateConversationModel changes the model for an existing conversation.
+func UpdateConversationModel(id, model string) error {
+	db := store.MustGetDB()
+	_, err := db.Exec(`UPDATE chat_conversations SET model = ?, updated_at = ? WHERE id = ?`,
+		model, time.Now().Format(time.RFC3339), id)
+	return err
+}
+
 // GetMessages returns all messages for a conversation
 func GetMessages(conversationID string) ([]Message, error) {
 	db := store.MustGetDB()
@@ -295,3 +341,70 @@ func BulkDeleteMessages(ids []string) error {
 	}
 	return tx.Commit()
 }
+
+// SessionExport is the structure returned by ExportSession.
+type SessionExport struct {
+	Conversation Conversation `json:"conversation"`
+	Messages     []Message    `json:"messages"`
+	ExportedAt   string       `json:"exported_at"`
+}
+
+// ExportSession returns a JSON string containing the conversation metadata
+// and all its messages, suitable for backup or external sharing.
+func ExportSession(conversationID string) (string, error) {
+	conv, err := GetConversation(conversationID)
+	if err != nil {
+		return "", fmt.Errorf("conversation not found: %w", err)
+	}
+	msgs, err := GetMessages(conversationID)
+	if err != nil {
+		return "", fmt.Errorf("failed to get messages: %w", err)
+	}
+	export := SessionExport{
+		Conversation: conv,
+		Messages:     msgs,
+		ExportedAt:   time.Now().Format(time.RFC3339),
+	}
+	data, err := json.MarshalIndent(export, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal export: %w", err)
+	}
+	return string(data), nil
+}
+
+// ConversationStats holds message count statistics for a conversation.
+type ConversationStats struct {
+	ConversationID string `json:"conversationId"`
+	TotalMessages  int    `json:"totalMessages"`
+	UserMessages   int    `json:"userMessages"`
+	AsstMessages   int    `json:"asstMessages"`
+}
+
+// GetConversationStats returns message counts (total, user, assistant) for a conversation.
+func GetConversationStats(conversationID string) (ConversationStats, error) {
+	db := store.MustGetDB()
+	stats := ConversationStats{ConversationID: conversationID}
+	row := db.QueryRow(`
+		SELECT
+		    COUNT(*),
+		    SUM(CASE WHEN role = 'user' THEN 1 ELSE 0 END),
+		    SUM(CASE WHEN role = 'assistant' THEN 1 ELSE 0 END)
+		FROM chat_messages
+		WHERE conversation_id = ?
+	`, conversationID)
+	var totalNull, userNull, asstNull *int
+	if err := row.Scan(&totalNull, &userNull, &asstNull); err != nil {
+		return stats, fmt.Errorf("stats query failed: %w", err)
+	}
+	if totalNull != nil {
+		stats.TotalMessages = *totalNull
+	}
+	if userNull != nil {
+		stats.UserMessages = *userNull
+	}
+	if asstNull != nil {
+		stats.AsstMessages = *asstNull
+	}
+	return stats, nil
+}
+

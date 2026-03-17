@@ -798,6 +798,85 @@ func (s *Session) RenameTable(schema, oldName, newName string) error {
 	return err
 }
 
+// GetTableRowCount returns the exact row count for a table via COUNT(*).
+// Slower than reltuples but always accurate.
+func (s *Session) GetTableRowCount(schema, table string) (int64, error) {
+	var count int64
+	q := fmt.Sprintf("SELECT COUNT(*) FROM %s.%s", quoteIdent(schema), quoteIdent(table))
+	if err := s.DB.QueryRow(q).Scan(&count); err != nil {
+		return 0, fmt.Errorf("row count failed: %w", err)
+	}
+	return count, nil
+}
+
+// VacuumAnalyze runs VACUUM ANALYZE on a specific table.
+// This reclaims storage and updates planner statistics.
+// NOTE: VACUUM cannot run inside a transaction block; it uses a direct Exec.
+func (s *Session) VacuumAnalyze(schema, table string) error {
+	q := fmt.Sprintf("VACUUM ANALYZE %s.%s", quoteIdent(schema), quoteIdent(table))
+	_, err := s.DB.Exec(q)
+	return err
+}
+
+// AddColumn adds a new column to a table.
+// columnType should be a valid PostgreSQL type (e.g. "TEXT", "INTEGER", "BOOLEAN").
+// defaultExpr may be empty (no DEFAULT clause) or a SQL expression string.
+func (s *Session) AddColumn(schema, table, column, columnType, defaultExpr string) error {
+	if column == "" || columnType == "" {
+		return fmt.Errorf("column name and type are required")
+	}
+	q := fmt.Sprintf("ALTER TABLE %s.%s ADD COLUMN %s %s",
+		quoteIdent(schema), quoteIdent(table), quoteIdent(column), columnType)
+	if defaultExpr != "" {
+		q += " DEFAULT " + defaultExpr
+	}
+	_, err := s.DB.Exec(q)
+	return err
+}
+
+// DropColumn removes a column from a table (requires PostgreSQL 10+).
+func (s *Session) DropColumn(schema, table, column string) error {
+	if column == "" {
+		return fmt.Errorf("column name is required")
+	}
+	q := fmt.Sprintf("ALTER TABLE %s.%s DROP COLUMN %s",
+		quoteIdent(schema), quoteIdent(table), quoteIdent(column))
+	_, err := s.DB.Exec(q)
+	return err
+}
+
+
+
+// ExplainQuery runs EXPLAIN ANALYZE on a SQL statement and returns the plan as plain text.
+// The sqlText should be a SELECT or DML statement; EXPLAIN ANALYZE is prepended automatically.
+// If sqlText already starts with EXPLAIN, it is used as-is.
+func (s *Session) ExplainQuery(sqlText string) (string, error) {
+	sqlText = strings.TrimSpace(sqlText)
+	if sqlText == "" {
+		return "", fmt.Errorf("empty query")
+	}
+	explainSQL := sqlText
+	upperSQL := strings.ToUpper(sqlText)
+	if !strings.HasPrefix(upperSQL, "EXPLAIN") {
+		explainSQL = "EXPLAIN ANALYZE " + sqlText
+	}
+	rows, err := s.DB.Query(explainSQL)
+	if err != nil {
+		return "", fmt.Errorf("EXPLAIN 失败: %w", err)
+	}
+	defer rows.Close()
+
+	var lines []string
+	for rows.Next() {
+		var line string
+		if err := rows.Scan(&line); err != nil {
+			return "", err
+		}
+		lines = append(lines, line)
+	}
+	return strings.Join(lines, "\n"), nil
+}
+
 // executeRawQuery executes a query that returns rows
 func (s *Session) executeRawQuery(sqlText string) (*QueryResult, error) {
 	rows, err := s.DB.Query(sqlText)
